@@ -4,14 +4,17 @@
 
 import { TILE_SIZE } from '../core/constants.js';
 
-// Aim for roughly this many tiles across the short screen axis; zoom is the
-// integer that gets closest without going under, clamped to a sane range.
-const TARGET_SHORT_AXIS_TILES = 20;
-const MAX_ZOOM = 6;
+// Target on-screen size of a tile, in CSS pixels. Zoom is chosen to hold tiles
+// at (about) this size REGARDLESS of screen size — so a bigger screen shows MORE
+// tiles, not bigger ones (per the design). Integer zoom keeps the grid crisp.
+const TARGET_TILE_CSS = 30;
+const MAX_ZOOM = 8;
 
-export function computeZoom(canvasW, canvasH) {
-  const minDim = Math.min(canvasW, canvasH);
-  const z = Math.floor(minDim / (TARGET_SHORT_AXIS_TILES * TILE_SIZE));
+// Integer zoom for a given device pixel ratio. The render buffer is sized in
+// device pixels (see the scene's fitToWindow), so we scale the target by dpr to
+// keep the apparent CSS tile size constant while rendering crisply on hi-dpi.
+export function computeZoom(dpr = 1) {
+  const z = Math.round((TARGET_TILE_CSS * dpr) / TILE_SIZE);
   return Math.max(1, Math.min(z, MAX_ZOOM));
 }
 

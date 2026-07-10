@@ -30,23 +30,46 @@ export class DungeonScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor('#05060a');
     this.cameras.main.setRoundPixels(true);
-    this.applyZoom();
+    this.renderRatio = 1;
+    this.fitToWindow();
 
     // Let the composition root reach the scene to repaint and to convert
     // pointer coordinates to tiles.
     this.registry.set('scene', this);
 
     this.render();
-    this.scale.on('resize', this.onResize, this);
+
+    // Scale.NONE means we own the sizing: keep the device-pixel buffer, the CSS
+    // display size, and the integer zoom in sync with the window.
+    this.onWindowResize = () => {
+      this.fitToWindow();
+      this.centerOnPlayer();
+    };
+    window.addEventListener('resize', this.onWindowResize);
+    window.addEventListener('orientationchange', this.onWindowResize);
+    this.events.once('shutdown', () => {
+      window.removeEventListener('resize', this.onWindowResize);
+      window.removeEventListener('orientationchange', this.onWindowResize);
+    });
   }
 
-  applyZoom() {
-    this.cameras.main.setZoom(computeZoom(this.scale.width, this.scale.height));
-  }
-
-  onResize() {
-    this.applyZoom();
-    this.centerOnPlayer();
+  // Render at device resolution (crisp on hi-dpi), display at CSS size, and pick
+  // an integer zoom that holds tiles at a roughly constant on-screen size.
+  fitToWindow() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    this.renderRatio = dpr;
+    const cssW = Math.max(1, Math.floor(window.innerWidth));
+    const cssH = Math.max(1, Math.floor(window.innerHeight));
+    const bufW = Math.floor(cssW * dpr);
+    const bufH = Math.floor(cssH * dpr);
+    this.scale.resize(bufW, bufH);
+    const canvas = this.game.canvas;
+    if (canvas) {
+      canvas.style.width = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+    }
+    this.cameras.resize(bufW, bufH);
+    this.cameras.main.setZoom(computeZoom(dpr));
   }
 
   // Discard the current floor's visuals and draw a freshly generated one.
@@ -140,9 +163,12 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  // Canvas/screen pixel → tile coordinate, for click/tap input.
-  screenToTile(screenX, screenY) {
-    const p = this.cameras.main.getWorldPoint(screenX, screenY);
+  // Canvas/screen (CSS) pixel → tile coordinate, for click/tap input. The click
+  // arrives in CSS pixels; the render buffer is device pixels, so scale by the
+  // ratio before asking the camera to unproject.
+  screenToTile(cssX, cssY) {
+    const r = this.renderRatio || 1;
+    const p = this.cameras.main.getWorldPoint(cssX * r, cssY * r);
     return worldToTile(p.x, p.y);
   }
 }
