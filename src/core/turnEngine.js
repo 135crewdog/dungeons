@@ -2,7 +2,7 @@
 // from the briefing and returns the events it produced. It mutates state in
 // place (the single source of truth) but never touches the renderer.
 
-import { getPlayer, enemiesSorted, tileAt } from './query.js';
+import { getPlayer, enemiesSorted, tileAt, isKnownWalkable } from './query.js';
 import { TILE } from './constants.js';
 import { tryMove } from './movement.js';
 import { descend } from './gameState.js';
@@ -10,6 +10,7 @@ import { pushLog } from './entity.js';
 import { pickupEvent, descendEvent } from './events.js';
 import { updateVisibility } from '../systems/visibility.js';
 import { enemyTurn } from '../systems/ai.js';
+import { aStar } from '../systems/pathfinding.js';
 
 // Run a turn from a player command. Returns events, or an empty array if the
 // command was invalid / a no-op (the turn is NOT consumed and the world does
@@ -81,4 +82,43 @@ function enemyPhase(state, events) {
     if (!state.entities.byId.has(enemy.id)) continue; // safety
     for (const e of enemyTurn(state, enemy.id)) events.push(e);
   }
+}
+
+// --- Click/tap auto-walk path planning ---------------------------------------
+
+// Plan a path from the player to (tx, ty) over ONLY known-walkable tiles
+// (unexplored is treated as blocked). Stores it on state.path and returns true
+// if a usable path exists; a click on an unknown or unreachable tile is a no-op.
+export function planPath(state, tx, ty) {
+  const player = getPlayer(state);
+  if (tx === player.x && ty === player.y) return false;
+  if (!isKnownWalkable(state, tx, ty)) return false;
+
+  const passable = (x, y) => isKnownWalkable(state, x, y);
+  const path = aStar(passable, { x: player.x, y: player.y }, { x: tx, y: ty }, state.map.width);
+  if (!path || path.length < 2) return false;
+
+  state.path = { nodes: path, index: 0 };
+  return true;
+}
+
+// The next step of the stored path as { dx, dy }, advancing the path cursor; or
+// null if there is no path, it is finished, or the next tile is no longer valid.
+export function nextPathStep(state) {
+  const p = state.path;
+  if (!p || p.index >= p.nodes.length - 1) return null;
+  const cur = p.nodes[p.index];
+  const nxt = p.nodes[p.index + 1];
+  if (!isKnownWalkable(state, nxt.x, nxt.y)) return null;
+  p.index++;
+  return { dx: nxt.x - cur.x, dy: nxt.y - cur.y };
+}
+
+export function pathFinished(state) {
+  const p = state.path;
+  return !p || p.index >= p.nodes.length - 1;
+}
+
+export function clearPath(state) {
+  state.path = null;
 }

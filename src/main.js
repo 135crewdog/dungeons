@@ -7,6 +7,7 @@ import { EV } from './core/events.js';
 import { createPhaserGame } from './renderer/phaserConfig.js';
 import { createController } from './input/controller.js';
 import { attachKeyboard } from './input/keyboard.js';
+import { attachPointer } from './input/pointer.js';
 
 // Pick a seed: an explicit ?seed= in the URL (for reproducing a run) or a fresh
 // random one. The seed is logged so any run can be replayed later.
@@ -43,3 +44,15 @@ const controller = createController(state, (events) => {
 });
 
 attachKeyboard(window, controller.dispatch);
+
+// Convert a client-space pointer position to a tile via the scene's camera
+// (fetched lazily, since Phaser boots the scene asynchronously). This keeps the
+// input layer free of any renderer import.
+function pointerToTile(clientX, clientY) {
+  const scene = game.registry.get('scene');
+  const canvas = game.canvas;
+  if (!scene || !canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  return scene.screenToTile(clientX - rect.left, clientY - rect.top);
+}
+attachPointer(parent, pointerToTile, controller.dispatch);
