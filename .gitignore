@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Vite / PWA generated
+dev-dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local dev-only helper scripts (screenshots, manual checks) — not part of the project
+_*.mjs
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.local
