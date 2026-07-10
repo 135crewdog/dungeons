@@ -61,12 +61,20 @@ export class GlyphGrid {
     this.images = null;
   }
 
-  // Repaint every tile. Fog of view is layered in later; for now the whole map
-  // is drawn lit so the generated floor is visible.
+  // Repaint every tile at its current visibility: lit if visible, dimmed if
+  // only remembered (explored), hidden if never seen.
   sync(state) {
     const map = state.map;
+    const { visible, explored } = state.vis;
     for (let i = 0; i < map.tiles.length; i++) {
       const img = this.images[i];
+      let vis;
+      if (visible[i]) vis = VIS.VISIBLE;
+      else if (explored[i]) vis = VIS.EXPLORED;
+      else {
+        img.setVisible(false);
+        continue;
+      }
       const t = map.tiles[i];
       const ch = tileGlyph(t);
       if (ch === ' ') {
@@ -74,7 +82,7 @@ export class GlyphGrid {
         continue;
       }
       img.setTexture(glyphKey(ch));
-      img.setTint(tileColor(t, VIS.VISIBLE));
+      img.setTint(tileColor(t, vis));
       img.setVisible(true);
     }
   }

@@ -7,6 +7,7 @@ import { createRng } from './rng.js';
 import { generateFloor } from '../world/dungeon.js';
 import { roomCenter } from '../world/rooms.js';
 import { createPlayer } from '../entities/player.js';
+import { updateVisibility } from '../systems/visibility.js';
 
 // Allocate a fresh, monotonically increasing entity id. Ascending ids define
 // deterministic turn order.
@@ -72,4 +73,7 @@ function buildFloor(state, floorNumber) {
   const player = createPlayer(start.x, start.y);
   addEntity(state, player);
   state.entities.playerId = player.id;
+
+  // Compute the initial view so the first frame shows what the player can see.
+  updateVisibility(state);
 }

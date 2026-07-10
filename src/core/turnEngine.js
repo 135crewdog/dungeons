@@ -6,6 +6,7 @@
 
 import { getPlayer, isWalkable, entityAt } from './query.js';
 import { moveEvent } from './events.js';
+import { updateVisibility } from '../systems/visibility.js';
 
 // Run a turn from a player command. Returns events, or an empty array if the
 // command was invalid / a no-op (in which case the turn is NOT consumed and the
@@ -68,8 +69,10 @@ export function canStep(state, entity, dx, dy) {
   return true;
 }
 
-// Everything that happens after the player acts. Enemy turns, pickups, and FOV
-// are added here in later milestones — in the briefing's order.
+// Everything that happens after the player acts, in the briefing's order.
+// Enemy turns and item pickups are layered in here in later milestones.
 function advanceWorld(state, events) {
   state.turn++;
+  // Step 5: update field of view and visibility.
+  updateVisibility(state);
 }
