@@ -1,53 +1,79 @@
 // Composition root. This is the ONLY module allowed to import the renderer
-// layer. It wires the simulation, renderer, and input together. As milestones
-// land, this file grows to route input into the turn engine and hand state +
-// events to the renderer — but it never contains gameplay rules itself.
-import { createGame } from './core/gameState.js';
+// layer. It wires the simulation, renderer, input, and UI overlays together,
+// but never contains gameplay rules itself.
+import { createGame, restart } from './core/gameState.js';
 import { EV } from './core/events.js';
 import { createPhaserGame } from './renderer/phaserConfig.js';
 import { createController } from './input/controller.js';
 import { attachKeyboard } from './input/keyboard.js';
 import { attachPointer } from './input/pointer.js';
+import { createHud } from './ui/hud.js';
+import { createMessageLog } from './ui/messageLog.js';
+import { createGameOver } from './ui/gameOver.js';
 
-// Pick a seed: an explicit ?seed= in the URL (for reproducing a run) or a fresh
-// random one. The seed is logged so any run can be replayed later.
-function chooseSeed() {
-  const fromUrl = new URLSearchParams(window.location.search).get('seed');
-  if (fromUrl !== null && fromUrl !== '') return fromUrl;
+function randomSeed() {
   const buf = new Uint32Array(1);
   (window.crypto || window.msCrypto).getRandomValues(buf);
   return buf[0];
 }
 
-const seed = chooseSeed();
-const state = createGame(seed);
-console.log(
-  `[dungeons] seed = ${state.seed} (base36: ${state.seed.toString(36)}) — ` +
-    `replay with ?seed=${state.seed}`,
-);
+// Prefer an explicit ?seed= in the URL (to reproduce a run), else a fresh seed.
+function chooseSeed() {
+  const fromUrl = new URLSearchParams(window.location.search).get('seed');
+  if (fromUrl !== null && fromUrl !== '') return fromUrl;
+  return randomSeed();
+}
 
-// Expose for debugging/reproducibility from the console.
-window.__game = state;
+function logSeed(state) {
+  console.log(
+    `[dungeons] seed = ${state.seed} (base36: ${state.seed.toString(36)}) — ` +
+      `replay with ?seed=${state.seed}`,
+  );
+}
+
+const state = createGame(chooseSeed());
+logSeed(state);
+window.__game = state; // exposed for debugging / reproducibility
 
 const parent = document.getElementById('game');
 const game = createPhaserGame(parent, state);
 
-// A consumed turn repaints the scene (created asynchronously by Phaser, so it
-// is fetched lazily from the registry).
+const hud = createHud(document.body);
+const messageLog = createMessageLog(document.body);
+const gameOver = createGameOver(document.body);
+
+function refreshUi() {
+  hud.update(state);
+  messageLog.update(state);
+}
+
+// Permadeath: reset the run in place to a fresh floor 1 with a new logged seed.
+function handleRestart() {
+  restart(state, randomSeed());
+  logSeed(state);
+  gameOver.hide();
+  const scene = game.registry.get('scene');
+  if (scene) scene.rebuildFloor();
+  refreshUi();
+}
+
 const controller = createController(state, (events) => {
   const scene = game.registry.get('scene');
-  if (!scene) return;
-  // Descending swaps in a brand-new floor, so rebuild the tile/entity visuals.
-  if (events.some((e) => e.type === EV.DESCEND)) scene.rebuildFloor();
-  else scene.render();
-  scene.playEvents(events);
+  if (scene) {
+    // Descending swaps in a new floor, so rebuild the tile/entity visuals.
+    if (events.some((e) => e.type === EV.DESCEND)) scene.rebuildFloor();
+    else scene.render();
+    scene.playEvents(events);
+  }
+  refreshUi();
+  if (state.status === 'dead') gameOver.show(state, handleRestart);
 });
 
 attachKeyboard(window, controller.dispatch);
 
 // Convert a client-space pointer position to a tile via the scene's camera
-// (fetched lazily, since Phaser boots the scene asynchronously). This keeps the
-// input layer free of any renderer import.
+// (fetched lazily, since Phaser boots the scene asynchronously). Keeps the input
+// layer free of any renderer import.
 function pointerToTile(clientX, clientY) {
   const scene = game.registry.get('scene');
   const canvas = game.canvas;
@@ -56,3 +82,5 @@ function pointerToTile(clientX, clientY) {
   return scene.screenToTile(clientX - rect.left, clientY - rect.top);
 }
 attachPointer(parent, pointerToTile, controller.dispatch);
+
+refreshUi();

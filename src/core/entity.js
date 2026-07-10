@@ -14,7 +14,10 @@ export function addEntity(state, entity) {
   return entity;
 }
 
-// Append a structured message; the UI turns it into a display string.
+// Append a structured message; the UI turns it into a display string. The log
+// is capped so a long run does not grow it without bound.
+const MAX_LOG = 100;
 export function pushLog(state, type, data = {}) {
   state.log.push({ turn: state.turn, type, data });
+  if (state.log.length > MAX_LOG) state.log.splice(0, state.log.length - MAX_LOG);
 }

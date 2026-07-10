@@ -51,6 +51,22 @@ export function descend(state) {
   buildFloor(state, state.floor, player);
 }
 
+// Reset the existing state object in place to a brand-new run on floor 1 with a
+// new seed. Resetting in place (rather than making a new object) keeps every
+// holder of this state — scene, controller, HUD — pointing at the live run.
+export function restart(state, seed) {
+  const rng = createRng(seed);
+  state.seed = rng.seed;
+  state.rng = rng;
+  state.turn = 0;
+  state.floor = 1;
+  state.status = 'playing';
+  state.log = [];
+  state.items = [];
+  state.entities = { nextId: 1, playerId: 0, byId: new Map() };
+  buildFloor(state, 1);
+}
+
 // Assemble a floor onto the state: generate the map, reset all per-floor fields
 // and the entity registry, place the player in the first room, then populate
 // enemies and potions. Pass an existing player to carry it across floors.
