@@ -12,6 +12,9 @@ dev-dist/
 *.log
 npm-debug.log*
 
+# Local dev-only screenshot helper (not part of the project)
+_shot.mjs
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json

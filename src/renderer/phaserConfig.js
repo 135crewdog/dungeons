@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { BootScene } from './GameScene.js';
+import { DungeonScene } from './GameScene.js';
 
-// Phaser lives ONLY in the renderer layer. This module builds the Phaser.Game
-// configuration. Integer scaling + letterboxing is refined in a later milestone;
-// for now the canvas fills the window so the boot pipeline is visible.
-export function createPhaserGame(parent) {
+// Phaser lives ONLY in the renderer layer. Scale.RESIZE keeps the game surface
+// equal to the window (so bigger screens reveal MORE tiles), while the scene's
+// camera applies INTEGER zoom for crisp glyphs and follows the player. Leftover
+// space beyond the map edges shows the neutral background — the letterbox.
+export function createPhaserGame(parent, state) {
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -16,6 +17,10 @@ export function createPhaserGame(parent) {
       width: '100%',
       height: '100%',
     },
-    scene: [BootScene],
+    callbacks: {
+      // Available before scenes boot, so DungeonScene.create can read it.
+      preBoot: (game) => game.registry.set('state', state),
+    },
+    scene: [DungeonScene],
   });
 }

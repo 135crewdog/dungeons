@@ -26,4 +26,4 @@ console.log(
 window.__game = state;
 
 const parent = document.getElementById('game');
-createPhaserGame(parent);
+createPhaserGame(parent, state);
