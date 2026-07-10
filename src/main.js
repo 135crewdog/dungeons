@@ -3,6 +3,7 @@
 // land, this file grows to route input into the turn engine and hand state +
 // events to the renderer — but it never contains gameplay rules itself.
 import { createGame } from './core/gameState.js';
+import { EV } from './core/events.js';
 import { createPhaserGame } from './renderer/phaserConfig.js';
 import { createController } from './input/controller.js';
 import { attachKeyboard } from './input/keyboard.js';
@@ -35,7 +36,9 @@ const game = createPhaserGame(parent, state);
 const controller = createController(state, (events) => {
   const scene = game.registry.get('scene');
   if (!scene) return;
-  scene.render();
+  // Descending swaps in a brand-new floor, so rebuild the tile/entity visuals.
+  if (events.some((e) => e.type === EV.DESCEND)) scene.rebuildFloor();
+  else scene.render();
   scene.playEvents(events);
 });
 

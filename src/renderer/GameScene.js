@@ -76,12 +76,15 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.centerOn(c.x, c.y);
   }
 
-  // Play transient effects from a turn's event list (floating combat numbers).
+  // Play transient effects from a turn's event list (floating numbers).
   playEvents(events) {
     for (const ev of events) {
-      if (ev.type !== EV.ATTACK) continue;
-      if (ev.hit) spawnFloatingText(this, ev.x, ev.y, `-${ev.damage}`, '#ff5566');
-      else spawnFloatingText(this, ev.x, ev.y, 'Miss!', '#aab2c4');
+      if (ev.type === EV.ATTACK) {
+        if (ev.hit) spawnFloatingText(this, ev.x, ev.y, `-${ev.damage}`, '#ff5566');
+        else spawnFloatingText(this, ev.x, ev.y, 'Miss!', '#aab2c4');
+      } else if (ev.type === EV.PICKUP && ev.heal > 0) {
+        spawnFloatingText(this, ev.x, ev.y, `+${ev.heal}`, '#5ad07a');
+      }
     }
   }
 

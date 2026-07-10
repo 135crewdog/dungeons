@@ -3,10 +3,17 @@
 // stairs, door, or on the player. Health potions are added in a later milestone.
 
 import { nextInt, pick } from '../core/rng.js';
-import { TILE, MIN_ENEMIES, MAX_ENEMIES } from '../core/constants.js';
+import {
+  TILE,
+  MIN_ENEMIES,
+  MAX_ENEMIES,
+  MIN_POTIONS,
+  MAX_POTIONS,
+} from '../core/constants.js';
 import { idx, entityAt } from '../core/query.js';
-import { addEntity } from '../core/entity.js';
+import { addEntity, allocId } from '../core/entity.js';
 import { createEnemy, SPAWNABLE_ENEMIES } from './enemies.js';
+import { createPotion } from './items.js';
 
 // A random unoccupied FLOOR tile within a room, or null if none found quickly.
 // FLOOR excludes doors and stairs, so nothing spawns in a doorway or on '>'.
@@ -24,6 +31,7 @@ export function randomFreeFloorInRoom(state, room) {
 
 export function populateFloor(state, floorNumber) {
   spawnEnemies(state);
+  spawnPotions(state);
 }
 
 function spawnEnemies(state) {
@@ -37,5 +45,19 @@ function spawnEnemies(state) {
     if (!tile) continue;
     const type = pick(state.rng, SPAWNABLE_ENEMIES);
     addEntity(state, createEnemy(type, tile.x, tile.y));
+  }
+}
+
+function spawnPotions(state) {
+  const rooms = state.map.rooms;
+  const count = nextInt(state.rng, MIN_POTIONS, MAX_POTIONS);
+  for (let i = 0; i < count; i++) {
+    const room = pick(state.rng, rooms);
+    const tile = randomFreeFloorInRoom(state, room);
+    if (!tile) continue;
+    if (state.items.some((it) => it.x === tile.x && it.y === tile.y)) continue;
+    const potion = createPotion(tile.x, tile.y);
+    potion.id = allocId(state);
+    state.items.push(potion);
   }
 }
