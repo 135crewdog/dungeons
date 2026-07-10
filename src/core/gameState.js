@@ -4,23 +4,12 @@
 // floor while carrying the player over.
 
 import { createRng } from './rng.js';
+import { addEntity } from './entity.js';
 import { generateFloor } from '../world/dungeon.js';
 import { roomCenter } from '../world/rooms.js';
 import { createPlayer } from '../entities/player.js';
+import { populateFloor } from '../entities/spawn.js';
 import { updateVisibility } from '../systems/visibility.js';
-
-// Allocate a fresh, monotonically increasing entity id. Ascending ids define
-// deterministic turn order.
-export function allocId(state) {
-  return state.entities.nextId++;
-}
-
-// Add an entity to the state, assigning it an id. Returns the entity.
-export function addEntity(state, entity) {
-  entity.id = allocId(state);
-  state.entities.byId.set(entity.id, entity);
-  return entity;
-}
 
 // Allocate empty visibility layers sized to a map.
 export function makeVisibility(width, height) {
@@ -28,11 +17,6 @@ export function makeVisibility(width, height) {
     visible: new Uint8Array(width * height),
     explored: new Uint8Array(width * height),
   };
-}
-
-// Append a structured message to the log (UI formats it into a string later).
-export function pushLog(state, type, data = {}) {
-  state.log.push({ turn: state.turn, type, data });
 }
 
 // Build a fresh game. `seed` may be a number or string; if omitted, callers
@@ -73,6 +57,10 @@ function buildFloor(state, floorNumber) {
   const player = createPlayer(start.x, start.y);
   addEntity(state, player);
   state.entities.playerId = player.id;
+
+  // Populate enemies (and, later, items) after the player exists so nothing
+  // spawns on top of them.
+  populateFloor(state, floorNumber);
 
   // Compute the initial view so the first frame shows what the player can see.
   updateVisibility(state);

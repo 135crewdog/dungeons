@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { processCommand, canStep } from '../src/core/turnEngine.js';
+import { processCommand } from '../src/core/turnEngine.js';
+import { canStep } from '../src/core/movement.js';
 import { TILE } from '../src/core/constants.js';
 import { idx } from '../src/core/query.js';
 

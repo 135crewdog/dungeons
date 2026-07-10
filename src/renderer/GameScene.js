@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { getPlayer, entitiesSorted, isVisible, isExplored } from '../core/query.js';
+import { EV } from '../core/events.js';
 import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
 import { computeZoom, tileToWorld, tileCenterWorld, worldToTile } from './camera.js';
 import { entityGlyph, entityColor, itemGlyph, itemColor, scaleColor } from './tileStyle.js';
+import { spawnFloatingText } from './floatingText.js';
 
 // The one Phaser scene. It OBSERVES the game state and draws it — glyph grid,
 // items, entities — and follows the player with an integer-zoomed camera. It
@@ -72,6 +74,15 @@ export class DungeonScene extends Phaser.Scene {
     if (!p) return;
     const c = tileCenterWorld(p.x, p.y);
     this.cameras.main.centerOn(c.x, c.y);
+  }
+
+  // Play transient effects from a turn's event list (floating combat numbers).
+  playEvents(events) {
+    for (const ev of events) {
+      if (ev.type !== EV.ATTACK) continue;
+      if (ev.hit) spawnFloatingText(this, ev.x, ev.y, `-${ev.damage}`, '#ff5566');
+      else spawnFloatingText(this, ev.x, ev.y, 'Miss!', '#aab2c4');
+    }
   }
 
   syncItems() {

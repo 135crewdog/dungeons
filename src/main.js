@@ -32,9 +32,11 @@ const game = createPhaserGame(parent, state);
 
 // A consumed turn repaints the scene (created asynchronously by Phaser, so it
 // is fetched lazily from the registry).
-const controller = createController(state, () => {
+const controller = createController(state, (events) => {
   const scene = game.registry.get('scene');
-  if (scene) scene.render();
+  if (!scene) return;
+  scene.render();
+  scene.playEvents(events);
 });
 
 attachKeyboard(window, controller.dispatch);

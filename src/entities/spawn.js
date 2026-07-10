@@ -1,0 +1,41 @@
+// Populates a freshly generated floor with entities and items. Placement uses
+// the game RNG and never puts two things on the same tile, never on a wall,
+// stairs, door, or on the player. Health potions are added in a later milestone.
+
+import { nextInt, pick } from '../core/rng.js';
+import { TILE, MIN_ENEMIES, MAX_ENEMIES } from '../core/constants.js';
+import { idx, entityAt } from '../core/query.js';
+import { addEntity } from '../core/entity.js';
+import { createEnemy, SPAWNABLE_ENEMIES } from './enemies.js';
+
+// A random unoccupied FLOOR tile within a room, or null if none found quickly.
+// FLOOR excludes doors and stairs, so nothing spawns in a doorway or on '>'.
+export function randomFreeFloorInRoom(state, room) {
+  const map = state.map;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const x = nextInt(state.rng, room.x, room.x + room.w - 1);
+    const y = nextInt(state.rng, room.y, room.y + room.h - 1);
+    if (map.tiles[idx(map, x, y)] !== TILE.FLOOR) continue;
+    if (entityAt(state, x, y)) continue;
+    return { x, y };
+  }
+  return null;
+}
+
+export function populateFloor(state, floorNumber) {
+  spawnEnemies(state);
+}
+
+function spawnEnemies(state) {
+  const rooms = state.map.rooms;
+  if (rooms.length < 2) return; // room 0 is the player's; need somewhere else
+  const count = nextInt(state.rng, MIN_ENEMIES, MAX_ENEMIES);
+  for (let i = 0; i < count; i++) {
+    // Never spawn in the starting room, so the player gets a beat to orient.
+    const room = rooms[nextInt(state.rng, 1, rooms.length - 1)];
+    const tile = randomFreeFloorInRoom(state, room);
+    if (!tile) continue;
+    const type = pick(state.rng, SPAWNABLE_ENEMIES);
+    addEntity(state, createEnemy(type, tile.x, tile.y));
+  }
+}
