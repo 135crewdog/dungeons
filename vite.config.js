@@ -40,6 +40,8 @@ export default defineConfig({
   build: {
     target: 'es2020',
     sourcemap: true,
+    // Phaser is a single large dependency; the warning is expected and noisy.
+    chunkSizeWarningLimit: 2000,
   },
   test: {
     environment: 'node',
