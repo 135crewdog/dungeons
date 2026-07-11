@@ -8,6 +8,10 @@
 // single hit frame for heroes only; there are NO death frames, so death falls
 // back to hit→idle and is sold with a dissolve in the renderer.
 
+// The Phaser texture key the combined atlas is loaded under; every frame
+// registered from tile_list lives on this texture.
+export const ATLAS_KEY = 'dungeon';
+
 // Our entity.kind -> the atlas sprite base that represents it.
 export const ENTITY_SPRITE = Object.freeze({
   player: 'knight_m',
@@ -34,7 +38,9 @@ export const STAIRS_FRAME = 'floor_stairs';
 export const POTION_FRAME = 'flask_red';
 
 // Named wall pieces used to assemble the 2.5D walls (TileLayer owns the
-// selection logic; these are the vocabulary it draws from).
+// selection logic; these are the vocabulary it draws from). All names exist in
+// tile_list_v1.7: `wall_mid/left/right` are the brick FACE and its ends;
+// `wall_top_mid/left/right` are the flat TOP cap and its ends.
 export const WALL_FRAMES = Object.freeze({
   face: 'wall_mid',
   faceLeft: 'wall_left',
@@ -42,13 +48,6 @@ export const WALL_FRAMES = Object.freeze({
   topMid: 'wall_top_mid',
   topLeft: 'wall_top_left',
   topRight: 'wall_top_right',
-  outerTopLeft: 'wall_outer_top_left',
-  outerTopRight: 'wall_outer_top_right',
-  outerMidLeft: 'wall_outer_mid_left',
-  outerMidRight: 'wall_outer_mid_right',
-  innerTopLeft: 'wall_inner_corner_t_top_left',
-  edgeLeft: 'wall_side_mid_left',
-  edgeRight: 'wall_side_mid_right',
 });
 
 // The base sprite for an entity kind, defaulting to the player's if unknown so

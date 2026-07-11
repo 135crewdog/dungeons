@@ -1,12 +1,29 @@
 import Phaser from 'phaser';
 import { getPlayer, entitiesSorted, isVisible, isExplored } from '../core/query.js';
 import { EV } from '../core/events.js';
-import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
-import { computeZoom, tileToWorld, tileCenterWorld, worldToTile } from './camera.js';
-import { entityGlyph, entityColor, itemGlyph, itemColor, scaleColor } from './tileStyle.js';
+import { TILE_SIZE } from '../core/constants.js';
+import { computeZoom, tileCenterWorld, worldToTile } from './camera.js';
+import { TileLayer } from './TileLayer.js';
+import { registerAtlasFrames, registerAnims } from './tileset/loader.js';
+import { parseTileList } from './tileset/tileList.js';
+import { ATLAS_KEY, POTION_FRAME, entityAnimKey } from './tileset/manifest.js';
 import { spawnFloatingText } from './floatingText.js';
 
-// The one Phaser scene. It OBSERVES the game state and draws it — glyph grid,
+// The combined 0x72 atlas image + its frame map, bundled by Vite (the ?raw
+// import keeps the atlas map in JS, so nothing extra needs precaching offline).
+import atlasUrl from '../../0x72_DungeonTilesetII_v1.7/0x72_DungeonTilesetII_v1.7.png';
+import tileListText from '../../0x72_DungeonTilesetII_v1.7/tile_list_v1.7?raw';
+
+// Item/entity tints under fog. Enemies are only drawn while visible, so they
+// stay full-colour; items are remembered dimly once explored.
+const LIT = 0xffffff;
+const DIM = 0x3a3d52;
+
+// Depths: terrain (0) < items < entities < floating text (1000).
+const ITEM_DEPTH = 5;
+const ENTITY_DEPTH = 10;
+
+// The one Phaser scene. It OBSERVES the game state and draws it — tile layer,
 // items, entities — and follows the player with an integer-zoomed camera. It
 // never mutates the simulation. render() is the single "state changed, repaint"
 // entry point the input layer calls after each turn.
@@ -15,18 +32,24 @@ export class DungeonScene extends Phaser.Scene {
     super('dungeon');
   }
 
+  preload() {
+    this.load.image(ATLAS_KEY, atlasUrl);
+  }
+
   create() {
     this.state = this.registry.get('state');
-    createGlyphTextures(this);
 
-    this.grid = new GlyphGrid(this);
-    this.grid.build(this.state.map);
+    // Turn the loaded atlas + tile_list into named frames, then build anims.
+    registerAtlasFrames(this, parseTileList(tileListText));
+    registerAnims(this);
 
-    // Items under entities under nothing; the grid is beneath both.
-    this.itemLayer = this.add.layer();
-    this.entityLayer = this.add.layer();
-    this.itemImages = new Map();
-    this.entityImages = new Map();
+    this.tiles = new TileLayer(this);
+    this.tiles.build(this.state.map);
+
+    this.itemLayer = this.add.layer().setDepth(ITEM_DEPTH);
+    this.entityLayer = this.add.layer().setDepth(ENTITY_DEPTH);
+    this.itemSprites = new Map();
+    this.entitySprites = new Map();
 
     this.cameras.main.setBackgroundColor('#05060a');
     this.cameras.main.setRoundPixels(true);
@@ -74,19 +97,19 @@ export class DungeonScene extends Phaser.Scene {
 
   // Discard the current floor's visuals and draw a freshly generated one.
   rebuildFloor() {
-    this.grid.destroy();
-    this.grid = new GlyphGrid(this);
-    this.grid.build(this.state.map);
-    for (const img of this.itemImages.values()) img.destroy();
-    for (const img of this.entityImages.values()) img.destroy();
-    this.itemImages.clear();
-    this.entityImages.clear();
+    this.tiles.destroy();
+    this.tiles = new TileLayer(this);
+    this.tiles.build(this.state.map);
+    for (const s of this.itemSprites.values()) s.destroy();
+    for (const s of this.entitySprites.values()) s.destroy();
+    this.itemSprites.clear();
+    this.entitySprites.clear();
     this.render();
   }
 
   // Repaint everything from current state and recenter the camera.
   render() {
-    this.grid.sync(this.state);
+    this.tiles.sync(this.state);
     this.syncItems();
     this.syncEntities();
     this.centerOnPlayer();
@@ -115,24 +138,23 @@ export class DungeonScene extends Phaser.Scene {
     const alive = new Set();
     for (const item of this.state.items) {
       alive.add(item.id);
-      let img = this.itemImages.get(item.id);
-      if (!img) {
-        img = this.add.image(0, 0, glyphKey(itemGlyph(item))).setOrigin(0, 0);
-        this.itemLayer.add(img);
-        this.itemImages.set(item.id, img);
+      let sprite = this.itemSprites.get(item.id);
+      if (!sprite) {
+        sprite = this.add.image(0, 0, ATLAS_KEY, POTION_FRAME).setOrigin(0.5, 0.5);
+        this.itemLayer.add(sprite);
+        this.itemSprites.set(item.id, sprite);
       }
-      const w = tileToWorld(item.x, item.y);
-      img.setPosition(w.x, w.y);
-      // Remembered while explored; full color only when currently visible.
+      sprite.setPosition(item.x * TILE_SIZE + TILE_SIZE / 2, item.y * TILE_SIZE + TILE_SIZE / 2);
+      // Remembered while explored; full colour only when currently visible.
       const seen = isExplored(this.state, item.x, item.y);
       const lit = isVisible(this.state, item.x, item.y);
-      img.setVisible(seen);
-      img.setTint(lit ? itemColor(item) : scaleColor(itemColor(item), 0.32));
+      sprite.setVisible(seen);
+      sprite.setTint(lit ? LIT : DIM);
     }
-    for (const [id, img] of this.itemImages) {
+    for (const [id, sprite] of this.itemSprites) {
       if (!alive.has(id)) {
-        img.destroy();
-        this.itemImages.delete(id);
+        sprite.destroy();
+        this.itemSprites.delete(id);
       }
     }
   }
@@ -142,23 +164,22 @@ export class DungeonScene extends Phaser.Scene {
     const playerId = this.state.entities.playerId;
     for (const e of entitiesSorted(this.state)) {
       alive.add(e.id);
-      let img = this.entityImages.get(e.id);
-      if (!img) {
-        img = this.add.image(0, 0, glyphKey(entityGlyph(e))).setOrigin(0, 0);
-        this.entityLayer.add(img);
-        this.entityImages.set(e.id, img);
+      let sprite = this.entitySprites.get(e.id);
+      if (!sprite) {
+        sprite = this.add.sprite(0, 0, ATLAS_KEY).setOrigin(0.5, 1);
+        sprite.play(entityAnimKey(e.kind, 'idle'));
+        this.entityLayer.add(sprite);
+        this.entitySprites.set(e.id, sprite);
       }
-      img.setTexture(glyphKey(entityGlyph(e)));
-      img.setTint(entityColor(e));
-      const w = tileToWorld(e.x, e.y);
-      img.setPosition(w.x, w.y);
+      // Feet at the bottom-centre of the tile; tall sprites rise upward.
+      sprite.setPosition(e.x * TILE_SIZE + TILE_SIZE / 2, e.y * TILE_SIZE + TILE_SIZE);
       // The player is always shown; enemies only when currently in view.
-      img.setVisible(e.id === playerId || isVisible(this.state, e.x, e.y));
+      sprite.setVisible(e.id === playerId || isVisible(this.state, e.x, e.y));
     }
-    for (const [id, img] of this.entityImages) {
+    for (const [id, sprite] of this.entitySprites) {
       if (!alive.has(id)) {
-        img.destroy();
-        this.entityImages.delete(id);
+        sprite.destroy();
+        this.entitySprites.delete(id);
       }
     }
   }

@@ -19,8 +19,8 @@ export const HIT_CHANCE = 0.75;
 export const PLAYER_MAX_HP = 20;
 export const PLAYER_DAMAGE = 4;
 
-// Two enemy types with distinct HP and damage. `glyph` is a presentation hint;
-// the renderer's tileStyle owns the final glyph/color.
+// Two enemy types with distinct HP and damage. `glyph` is a legacy presentation
+// hint; the renderer's tileset manifest maps each kind to its sprite.
 export const ENEMY_TYPES = Object.freeze({
   goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damage: 2 },
   skeleton: { kind: 'skeleton', glyph: 's', maxHp: 11, damage: 4 },
