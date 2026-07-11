@@ -33,11 +33,14 @@ export class Fx {
     // The torch pool: a darkness that closes in beyond the player's light.
     // World-space so it scales with the integer zoom; sits above the map and
     // sprites but below floating text. Followed to the player each frame.
+    // `?nolight` disables it (a brighter, flat-lit view).
+    this.lightOn = !new URLSearchParams(window.location.search).has('nolight');
     this.torch = scene.add
       .image(0, 0, TORCH)
       .setOrigin(0.5, 0.5)
       .setDepth(500)
-      .setDisplaySize(TILE_SIZE * 26, TILE_SIZE * 26);
+      .setDisplaySize(TILE_SIZE * 26, TILE_SIZE * 26)
+      .setVisible(this.lightOn);
     this.flickerT = 0;
 
     // Pooled emitters for sparkles (pickup) and death motes.
@@ -65,7 +68,7 @@ export class Fx {
 
   // Per-frame: keep the torch pool on the player and flicker its size/alpha.
   update(playerSprite, delta) {
-    if (!playerSprite) return;
+    if (!playerSprite || !this.lightOn) return;
     this.flickerT += delta;
     const f = Math.sin(this.flickerT * 0.012) * 0.5 + Phaser.Math.FloatBetween(-0.06, 0.06);
     this.torch.setPosition(playerSprite.x, playerSprite.y - TILE_SIZE / 2);

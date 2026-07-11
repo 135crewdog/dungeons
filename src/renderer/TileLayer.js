@@ -40,14 +40,29 @@ function openFrame(map, x, y) {
   return FLOOR_WEIGHTED[variantIndex(x, y, FLOOR_WEIGHTED.length)];
 }
 
-// The lit top cap that crowns a wall where a room sits below it. End-capped at
-// the horizontal ends of a run so room corners read cleanly.
-function capFrame(map, x, y) {
-  const wallW = isWallAt(map, x - 1, y);
-  const wallE = isWallAt(map, x + 1, y);
-  if (!wallW) return WALL_FRAMES.topLeft;
-  if (!wallE) return WALL_FRAMES.topRight;
-  return WALL_FRAMES.topMid;
+// A wall's appearance in the 2.5D scheme is chosen from its open (floor)
+// neighbours, tracing a lit outline around the darker brick — matching the
+// 0x72 dungeon look:
+//   • floor to the SOUTH  → a brick FACE here + a lit TOP cap raised one tile up
+//   • floor to the WEST   → brick with a lit LEFT edge
+//   • floor to the EAST   → brick with a lit RIGHT edge
+//   • otherwise           → plain brick (deep/interior, rarely seen through fog)
+// Corners (front + a side) take the matching edge-lit face and corner cap.
+function wallSprites(map, x, y) {
+  const oS = !isWallAt(map, x, y + 1);
+  const oE = !isWallAt(map, x + 1, y);
+  const oW = !isWallAt(map, x - 1, y);
+  if (oS) {
+    let body = WALL_FRAMES.face;
+    let cap = WALL_FRAMES.topMid;
+    if (oW) { body = WALL_FRAMES.faceLeft; cap = WALL_FRAMES.topLeft; }
+    else if (oE) { body = WALL_FRAMES.faceRight; cap = WALL_FRAMES.topRight; }
+    // [x, y] = face, [x, y-1] = raised cap.
+    return [{ x, y, frame: body }, { x, y: y - 1, frame: cap }];
+  }
+  if (oW) return [{ x, y, frame: WALL_FRAMES.faceLeft }];
+  if (oE) return [{ x, y, frame: WALL_FRAMES.faceRight }];
+  return [{ x, y, frame: WALL_FRAMES.face }];
 }
 
 export class TileLayer {
@@ -76,13 +91,8 @@ export class TileLayer {
           if (map.tiles[i] === TILE.STAIRS) this.stairsSprite = s;
           sprites.push(s);
         } else {
-          // Every wall shows a solid brick face so rooms read as brick boxes
-          // (no gaps). Walls with open floor to the SOUTH additionally get a
-          // lit top cap raised one tile above them — the 2.5D "height" edge.
-          sprites.push(this.place(x, y, WALL_FRAMES.face));
-          if (isOpen(map, x, y + 1)) {
-            sprites.push(this.place(x, y - 1, capFrame(map, x, y)));
-          }
+          // A 2.5D wall: a lit outline around brick, chosen from open neighbours.
+          for (const s of wallSprites(map, x, y)) sprites.push(this.place(s.x, s.y, s.frame));
         }
         for (const s of sprites) s.setVisible(false);
         this.byTile[i] = sprites;
