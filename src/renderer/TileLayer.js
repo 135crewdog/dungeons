@@ -40,39 +40,81 @@ function openFrame(map, x, y) {
   return FLOOR_WEIGHTED[variantIndex(x, y, FLOOR_WEIGHTED.length)];
 }
 
-// A wall's appearance follows the 0x72 2.5D model (per the art reference):
-//   • Horizontal walls (a room to the N or S) are BRICK WITH A TOP — a brick
-//     face plus a lit tan cap. A wall facing a room to the south raises its cap
-//     one tile up so it reads tall; a wall backing a room to the north caps its
-//     own top edge.
-//   • Vertical walls (a room to the E or W) are TOP ONLY — the tan top surface,
-//     no brick face (you look down their length, never at a face).
-//   • Deep/interior walls are plain brick (rarely seen through the fog).
-function wallSprites(map, x, y) {
-  const F = (a, b) => !isWallAt(map, a, b); // open (floor/door/stairs)?
-  const oN = F(x, y - 1);
-  const oS = F(x, y + 1);
-  const oE = F(x + 1, y);
-  const oW = F(x - 1, y);
-  if (oS) {
-    // North wall of a room to the south: brick face + a raised lit cap. The cap
-    // terminates with a corner piece where the horizontal run ends (no adjacent
-    // north-wall = a floor tile is NOT below the neighbour).
-    const leftEnd = !F(x - 1, y + 1);
-    const rightEnd = !F(x + 1, y + 1);
-    const cap = leftEnd ? WALL_FRAMES.topLeft : rightEnd ? WALL_FRAMES.topRight : WALL_FRAMES.topMid;
-    return [{ x, y, frame: WALL_FRAMES.face }, { x, y: y - 1, frame: cap }];
+// Wall roles in the 0x72 2.5D model (per the art reference):
+//   FRONT   — a room to the SOUTH: brick FACE + a lit tan cap raised one tile
+//             up, so it reads tall.
+//   SIDE_W  — the LEFT/west wall of a room (room to the east): tan top only,
+//             bright tan on the outer (left) edge.
+//   SIDE_E  — the RIGHT/east wall of a room (room to the west): tan top, bright
+//             tan on the right.
+//   SOUTH   — a room to the NORTH: brick with a lit top edge.
+//   INTERIOR— deep brick, rarely seen through the fog.
+const WT = Object.freeze({ FRONT: 1, SIDE_W: 2, SIDE_E: 3, SOUTH: 4, INTERIOR: 5 });
+
+// Classify every wall tile once. Side (tan) columns are then GROWN vertically
+// through interior tiles so a tan wall runs the full height of a thick wall,
+// right up to the cap row — that's what makes room corners read as a continuous
+// tan outline instead of turning to brick partway up.
+function classifyWalls(map) {
+  const { width, height } = map;
+  const F = (x, y) => !isWallAt(map, x, y);
+  const cls = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (F(x, y)) continue; // floor
+      const i = y * width + x;
+      // Cardinal neighbours decide the wall's role first; a diagonal-only floor
+      // marks a corner tile that extends a side column. (Checking diagonals
+      // before cardinals would wrongly turn a south wall — whose room sits to
+      // the NE/NW — into a tan side wall.)
+      if (F(x, y + 1)) cls[i] = WT.FRONT;
+      else if (F(x + 1, y)) cls[i] = WT.SIDE_W;
+      else if (F(x - 1, y)) cls[i] = WT.SIDE_E;
+      else if (F(x, y - 1)) cls[i] = WT.SOUTH;
+      else if (F(x + 1, y + 1) || F(x + 1, y - 1)) cls[i] = WT.SIDE_W;
+      else if (F(x - 1, y + 1) || F(x - 1, y - 1)) cls[i] = WT.SIDE_E;
+      else cls[i] = WT.INTERIOR;
+    }
   }
-  if (oN) {
-    // South wall of a room to the north: brick with a lit top edge.
-    return [{ x, y, frame: WALL_FRAMES.face }, { x, y, frame: WALL_FRAMES.topMid }];
+  // Grow the tan side columns up/down through interior brick (never through a
+  // FRONT/SOUTH horizontal wall, which stays brick).
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        if (cls[i] !== WT.INTERIOR) continue;
+        const up = y > 0 ? cls[i - width] : 0;
+        const down = y < height - 1 ? cls[i + width] : 0;
+        if (up === WT.SIDE_W || down === WT.SIDE_W) { cls[i] = WT.SIDE_W; changed = true; }
+        else if (up === WT.SIDE_E || down === WT.SIDE_E) { cls[i] = WT.SIDE_E; changed = true; }
+      }
+    }
   }
-  // Vertical side walls (tan top only) — including the corner tiles above/below
-  // a room, where the column continues past the floor's extent to meet the cap.
-  // A room to the east (floor on the E side, cardinal or diagonal) → left column.
-  if (oE || F(x + 1, y + 1) || F(x + 1, y - 1)) return [{ x, y, frame: WALL_FRAMES.edgeRight }];
-  if (oW || F(x - 1, y + 1) || F(x - 1, y - 1)) return [{ x, y, frame: WALL_FRAMES.edgeLeft }];
-  return [{ x, y, frame: WALL_FRAMES.face }];
+  return cls;
+}
+
+function wallSprites(map, cls, x, y) {
+  const F = (a, b) => !isWallAt(map, a, b);
+  switch (cls[idx(map, x, y)]) {
+    case WT.FRONT: {
+      // Brick face + a raised lit cap; the cap terminates with a corner piece
+      // where the horizontal run ends (no north-wall continues to the side).
+      const leftEnd = !F(x - 1, y + 1);
+      const rightEnd = !F(x + 1, y + 1);
+      const cap = leftEnd ? WALL_FRAMES.topLeft : rightEnd ? WALL_FRAMES.topRight : WALL_FRAMES.topMid;
+      return [{ x, y, frame: WALL_FRAMES.face }, { x, y: y - 1, frame: cap }];
+    }
+    case WT.SOUTH:
+      return [{ x, y, frame: WALL_FRAMES.face }, { x, y, frame: WALL_FRAMES.topMid }];
+    case WT.SIDE_W:
+      return [{ x, y, frame: WALL_FRAMES.edgeMidLeft }];
+    case WT.SIDE_E:
+      return [{ x, y, frame: WALL_FRAMES.edgeMidRight }];
+    default:
+      return [{ x, y, frame: WALL_FRAMES.face }];
+  }
 }
 
 export class TileLayer {
@@ -91,6 +133,7 @@ export class TileLayer {
     this.layer = this.scene.add.layer();
     this.layer.setDepth(0);
     this.byTile = new Array(map.width * map.height);
+    const cls = classifyWalls(map);
 
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
@@ -101,8 +144,8 @@ export class TileLayer {
           if (map.tiles[i] === TILE.STAIRS) this.stairsSprite = s;
           sprites.push(s);
         } else {
-          // A 2.5D wall: a lit outline around brick, chosen from open neighbours.
-          for (const s of wallSprites(map, x, y)) sprites.push(this.place(s.x, s.y, s.frame));
+          // A 2.5D wall: a lit outline around brick, from the wall classification.
+          for (const s of wallSprites(map, cls, x, y)) sprites.push(this.place(s.x, s.y, s.frame));
         }
         for (const s of sprites) s.setVisible(false);
         this.byTile[i] = sprites;
