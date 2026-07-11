@@ -77,6 +77,22 @@ src/
 `CLAUDE.md` is the full project briefing and the source of truth for the rules and
 conventions.
 
+## Time capsule — v0.1 (ASCII)
+
+Phase 1 rendered the whole game in ASCII. Phase 2 moves it to pixel-art tiles and
+sprites, but the original ASCII build is preserved, frozen and playable, at
+[`/ascii/`](./ascii/) (there's also a link in the top-right of the live game). It is
+a self-contained static copy with no service worker of its own; the tag `v1-ascii`
+marks the source it was built from. A small time capsule — where this started.
+
+The archive is rebuilt only intentionally, with the PWA disabled:
+
+```bash
+ARCHIVE_BUILD=1 npx vite build --outDir dist-ascii --emptyOutDir
+# then copy dist-ascii/ into public/ascii/ (sourcemaps dropped)
+```
+
 ## Tech
 
 Phaser 3 · Vite · Vitest · vite-plugin-pwa (Workbox). Plain JavaScript, ES modules.
+Pixel art: [0x72 Dungeon Tileset II](https://0x72.itch.io/dungeontileset-ii) (CC0).

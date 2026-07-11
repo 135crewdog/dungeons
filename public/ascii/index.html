@@ -61,22 +61,6 @@
         font-size: 15px;
         text-shadow: 0 1px 2px #000, 0 0 2px #000;
       }
-      /* A quiet link to the frozen Phase-1 ASCII build (the "time capsule"),
-         anchored top-right opposite the HUD. */
-      #archive-link {
-        top: max(8px, env(safe-area-inset-top));
-        right: max(10px, env(safe-area-inset-right));
-        font-size: 11px;
-        letter-spacing: 0.3px;
-        color: #8b93a6;
-        opacity: 0.45;
-        text-decoration: none;
-        pointer-events: auto;
-        text-shadow: 0 1px 2px #000, 0 0 2px #000;
-      }
-      #archive-link:hover {
-        opacity: 0.85;
-      }
       #hud b {
         color: #fff;
         font-weight: 700;
@@ -137,10 +121,9 @@
         background: #fff;
       }
     </style>
+    <script type="module" crossorigin src="./assets/index-FaD5IYVZ.js"></script>
   </head>
   <body>
     <div id="game"></div>
-    <a id="archive-link" class="overlay" href="./ascii/" title="Play the original Phase-1 ASCII build">v0.1 · ASCII ↗</a>
-    <script type="module" src="/src/main.js"></script>
   </body>
 </html>
