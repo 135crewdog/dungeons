@@ -109,11 +109,11 @@ function wallSprites(map, cls, x, y) {
     case WT.SOUTH:
       return [{ x, y, frame: WALL_FRAMES.face }, { x, y, frame: WALL_FRAMES.topMid }];
     case WT.SIDE_W:
-      // Room is to the EAST → tan faces the room on the right.
-      return [{ x, y, frame: WALL_FRAMES.edgeMidRight }];
+      // Room is to the EAST → tan faces the room on the right (opaque piece).
+      return [{ x, y, frame: WALL_FRAMES.edgeRight }];
     case WT.SIDE_E:
-      // Room is to the WEST → tan faces the room on the left.
-      return [{ x, y, frame: WALL_FRAMES.edgeMidLeft }];
+      // Room is to the WEST → tan faces the room on the left (opaque piece).
+      return [{ x, y, frame: WALL_FRAMES.edgeLeft }];
     default:
       return [{ x, y, frame: WALL_FRAMES.face }];
   }

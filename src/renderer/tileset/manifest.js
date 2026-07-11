@@ -48,12 +48,14 @@ export const WALL_FRAMES = Object.freeze({
   topMid: 'wall_top_mid',
   topLeft: 'wall_top_left',
   topRight: 'wall_top_right',
-  // Tan "top surface" strips for vertical (E/W) walls — no brick face. The tan
-  // must face the ROOM (the other side is transparent, i.e. the black void
-  // outside): a room's LEFT/west wall (room to its east) uses `edgeMidRight`
-  // (tan on the right); its RIGHT/east wall uses `edgeMidLeft` (tan on left).
-  edgeMidLeft: 'wall_edge_mid_left',
-  edgeMidRight: 'wall_edge_mid_right',
+  // Solid (opaque) tan tops for vertical (E/W) walls: tan on the room-facing
+  // edge, brick on the outer edge — no transparency, so they never show the
+  // black void through the wall. `edgeRight` (tan on the right) is a room's
+  // LEFT/west wall (room to its east); `edgeLeft` (tan on the left) is a room's
+  // RIGHT/east wall. (The `..._mid_..` variants are tan+transparent and render
+  // as thin broken lines — do not use for full walls.)
+  edgeLeft: 'wall_edge_left',
+  edgeRight: 'wall_edge_right',
 });
 
 // The base sprite for an entity kind, defaulting to the player's if unknown so
