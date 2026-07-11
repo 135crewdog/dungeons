@@ -69,19 +69,23 @@ generated at startup, stored on the game state, and **logged to the console** (d
 
 ## Field of View
 
-**Symmetric shadowcasting.** Walls block sight; open doors do not. Each turn recompute
-currently-visible tiles. States: **visible** (fully lit) · **previously seen**
-(remembered, darkened) · **unexplored** (black). On first entering a room, the entire
-room is marked **explored**.
+**Symmetric shadowcasting.** Walls **and doors** block sight — a closed door is
+walkable but opaque, so nothing (player or enemy) sees through a doorway until standing
+in it. Each turn recompute currently-visible tiles. States: **visible** (fully lit) ·
+**previously seen** (remembered, darkened) · **unexplored** (black). On first entering a
+room, the entire room is marked **explored**.
 
 ## Combat
 
 Moving adjacent to an enemy attacks it **immediately in that same turn** (no separate
 attack turn; on a kill the player stays put). On its turn an enemy attacks if adjacent,
 else moves toward the player. **Enemies aggro on sight** — they hold until the player
-enters their line of sight, then chase relentlessly. Base hit chance **75%**: show a
-floating **"Miss!"** on a miss and a floating **damage number** on a hit. Two entities
-never share a tile.
+enters their line of sight, then give chase. A chasing enemy that **loses sight** of the
+player heads for the tile it last saw them on; if it arrives empty-handed (or stays
+blind for several turns) it **gives up** and holds position, re-aggroing only on a fresh
+sighting — so breaking line of sight (e.g. slipping through a door) can shake pursuit.
+Base hit chance **75%**: show a floating **"Miss!"** on a miss and a floating **damage
+number** on a hit. Two entities never share a tile.
 
 ## Death
 
@@ -91,8 +95,9 @@ on floor 1 with a **new random seed** (logged).
 ## Visual Style
 
 The entire game renders in **ASCII, monospace**. Floor `.` · Wall `#` · Player `@` ·
-Enemies single letters (`g` goblin, `s` skeleton) · Potion `!` · Stairs `>` · Door `+`
-· Unexplored space · Explored-but-not-visible: same glyph, darker. This is the
+Enemies single letters (`g` goblin, `s` skeleton) · Potion `!` · Stairs down `>` ·
+Stairs up `<` · Door `+` · Unexplored space · Explored-but-not-visible: same glyph,
+darker. This is the
 intentional Phase-1 art style, not a placeholder. The renderer is structured so sprites
 could swap in later (`tileStyle.js` is the seam) without touching game logic.
 
@@ -135,7 +140,9 @@ renderer.
 Procedural dungeon generation (rooms + corridors, each floor different) · ASCII
 rendering · click/tap A\* + keyboard movement · two enemy types with different HP/damage
 that chase and attack · 75%-hit combat with floating numbers · health potions that
-restore HP when walked over · stairs that generate a new floor · HUD (HP, floor number,
+restore HP when walked over · **persistent floors** connected by down- and up-stairs
+(floors are cached per run, so climbing back up returns to the same floor exactly as it
+was left — layout, fog memory, items, and surviving enemies) · HUD (HP, floor number,
 scrolling message log) · shadowcasting FOV with explored memory · installable offline
 PWA. **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.

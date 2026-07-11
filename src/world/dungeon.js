@@ -11,19 +11,22 @@ import { connectRooms } from './corridors.js';
 export function generateFloor(rng, floorNumber, width = MAP_WIDTH, height = MAP_HEIGHT) {
   const tiles = new Uint8Array(width * height); // 0 === TILE.WALL
   const roomAt = new Int16Array(width * height).fill(-1);
-  const map = { width, height, tiles, rooms: [], roomAt, stairs: null };
+  const map = { width, height, tiles, rooms: [], roomAt, stairsDown: null, stairsUp: null };
 
   const rooms = placeRooms(rng, width, height);
   map.rooms = rooms;
   carveRooms(map, rooms);
   connectRooms(map, rng, rooms);
-  placeStairs(map, rooms);
+  placeStairs(map, rooms, floorNumber);
   return map;
 }
 
-// Place the down-stairs in the room whose center is farthest (Manhattan) from
-// the first room, where the player starts — so the exit is never underfoot.
-function placeStairs(map, rooms) {
+// Place the stairs. Down-stairs go in the room whose center is farthest
+// (Manhattan) from the first room, where the player starts — so the exit is
+// never underfoot. On floors below the first, an up-stairs sits at the start
+// room's center: it is exactly where the player arrives when descending, and
+// the tile they step onto to climb back up.
+function placeStairs(map, rooms, floorNumber) {
   const origin = roomCenter(rooms[0]);
   let best = rooms[0];
   let bestDist = -1;
@@ -35,7 +38,12 @@ function placeStairs(map, rooms) {
       best = room;
     }
   }
-  const c = roomCenter(best);
-  map.tiles[idx(map, c.x, c.y)] = TILE.STAIRS;
-  map.stairs = { x: c.x, y: c.y };
+  const down = roomCenter(best);
+  map.tiles[idx(map, down.x, down.y)] = TILE.STAIRS_DOWN;
+  map.stairsDown = { x: down.x, y: down.y };
+
+  if (floorNumber > 1) {
+    map.tiles[idx(map, origin.x, origin.y)] = TILE.STAIRS_UP;
+    map.stairsUp = { x: origin.x, y: origin.y };
+  }
 }

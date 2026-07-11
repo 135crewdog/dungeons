@@ -13,9 +13,11 @@ before you die.
 
 - Procedurally generated floors (rooms + corridors + doors), different every run
 - Symmetric-shadowcasting field of view with remembered (dimmed) terrain
-- Two enemy types that wake on sight and hunt you with A\* pathfinding
+- Two enemy types that wake on sight and hunt you with A\* pathfinding — and give up
+  the chase when you break their line of sight (closed doors block sight, too)
 - Bump-to-attack combat: 75% hit chance, floating damage / "Miss!" numbers
-- Health potions (walk over to drink) and stairs that generate a new floor
+- Health potions (walk over to drink) and persistent floors joined by up/down stairs —
+  climb back up and the floor is exactly as you left it
 - HUD with HP + floor number and a scrolling message log
 - Permadeath: die and restart a fresh run
 - Deterministic: every run is driven by a single seed, logged to the console
@@ -27,10 +29,11 @@ before you die.
 - **Click / tap** anywhere on the map to auto-walk there along a path over
   explored ground. The walk stops if a new enemy appears, you take damage, or you
   press a key.
-- Attack by moving into an enemy. Walk onto `>` to descend, onto `!` to drink.
+- Attack by moving into an enemy. Walk onto `>` to descend, `<` to ascend, onto
+  `!` to drink.
 
-Glyphs: `@` you · `#` wall · `.` floor · `+` door · `>` stairs · `!` potion ·
-`g` goblin · `s` skeleton.
+Glyphs: `@` you · `#` wall · `.` floor · `+` door · `>` stairs down · `<` stairs up ·
+`!` potion · `g` goblin · `s` skeleton.
 
 ## Getting started
 

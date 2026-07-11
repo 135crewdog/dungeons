@@ -60,9 +60,10 @@ function handleRestart() {
 const controller = createController(state, (events) => {
   const scene = game.registry.get('scene');
   if (scene) {
-    // Descending swaps in a new floor, so rebuild the tile/entity visuals.
-    if (events.some((e) => e.type === EV.DESCEND)) scene.rebuildFloor();
-    else scene.render();
+    // Changing floors swaps in a different map, so rebuild the tile/entity visuals.
+    if (events.some((e) => e.type === EV.DESCEND || e.type === EV.ASCEND)) {
+      scene.rebuildFloor();
+    } else scene.render();
     scene.playEvents(events);
   }
   refreshUi();
