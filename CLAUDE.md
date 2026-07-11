@@ -90,11 +90,22 @@ on floor 1 with a **new random seed** (logged).
 
 ## Visual Style
 
-The entire game renders in **ASCII, monospace**. Floor `.` · Wall `#` · Player `@` ·
-Enemies single letters (`g` goblin, `s` skeleton) · Potion `!` · Stairs `>` · Door `+`
-· Unexplored space · Explored-but-not-visible: same glyph, darker. This is the
-intentional Phase-1 art style, not a placeholder. The renderer is structured so sprites
-could swap in later (`tileStyle.js` is the seam) without touching game logic.
+**Phase 2** renders the game in **pixel art** using the CC0 **0x72 Dungeon Tileset II**
+(committed at `0x72_DungeonTilesetII_v1.7/`): a single combined atlas addressed by named
+frames from its `tile_list`. Walls use a lightweight 2.5D scheme (brick faces with a lit
+top cap where a room sits below) for a Shattered-Pixel-Dungeon look; floors have weighted
+variety; the knight/goblin/skeleton are animated sprites (idle/run, plus hit for the
+hero) that glide between tiles, flip to face travel, lunge on attack, flash when struck,
+and dissolve on death. A torch pool of light follows the player; potions glow, pickups
+sparkle, stairs shimmer. Fog is three states — visible (full colour) · previously seen
+(remembered, dim tint) · unexplored (hidden).
+
+**The sprite seam is `src/renderer/tileset/manifest.js`** (which frame/animation each
+tile, entity and item maps to) plus `tileset/loader.js` (registers atlas frames + anims).
+Swapping tilesets means editing the manifest, not game logic.
+
+The original **Phase-1 ASCII** renderer is preserved as a frozen, playable build at
+`/ascii/` (tag `v1-ascii`) — a time capsule, not the live style.
 
 ## Canvas and Resolution
 
@@ -119,10 +130,11 @@ src/
   world/      // dungeon generation (rooms, corridors, doors, stairs)
   entities/   // player, enemies, items, spawning
   systems/    // combat, pathfinding, fov, visibility, ai
-  renderer/   // ALL Phaser code only
+  renderer/   // ALL Phaser code: TileLayer, SpriteEntity, fx, camera,
+              //   floatingText, autotile, tileset/ (manifest, loader, tileList)
   ui/         // HUD, message log, game-over (DOM overlays)
   input/      // keyboard, mouse, touch
-assets/       // empty for now
+0x72_DungeonTilesetII_v1.7/  // CC0 pixel-art atlas + tile_list (Phase 2 art)
 ```
 
 The simulation layer is `core/`, `world/`, `entities/`, `systems/`. The renderer layer
@@ -140,12 +152,24 @@ scrolling message log) · shadowcasting FOV with explored memory · installable 
 PWA. **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
 
+## Phase 2 Scope — visuals only
+
+Phase 2 is a **renderer-only** upgrade from ASCII to pixel art: the 0x72 tileset,
+2.5D autotiled walls, animated sprites, smooth tweened movement + camera follow,
+combat animation (lunge / hit flash / death dissolve), and atmosphere (torch light,
+potion glow, pickup sparkle, stairs shimmer). It adds **no** gameplay mechanics — the
+simulation (`core/`, `world/`, `entities/`, `systems/`) is untouched, and all new code
+lives in `src/renderer/`. The Phase-1 ASCII build is archived at `/ascii/`.
+
 ## Testing
 
 Each major module has browser-free unit tests (Vitest). The simulation is kept
 independent enough that dungeon generation, combat, pathfinding, and FOV are tested
-without instantiating Phaser. Determinism is guarded: no `Math.random()` and no Phaser
-import under the simulation directories.
+without instantiating Phaser. The renderer's pure logic is tested too — `autotile`
+(wall masks, floor hash), the `tileset/manifest` (frame + animation fallbacks), and
+`tileset/tileList` parsing — all without a canvas. Determinism is guarded: no
+`Math.random()` and no Phaser import under the simulation directories; renderer visual
+randomness uses `Phaser.Math`, never the game RNG.
 
 ## PWA
 

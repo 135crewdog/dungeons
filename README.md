@@ -1,13 +1,15 @@
 # Dungeons
 
 A browser-based roguelike dungeon crawler built with **Phaser** and vanilla
-JavaScript, playable as an installable **offline PWA**. Rendered entirely in ASCII.
-There is no scripted story — everything emerges from the systems and procedural
-generation.
+JavaScript, playable as an installable **offline PWA**. Rendered in **pixel art**
+(the CC0 [0x72 Dungeon Tileset II](https://0x72.itch.io/dungeontileset-ii)) with
+animated sprites, 2.5D walls, and torch-lit atmosphere. There is no scripted story —
+everything emerges from the systems and procedural generation.
 
-This is **Phase 1**: the complete core loop. Descend through procedurally generated
-floors, fight two kinds of monsters, grab potions, and see how deep you can get
-before you die.
+The complete core loop: descend through procedurally generated floors, fight two kinds
+of monsters, grab potions, and see how deep you can get before you die. Phase 1 built
+the loop in ASCII; **Phase 2** is a renderer-only upgrade to pixel art (the original
+ASCII build is preserved at [`/ascii/`](./ascii/) — see the time capsule below).
 
 ## Features
 
@@ -27,10 +29,10 @@ before you die.
 - **Click / tap** anywhere on the map to auto-walk there along a path over
   explored ground. The walk stops if a new enemy appears, you take damage, or you
   press a key.
-- Attack by moving into an enemy. Walk onto `>` to descend, onto `!` to drink.
+- Attack by moving into an enemy. Walk onto the stairs to descend, over a flask to
+  drink it.
 
-Glyphs: `@` you · `#` wall · `.` floor · `+` door · `>` stairs · `!` potion ·
-`g` goblin · `s` skeleton.
+You are the knight; goblins and skeletons hunt you; red flasks heal.
 
 ## Getting started
 
@@ -68,7 +70,7 @@ src/
   world/      dungeon generation (rooms, corridors, doors, stairs)
   entities/   player, enemies, items, spawning
   systems/    combat, pathfinding, fov, visibility, ai
-  renderer/   all Phaser code (glyph grid, camera, floating text)
+  renderer/   all Phaser code (tile layer, sprites, fx, camera, tileset atlas)
   ui/         HUD, message log, game-over (DOM overlays)
   input/      keyboard + pointer
 ```

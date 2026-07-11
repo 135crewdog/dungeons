@@ -58,6 +58,7 @@ export class TileLayer {
     // floor is one sprite; a face wall is two — face + raised cap).
     this.byTile = null;
     this.layer = null;
+    this.stairsSprite = null; // exposed so FX can shimmer the exit
   }
 
   build(map) {
@@ -71,7 +72,9 @@ export class TileLayer {
         const i = idx(map, x, y);
         const sprites = [];
         if (isOpen(map, x, y)) {
-          sprites.push(this.place(x, y, openFrame(map, x, y)));
+          const s = this.place(x, y, openFrame(map, x, y));
+          if (map.tiles[i] === TILE.STAIRS) this.stairsSprite = s;
+          sprites.push(s);
         } else {
           // Every wall shows a solid brick face so rooms read as brick boxes
           // (no gaps). Walls with open floor to the SOUTH additionally get a

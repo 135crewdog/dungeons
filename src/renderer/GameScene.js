@@ -5,6 +5,7 @@ import { TILE_SIZE } from '../core/constants.js';
 import { computeZoom, tileCenterWorld, worldToTile } from './camera.js';
 import { TileLayer } from './TileLayer.js';
 import { SpriteEntity } from './SpriteEntity.js';
+import { Fx } from './fx.js';
 import { registerAtlasFrames, registerAnims } from './tileset/loader.js';
 import { parseTileList } from './tileset/tileList.js';
 import { ATLAS_KEY, POTION_FRAME } from './tileset/manifest.js';
@@ -50,7 +51,11 @@ export class DungeonScene extends Phaser.Scene {
     this.itemLayer = this.add.layer().setDepth(ITEM_DEPTH);
     this.entityLayer = this.add.layer().setDepth(ENTITY_DEPTH);
     this.itemSprites = new Map();
+    this.itemGlows = new Map();
     this.entitySprites = new Map();
+
+    this.fx = new Fx(this);
+    this.fx.stairsShimmer(this.tiles.stairsSprite);
 
     this.cameras.main.setBackgroundColor('#05060a');
     this.cameras.main.setRoundPixels(true);
@@ -101,11 +106,22 @@ export class DungeonScene extends Phaser.Scene {
     this.tiles.destroy();
     this.tiles = new TileLayer(this);
     this.tiles.build(this.state.map);
+    this.fx.stairsShimmer(this.tiles.stairsSprite);
     for (const s of this.itemSprites.values()) s.destroy();
-    for (const s of this.entitySprites.values()) s.destroy();
+    for (const g of this.itemGlows.values()) g.destroy();
+    for (const se of this.entitySprites.values()) se.destroy();
     this.itemSprites.clear();
+    this.itemGlows.clear();
     this.entitySprites.clear();
     this.render();
+  }
+
+  // Per-frame (Phaser clock): keep the torch pool on the player and flicker it.
+  update(_time, delta) {
+    if (!this.fx) return;
+    const p = getPlayer(this.state);
+    const se = p && this.entitySprites.get(p.id);
+    this.fx.update(se ? se.sprite : null, delta);
   }
 
   // Full repaint with everything snapped to its current tile (no animation).
@@ -178,6 +194,7 @@ export class DungeonScene extends Phaser.Scene {
         else spawnFloatingText(this, ev.x, ev.y, 'Miss!', '#aab2c4');
       } else if (ev.type === EV.PICKUP && ev.heal > 0) {
         spawnFloatingText(this, ev.x, ev.y, `+${ev.heal}`, '#5ad07a');
+        this.fx.pickupSparkle(ev.x, ev.y);
       }
     }
   }
@@ -188,21 +205,29 @@ export class DungeonScene extends Phaser.Scene {
       alive.add(item.id);
       let sprite = this.itemSprites.get(item.id);
       if (!sprite) {
-        sprite = this.add.image(0, 0, ATLAS_KEY, POTION_FRAME).setOrigin(0.5, 0.5);
+        const px = item.x * TILE_SIZE + TILE_SIZE / 2;
+        const py = item.y * TILE_SIZE + TILE_SIZE / 2;
+        sprite = this.add.image(px, py, ATLAS_KEY, POTION_FRAME).setOrigin(0.5, 0.5);
         this.itemLayer.add(sprite);
         this.itemSprites.set(item.id, sprite);
+        this.itemGlows.set(item.id, this.fx.potionGlow(sprite));
       }
       sprite.setPosition(item.x * TILE_SIZE + TILE_SIZE / 2, item.y * TILE_SIZE + TILE_SIZE / 2);
-      // Remembered while explored; full colour only when currently visible.
+      // Remembered while explored; full colour + glow only when currently visible.
       const seen = isExplored(this.state, item.x, item.y);
       const lit = isVisible(this.state, item.x, item.y);
       sprite.setVisible(seen);
       sprite.setTint(lit ? LIT : DIM);
+      const glow = this.itemGlows.get(item.id);
+      if (glow) glow.setVisible(lit);
     }
     for (const [id, sprite] of this.itemSprites) {
       if (!alive.has(id)) {
         sprite.destroy();
         this.itemSprites.delete(id);
+        const glow = this.itemGlows.get(id);
+        if (glow) glow.destroy();
+        this.itemGlows.delete(id);
       }
     }
   }

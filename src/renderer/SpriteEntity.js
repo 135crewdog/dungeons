@@ -109,6 +109,7 @@ export class SpriteEntity {
   // the entity map first (by the caller) so nothing re-places it mid-dissolve.
   dissolve() {
     this.stopMove();
+    if (this.scene.fx) this.scene.fx.deathBurst(this.sprite.x, this.sprite.y - TILE_SIZE / 2);
     this.sprite.setTintFill(0xffffff);
     this.scene.time.delayedCall(80, () => {
       if (this.sprite.active) this.sprite.clearTint();
