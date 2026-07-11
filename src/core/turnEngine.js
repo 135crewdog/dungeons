@@ -5,9 +5,9 @@
 import { getPlayer, enemiesSorted, tileAt, isKnownWalkable } from './query.js';
 import { TILE } from './constants.js';
 import { tryMove } from './movement.js';
-import { descend } from './gameState.js';
+import { descend, ascend } from './gameState.js';
 import { pushLog } from './entity.js';
-import { pickupEvent, descendEvent } from './events.js';
+import { pickupEvent, descendEvent, ascendEvent } from './events.js';
 import { updateVisibility } from '../systems/visibility.js';
 import { enemyTurn } from '../systems/ai.js';
 import { aStar } from '../systems/pathfinding.js';
@@ -19,17 +19,32 @@ export function processCommand(state, command) {
   if (state.status !== 'playing') return [];
 
   const events = [];
+  const player = getPlayer(state);
+  const fromX = player.x;
+  const fromY = player.y;
   const acted = executePlayerAction(state, command, events);
   if (!acted) return events;
 
-  // Stepping onto the stairs ends this floor immediately: generate a new one
-  // and skip the enemy phase (the player has left the old floor behind).
-  const player = getPlayer(state);
-  if (tileAt(state.map, player.x, player.y) === TILE.STAIRS) {
-    descend(state);
-    pushLog(state, 'descend', { floor: state.floor });
-    events.push(descendEvent(state.floor));
-    return events;
+  // Stepping onto a staircase ends this floor immediately: swap floors and skip
+  // the enemy phase (the player has left this floor behind). Only a real step
+  // onto the stair counts — not a bump-attack made while already standing on it,
+  // nor the tile the player was placed on when they arrived — so the player
+  // doesn't ricochet straight back the way they came.
+  const movedOntoTile = player.x !== fromX || player.y !== fromY;
+  if (movedOntoTile) {
+    const tile = tileAt(state.map, player.x, player.y);
+    if (tile === TILE.STAIRS_DOWN) {
+      descend(state);
+      pushLog(state, 'descend', { floor: state.floor });
+      events.push(descendEvent(state.floor));
+      return events;
+    }
+    if (tile === TILE.STAIRS_UP) {
+      ascend(state);
+      pushLog(state, 'ascend', { floor: state.floor });
+      events.push(ascendEvent(state.floor));
+      return events;
+    }
   }
 
   advanceWorld(state, events);

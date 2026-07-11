@@ -1,11 +1,11 @@
 // The single authoritative game-state object and its lifecycle. Every system
 // reads from and writes to the state produced here; no system keeps its own
-// copy. createGame builds a fresh run; descend (added with stairs) rebuilds the
-// floor while carrying the player over.
+// copy. createGame builds a fresh run; descend/ascend move the player between
+// floors, caching each floor so it can be revisited exactly as it was left.
 
 import { createRng } from './rng.js';
-import { addEntity } from './entity.js';
-import { getPlayer } from './query.js';
+import { PLAYER_ID, DIRS8 } from './constants.js';
+import { getPlayer, entityAt, isWalkable } from './query.js';
 import { generateFloor } from '../world/dungeon.js';
 import { roomCenter } from '../world/rooms.js';
 import { createPlayer } from '../entities/player.js';
@@ -32,23 +32,43 @@ export function createGame(seed) {
     status: 'playing',
     map: null,
     vis: null,
-    entities: { nextId: 1, playerId: 0, byId: new Map() },
+    entities: { nextId: 2, playerId: PLAYER_ID, byId: new Map() },
     items: [],
     path: null,
-    prevVisibleEnemies: new Set(),
+    // Visited floors, keyed by floor number → { map, vis, items, byId, nextId }.
+    // The active floor's data lives on state.map/vis/items/entities; a floor is
+    // moved into this cache when the player leaves it and restored on return.
+    floors: new Map(),
     log: [],
   };
 
-  buildFloor(state, state.floor);
+  generateAndEnter(state, 1, createPlayer(0, 0));
   return state;
 }
 
-// Generate down the stairs: a completely new floor, carrying the player (and
-// its HP) over. Everything else — enemies, items, fog, stored path — is fresh.
+// Go down the stairs. Stash the current floor, then restore the floor below if
+// it has been visited before (arriving at its up-stairs) or generate it fresh.
+// The player object — and its HP — carries over either way.
 export function descend(state) {
   const player = getPlayer(state);
-  state.floor++;
-  buildFloor(state, state.floor, player);
+  const target = state.floor + 1;
+  snapshotFloor(state);
+  if (state.floors.has(target)) {
+    activateFloor(state, target, 'up', player);
+  } else {
+    generateAndEnter(state, target, player);
+  }
+}
+
+// Go up the stairs. The floor above has always been visited (you descended
+// through it), so it is restored from the cache; the player arrives at its
+// down-stairs — the tile they originally descended from.
+export function ascend(state) {
+  if (state.floor <= 1) return; // no way up from the top floor
+  const player = getPlayer(state);
+  const target = state.floor - 1;
+  snapshotFloor(state);
+  activateFloor(state, target, 'down', player);
 }
 
 // Reset the existing state object in place to a brand-new run on floor 1 with a
@@ -63,33 +83,85 @@ export function restart(state, seed) {
   state.status = 'playing';
   state.log = [];
   state.items = [];
-  state.entities = { nextId: 1, playerId: 0, byId: new Map() };
-  buildFloor(state, 1);
+  state.floors = new Map();
+  state.entities = { nextId: 2, playerId: PLAYER_ID, byId: new Map() };
+  generateAndEnter(state, 1, createPlayer(0, 0));
 }
 
-// Assemble a floor onto the state: generate the map, reset all per-floor fields
-// and the entity registry, place the player in the first room, then populate
-// enemies and potions. Pass an existing player to carry it across floors.
-function buildFloor(state, floorNumber, existingPlayer = null) {
+// Insert the carried player under its fixed id and make it the active player.
+// Enemies/items allocate from id 2 up, so this id is always free.
+function attachPlayer(state, player, x, y) {
+  player.id = PLAYER_ID;
+  player.x = x;
+  player.y = y;
+  state.entities.byId.set(PLAYER_ID, player);
+  state.entities.playerId = PLAYER_ID;
+}
+
+// Move the live floor (minus the player) into the cache under its floor number.
+function snapshotFloor(state) {
+  state.entities.byId.delete(PLAYER_ID);
+  state.floors.set(state.floor, {
+    map: state.map,
+    vis: state.vis,
+    items: state.items,
+    byId: state.entities.byId,
+    nextId: state.entities.nextId,
+  });
+}
+
+// Restore a previously-cached floor and drop the player onto the appropriate
+// stair (up-stairs when descending into it, down-stairs when ascending).
+function activateFloor(state, floorNumber, arrival, player) {
+  const cached = state.floors.get(floorNumber);
+  state.floor = floorNumber;
+  state.map = cached.map;
+  state.vis = cached.vis;
+  state.items = cached.items;
+  state.entities.byId = cached.byId;
+  state.entities.nextId = cached.nextId;
+  state.path = null;
+
+  const pos = arrival === 'up' ? state.map.stairsUp : state.map.stairsDown;
+  ensureArrivalClear(state, pos.x, pos.y);
+  attachPlayer(state, player, pos.x, pos.y);
+  updateVisibility(state);
+}
+
+// Generate a brand-new floor and enter it. The player lands on the up-stairs
+// (floor 1 has none, so it uses the start room's center instead).
+function generateAndEnter(state, floorNumber, player) {
   const map = generateFloor(state.rng, floorNumber);
+  state.floor = floorNumber;
   state.map = map;
   state.vis = makeVisibility(map.width, map.height);
   state.items = [];
   state.path = null;
-  state.prevVisibleEnemies = new Set();
   state.entities.byId = new Map();
-  state.entities.nextId = 1;
+  state.entities.nextId = 2; // reserve id 1 for the player (attached below)
 
-  const start = roomCenter(map.rooms[0]);
-  const player = existingPlayer ?? createPlayer(start.x, start.y);
-  player.x = start.x;
-  player.y = start.y;
-  addEntity(state, player);
-  state.entities.playerId = player.id;
+  const start = map.stairsUp ?? roomCenter(map.rooms[0]);
+  attachPlayer(state, player, start.x, start.y);
 
   // Populate after the player exists so nothing spawns on top of them.
   populateFloor(state, floorNumber);
 
   // Compute the initial view so the first frame shows what the player can see.
   updateVisibility(state);
+}
+
+// If a stray (de-aggroed) enemy is standing on the tile the player is about to
+// arrive on, nudge it to a free neighboring tile so the two never share a tile.
+function ensureArrivalClear(state, x, y) {
+  const occ = entityAt(state, x, y);
+  if (!occ) return;
+  for (const { dx, dy } of DIRS8) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (!isWalkable(state.map, nx, ny)) continue;
+    if (entityAt(state, nx, ny)) continue;
+    occ.x = nx;
+    occ.y = ny;
+    return;
+  }
 }

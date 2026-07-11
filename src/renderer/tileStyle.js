@@ -11,7 +11,8 @@ const TILE_GLYPH = {
   [TILE.WALL]: '#',
   [TILE.FLOOR]: '.',
   [TILE.DOOR]: '+',
-  [TILE.STAIRS]: '>',
+  [TILE.STAIRS_DOWN]: '>',
+  [TILE.STAIRS_UP]: '<',
 };
 
 // Lit (currently-visible) colors, as 24-bit RGB for Phaser tint.
@@ -19,7 +20,8 @@ const TILE_COLOR = {
   [TILE.WALL]: 0x8a93a6,
   [TILE.FLOOR]: 0x555b6e,
   [TILE.DOOR]: 0xc79a5b,
-  [TILE.STAIRS]: 0xf2d64b,
+  [TILE.STAIRS_DOWN]: 0xf2d64b,
+  [TILE.STAIRS_UP]: 0xf2d64b,
 };
 
 const ENTITY_COLOR = {
@@ -31,7 +33,7 @@ const ENTITY_COLOR = {
 const POTION_COLOR = 0xe0556b;
 
 // Every glyph the renderer can draw — used to pre-bake glyph textures.
-export const ALL_GLYPHS = ['#', '.', '+', '>', '@', 'g', 's', '!'];
+export const ALL_GLYPHS = ['#', '.', '+', '>', '<', '@', 'g', 's', '!'];
 
 export function tileGlyph(tileType) {
   return TILE_GLYPH[tileType] ?? ' ';

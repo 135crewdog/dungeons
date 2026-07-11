@@ -78,27 +78,53 @@ describe('dungeon generation', () => {
     }
   });
 
-  it('places exactly one stairs tile matching map.stairs', () => {
+  it('places exactly one down-stairs on floor 1 and no up-stairs', () => {
     const map = gen(555);
     let count = 0;
-    for (let i = 0; i < map.tiles.length; i++) if (map.tiles[i] === TILE.STAIRS) count++;
+    for (let i = 0; i < map.tiles.length; i++) if (map.tiles[i] === TILE.STAIRS_DOWN) count++;
     expect(count).toBe(1);
-    expect(map.tiles[idx(map, map.stairs.x, map.stairs.y)]).toBe(TILE.STAIRS);
+    expect(map.tiles[idx(map, map.stairsDown.x, map.stairsDown.y)]).toBe(TILE.STAIRS_DOWN);
+    expect(map.stairsUp).toBe(null);
   });
 
-  it('doors are walkable and transparent and occur at junctions', () => {
-    // Aggregate across seeds: door placement should be common.
-    let totalDoors = 0;
-    for (let s = 0; s < 20; s++) {
-      const map = gen(s * 101 + 3);
+  it('places both stairs on floors below the first; up-stairs at the start room', () => {
+    for (const f of [2, 3, 5]) {
+      const map = generateFloor(createRng(f * 13 + 1), f);
+      expect(map.stairsUp).not.toBe(null);
+      expect(map.tiles[idx(map, map.stairsUp.x, map.stairsUp.y)]).toBe(TILE.STAIRS_UP);
+      const start = roomCenter(map.rooms[0]);
+      expect(map.stairsUp).toEqual({ x: start.x, y: start.y });
+      let up = 0;
+      let down = 0;
       for (let i = 0; i < map.tiles.length; i++) {
-        if (map.tiles[i] === TILE.DOOR) {
+        if (map.tiles[i] === TILE.STAIRS_UP) up++;
+        if (map.tiles[i] === TILE.STAIRS_DOWN) down++;
+      }
+      expect(up).toBe(1);
+      expect(down).toBe(1);
+    }
+  });
+
+  it('doors are walkable but not transparent, and never form a row', () => {
+    let totalDoors = 0;
+    for (let s = 0; s < 30; s++) {
+      const map = gen(s * 101 + 3);
+      for (let y = 0; y < map.height; y++) {
+        for (let x = 0; x < map.width; x++) {
+          if (map.tiles[idx(map, x, y)] !== TILE.DOOR) continue;
           totalDoors++;
-          expect(isWalkableTile(TILE.DOOR)).toBe(true);
-          expect(isTransparentTile(TILE.DOOR)).toBe(true);
+          // A door never sits orthogonally next to another door (no door rows).
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
+            expect(map.tiles[idx(map, nx, ny)]).not.toBe(TILE.DOOR);
+          }
         }
       }
     }
+    expect(isWalkableTile(TILE.DOOR)).toBe(true);
+    expect(isTransparentTile(TILE.DOOR)).toBe(false);
     expect(totalDoors).toBeGreaterThan(0);
   });
 
@@ -111,7 +137,7 @@ describe('dungeon generation', () => {
         const c = roomCenter(room);
         expect(seen.has(c.y * map.width + c.x)).toBe(true);
       }
-      expect(seen.has(map.stairs.y * map.width + map.stairs.x)).toBe(true);
+      expect(seen.has(map.stairsDown.y * map.width + map.stairsDown.x)).toBe(true);
     }
   });
 });

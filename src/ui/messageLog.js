@@ -21,6 +21,8 @@ function format(entry) {
       return `You drink a potion (+${d.heal} HP).`;
     case 'descend':
       return `You descend to floor ${d.floor}.`;
+    case 'ascend':
+      return `You ascend to floor ${d.floor}.`;
     default:
       return '';
   }

@@ -17,13 +17,20 @@ export function tileAt(map, x, y) {
   return inBounds(map, x, y) ? map.tiles[idx(map, x, y)] : TILE.WALL;
 }
 
-// Doors are open in Phase 1: walkable and transparent. Stairs are walkable.
+// Doors are walkable but NOT transparent: you can pass through a door, but a
+// closed door blocks line of sight (so nothing sees through doorways). Both
+// stair tiles are walkable and transparent.
 export function isWalkableTile(t) {
-  return t === TILE.FLOOR || t === TILE.DOOR || t === TILE.STAIRS;
+  return (
+    t === TILE.FLOOR ||
+    t === TILE.DOOR ||
+    t === TILE.STAIRS_DOWN ||
+    t === TILE.STAIRS_UP
+  );
 }
 
 export function isTransparentTile(t) {
-  return t === TILE.FLOOR || t === TILE.DOOR || t === TILE.STAIRS;
+  return t === TILE.FLOOR || t === TILE.STAIRS_DOWN || t === TILE.STAIRS_UP;
 }
 
 export function isWalkable(map, x, y) {
