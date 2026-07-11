@@ -92,17 +92,25 @@ on floor 1 with a **new random seed** (logged).
 
 **Phase 2** renders the game in **pixel art** using the CC0 **0x72 Dungeon Tileset II**
 (committed at `0x72_DungeonTilesetII_v1.7/`): a single combined atlas addressed by named
-frames from its `tile_list`. Walls use a lightweight 2.5D scheme (brick faces with a lit
-top cap where a room sits below) for a Shattered-Pixel-Dungeon look; floors have weighted
-variety; the knight/goblin/skeleton are animated sprites (idle/run, plus hit for the
-hero) that glide between tiles, flip to face travel, lunge on attack, flash when struck,
-and dissolve on death. A torch pool of light follows the player; potions glow, pickups
-sparkle, stairs shimmer. Fog is three states — visible (full colour) · previously seen
-(remembered, dim tint) · unexplored (hidden).
+frames from its `tile_list`, plus the tileset's dedicated **low-wall autotile sheet**
+(`atlas_walls_low-16x16.png`, a 3×3-minimal blob of 16×16 cells). Walls are driven from
+that sheet — each wall tile picks a cell from its floor neighbours, so faces, vertical
+edges, corners and corridor junctions all come from the art as intended. They read the
+Shattered-Pixel-Dungeon way: viewed from the south, so a wall bordering floor to its south
+shows a lit-capped brick FACE with a cast shadow below, while back walls are plain brick.
+A plain floor tile is drawn UNDER every wall so the face's shadow lip and the room-side of
+vertical walls show floor, never void (no floor/wall gaps). Floors have weighted variety;
+the knight/goblin/skeleton are animated sprites (idle/run, plus hit for the hero) that
+glide between tiles, flip to face travel, lunge on attack, flash when struck, and dissolve
+on death. A torch pool of light follows the player; potions glow, pickups sparkle, stairs
+shimmer. Fog is three states — visible (full colour) · previously seen (remembered, dim
+tint) · unexplored (hidden).
 
 **The sprite seam is `src/renderer/tileset/manifest.js`** (which frame/animation each
-tile, entity and item maps to) plus `tileset/loader.js` (registers atlas frames + anims).
-Swapping tilesets means editing the manifest, not game logic.
+tile, entity and item maps to) and **`tileset/lowWalls.js`** (the wall autotile — the one
+place mapping a neighbour config to a wall cell), plus `tileset/loader.js` (registers atlas
+frames + anims). Swapping tilesets means editing those, not game logic. `?walldebug` lays
+out all 48 low-wall cells with labels for re-decoding.
 
 The original **Phase-1 ASCII** renderer is preserved as a frozen, playable build at
 `/ascii/` (tag `v1-ascii`) — a time capsule, not the live style.

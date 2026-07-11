@@ -37,26 +37,9 @@ export const FLOOR_FRAMES = Object.freeze([
 export const STAIRS_FRAME = 'floor_stairs';
 export const POTION_FRAME = 'flask_red';
 
-// Named wall pieces used to assemble the 2.5D walls (TileLayer owns the
-// selection logic; these are the vocabulary it draws from). All names exist in
-// tile_list_v1.7: `wall_mid/left/right` are the brick FACE and its ends;
-// `wall_top_mid/left/right` are the flat TOP cap and its ends.
-export const WALL_FRAMES = Object.freeze({
-  face: 'wall_mid',
-  faceLeft: 'wall_left',
-  faceRight: 'wall_right',
-  topMid: 'wall_top_mid',
-  topLeft: 'wall_top_left',
-  topRight: 'wall_top_right',
-  // Solid (opaque) tan tops for vertical (E/W) walls: tan on the room-facing
-  // edge, brick on the outer edge — no transparency, so they never show the
-  // black void through the wall. `edgeRight` (tan on the right) is a room's
-  // LEFT/west wall (room to its east); `edgeLeft` (tan on the left) is a room's
-  // RIGHT/east wall. (The `..._mid_..` variants are tan+transparent and render
-  // as thin broken lines — do not use for full walls.)
-  edgeLeft: 'wall_edge_left',
-  edgeRight: 'wall_edge_right',
-});
+// Walls are NOT assembled from these named atlas pieces anymore — they come from
+// the dedicated low-wall autotile sheet (see tileset/lowWalls.js), which reads
+// as a single 16x16 cell per wall tile chosen by its floor neighbours.
 
 // The base sprite for an entity kind, defaulting to the player's if unknown so
 // a new enemy type never renders nothing.
