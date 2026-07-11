@@ -26,13 +26,31 @@ const COLS = 12;
 // Frame index for a sheet cell (col,row).
 export const cell = (c, r) => r * COLS + c;
 
-const FACE_S = cell(9, 0);       // wall with floor to the south — the brick face
-const VERT_E = cell(3, 1);       // floor to the east  (room's left/west wall)
-const VERT_W = cell(1, 1);       // floor to the west   (room's right/east wall)
-const VERT_EW = cell(0, 0);      // floor both sides (a one-tile-thick vertical wall)
-const CORNER_SE = cell(5, 1);    // floor south+east (wall wraps the NW)
-const CORNER_SW = cell(6, 1);    // floor south+west (wall wraps the NE)
-const SOLID = cell(9, 3);        // fully surrounded / back wall — plain brick
+// Cells decoded from the sheet by their canonical 3×3-minimal signature (which
+// neighbours are floor). Crucially the whole set shares one mortar-seam grid, so
+// picking matching cells makes rooms read as continuous brickwork:
+//   FACE_S   f9  — floor to the S: the south-facing wall FACE (top walls,
+//                  corridor north walls). Its cap seams line up with the corners.
+//   WALL_W   f31 — floor to the E: a room's WEST/left wall (brick body on the
+//                  outer/left, lit face on the room/right). Matches INNER_TL's stub.
+//   WALL_E   f30 — floor to the W: a room's EAST/right wall. Matches INNER_TR.
+//   VERT_EW  f0  — floor on BOTH sides: a one-tile-thick vertical wall.
+//   CONVEX_* f17/f18 — a convex corner (two adjacent open sides).
+//   INNER_TL f5  — a room's TOP-LEFT corner (all sides wall, floor at the SE
+//                  diagonal only): the top wall turns down into the left wall.
+//   INNER_TR f6  — a room's TOP-RIGHT corner (floor at the SW diagonal only).
+//   SOLID    f45 — plain brick, no lit face: interior, and every north-facing/back
+//                  wall (bottom room walls, bottom corners) — the low-wall sheet
+//                  has NO north-facing cells, walls are only ever drawn from the south.
+const FACE_S = cell(9, 0);
+const WALL_W = cell(7, 2);
+const WALL_E = cell(6, 2);
+const VERT_EW = cell(0, 0);
+const CONVEX_SE = cell(5, 1);
+const CONVEX_SW = cell(6, 1);
+const INNER_TL = cell(5, 0);
+const INNER_TR = cell(6, 0);
+const SOLID = cell(9, 3);
 
 function isWall(map, x, y) {
   return tileAt(map, x, y) === TILE.WALL; // OOB reads as WALL
@@ -43,17 +61,23 @@ export function lowWallFrame(map, x, y) {
   const e = !isWall(map, x + 1, y);
   const s = !isWall(map, x, y + 1);
   const w = !isWall(map, x - 1, y);
+  const se = !isWall(map, x + 1, y + 1);
+  const sw = !isWall(map, x - 1, y + 1);
 
-  // Convex corners first (two adjacent open sides), then the dominant
-  // south-facing face, then straight vertical edges, then plain brick.
-  if (s && e && !w && !n) return CORNER_SE;
-  if (s && w && !e && !n) return CORNER_SW;
-  if (e && w && !n && !s) return VERT_EW;
-  if (s) return FACE_S;                 // any south floor → show the wall face
-  if (e && !w) return VERT_E;
-  if (w && !e) return VERT_W;
+  // Convex corners first (two adjacent open cardinals), then the south-facing
+  // face (which also covers the straight top wall), then vertical edges.
+  if (s && e && !w && !n) return CONVEX_SE;
+  if (s && w && !e && !n) return CONVEX_SW;
+  if (s) return FACE_S;                 // any south floor → the wall face
   if (e && w) return VERT_EW;
-  return SOLID;                          // no floor south/east/west (or floor only N)
+  if (e) return WALL_W;                  // floor east → room's west wall
+  if (w) return WALL_E;                  // floor west → room's east wall
+  // No open cardinal: a concave room corner shows through one bottom diagonal;
+  // only the two TOP corners have art (the sheet has no north-facing cells), so
+  // bottom corners / back walls / interior all fall back to plain brick.
+  if (se && !sw) return INNER_TL;        // top-left corner (floor at SE)
+  if (sw && !se) return INNER_TR;        // top-right corner (floor at SW)
+  return SOLID;
 }
 
 // Debug: lay out all 48 cells in a grid with (col,row) labels, at world origin.
