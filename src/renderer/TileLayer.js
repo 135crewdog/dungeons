@@ -49,25 +49,29 @@ function openFrame(map, x, y) {
 //     no brick face (you look down their length, never at a face).
 //   • Deep/interior walls are plain brick (rarely seen through the fog).
 function wallSprites(map, x, y) {
-  const oN = !isWallAt(map, x, y - 1);
-  const oS = !isWallAt(map, x, y + 1);
-  const oE = !isWallAt(map, x + 1, y);
-  const oW = !isWallAt(map, x - 1, y);
+  const F = (a, b) => !isWallAt(map, a, b); // open (floor/door/stairs)?
+  const oN = F(x, y - 1);
+  const oS = F(x, y + 1);
+  const oE = F(x + 1, y);
+  const oW = F(x - 1, y);
   if (oS) {
-    // North wall of a room to the south: brick face + a raised lit cap.
-    let body = WALL_FRAMES.face;
-    let cap = WALL_FRAMES.topMid;
-    if (oW) { body = WALL_FRAMES.faceLeft; cap = WALL_FRAMES.topLeft; }
-    else if (oE) { body = WALL_FRAMES.faceRight; cap = WALL_FRAMES.topRight; }
-    return [{ x, y, frame: body }, { x, y: y - 1, frame: cap }];
+    // North wall of a room to the south: brick face + a raised lit cap. The cap
+    // terminates with a corner piece where the horizontal run ends (no adjacent
+    // north-wall = a floor tile is NOT below the neighbour).
+    const leftEnd = !F(x - 1, y + 1);
+    const rightEnd = !F(x + 1, y + 1);
+    const cap = leftEnd ? WALL_FRAMES.topLeft : rightEnd ? WALL_FRAMES.topRight : WALL_FRAMES.topMid;
+    return [{ x, y, frame: WALL_FRAMES.face }, { x, y: y - 1, frame: cap }];
   }
   if (oN) {
     // South wall of a room to the north: brick with a lit top edge.
     return [{ x, y, frame: WALL_FRAMES.face }, { x, y, frame: WALL_FRAMES.topMid }];
   }
-  // Vertical side walls: tan top only, lit edge facing the room.
-  if (oE) return [{ x, y, frame: WALL_FRAMES.edgeRight }];
-  if (oW) return [{ x, y, frame: WALL_FRAMES.edgeLeft }];
+  // Vertical side walls (tan top only) — including the corner tiles above/below
+  // a room, where the column continues past the floor's extent to meet the cap.
+  // A room to the east (floor on the E side, cardinal or diagonal) → left column.
+  if (oE || F(x + 1, y + 1) || F(x + 1, y - 1)) return [{ x, y, frame: WALL_FRAMES.edgeRight }];
+  if (oW || F(x - 1, y + 1) || F(x - 1, y - 1)) return [{ x, y, frame: WALL_FRAMES.edgeLeft }];
   return [{ x, y, frame: WALL_FRAMES.face }];
 }
 
