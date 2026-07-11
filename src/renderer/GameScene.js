@@ -4,9 +4,10 @@ import { EV } from '../core/events.js';
 import { TILE_SIZE } from '../core/constants.js';
 import { computeZoom, tileCenterWorld, worldToTile } from './camera.js';
 import { TileLayer } from './TileLayer.js';
+import { SpriteEntity } from './SpriteEntity.js';
 import { registerAtlasFrames, registerAnims } from './tileset/loader.js';
 import { parseTileList } from './tileset/tileList.js';
-import { ATLAS_KEY, POTION_FRAME, entityAnimKey } from './tileset/manifest.js';
+import { ATLAS_KEY, POTION_FRAME } from './tileset/manifest.js';
 import { spawnFloatingText } from './floatingText.js';
 
 // The combined 0x72 atlas image + its frame map, bundled by Vite (the ?raw
@@ -107,12 +108,40 @@ export class DungeonScene extends Phaser.Scene {
     this.render();
   }
 
-  // Repaint everything from current state and recenter the camera.
+  // Full repaint with everything snapped to its current tile (no animation).
+  // Used on create / floor rebuild / resize; also re-anchors the camera.
   render() {
     this.tiles.sync(this.state);
     this.syncItems();
-    this.syncEntities();
-    this.centerOnPlayer();
+    this.syncEntities(null);
+    this.followPlayer();
+  }
+
+  // Per-turn repaint: durable state redrawn from `state`, movers glide from the
+  // MOVE events' from→to, and transient effects play. The camera follows the
+  // (tweening) player sprite on its own via startFollow — no recenter here.
+  applyTurn(events) {
+    const moved = new Map();
+    for (const ev of events) if (ev.type === EV.MOVE) moved.set(ev.id, ev);
+    this.tiles.sync(this.state);
+    this.syncItems();
+    this.syncEntities(moved);
+    this.playEvents(events);
+  }
+
+  // Snap the camera to the player's tile, then smoothly follow the player
+  // sprite. Snapping first avoids a long pan when a new floor loads.
+  followPlayer() {
+    const p = getPlayer(this.state);
+    if (!p) return;
+    const se = this.entitySprites.get(p.id);
+    const c = tileCenterWorld(p.x, p.y);
+    const cam = this.cameras.main;
+    cam.centerOn(c.x, c.y);
+    if (se) {
+      cam.startFollow(se.sprite, true, 0.18, 0.18);
+      cam.setFollowOffset(0, TILE_SIZE / 2); // center on the tile, not the feet
+    }
   }
 
   centerOnPlayer() {
@@ -159,26 +188,28 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  syncEntities() {
+  // Reconcile entity sprites against state. `moved` (id → MOVE event) makes an
+  // entity glide from→to this turn; without it (or for non-movers) it snaps.
+  syncEntities(moved) {
     const alive = new Set();
     const playerId = this.state.entities.playerId;
     for (const e of entitiesSorted(this.state)) {
       alive.add(e.id);
-      let sprite = this.entitySprites.get(e.id);
-      if (!sprite) {
-        sprite = this.add.sprite(0, 0, ATLAS_KEY).setOrigin(0.5, 1);
-        sprite.play(entityAnimKey(e.kind, 'idle'));
-        this.entityLayer.add(sprite);
-        this.entitySprites.set(e.id, sprite);
+      let se = this.entitySprites.get(e.id);
+      if (!se) {
+        se = new SpriteEntity(this, e);
+        this.entityLayer.add(se.sprite);
+        this.entitySprites.set(e.id, se);
       }
-      // Feet at the bottom-centre of the tile; tall sprites rise upward.
-      sprite.setPosition(e.x * TILE_SIZE + TILE_SIZE / 2, e.y * TILE_SIZE + TILE_SIZE);
+      const mv = moved && moved.get(e.id);
+      if (mv) se.moveStep(mv.from, mv.to);
+      else se.placeAt(e.x, e.y);
       // The player is always shown; enemies only when currently in view.
-      sprite.setVisible(e.id === playerId || isVisible(this.state, e.x, e.y));
+      se.setVisible(e.id === playerId || isVisible(this.state, e.x, e.y));
     }
-    for (const [id, sprite] of this.entitySprites) {
+    for (const [id, se] of this.entitySprites) {
       if (!alive.has(id)) {
-        sprite.destroy();
+        se.destroy();
         this.entitySprites.delete(id);
       }
     }

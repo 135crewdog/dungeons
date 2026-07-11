@@ -60,10 +60,10 @@ function handleRestart() {
 const controller = createController(state, (events) => {
   const scene = game.registry.get('scene');
   if (scene) {
-    // Descending swaps in a new floor, so rebuild the tile/entity visuals.
+    // Descending swaps in a new floor, so rebuild the tile/entity visuals;
+    // otherwise animate the turn (glide movers, play combat effects).
     if (events.some((e) => e.type === EV.DESCEND)) scene.rebuildFloor();
-    else scene.render();
-    scene.playEvents(events);
+    else scene.applyTurn(events);
   }
   refreshUi();
   if (state.status === 'dead') gameOver.show(state, handleRestart);
