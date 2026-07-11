@@ -122,11 +122,30 @@ export class DungeonScene extends Phaser.Scene {
   // (tweening) player sprite on its own via startFollow — no recenter here.
   applyTurn(events) {
     const moved = new Map();
-    for (const ev of events) if (ev.type === EV.MOVE) moved.set(ev.id, ev);
+    const dying = new Set();
+    for (const ev of events) {
+      if (ev.type === EV.MOVE) moved.set(ev.id, ev);
+      else if (ev.type === EV.DEATH) dying.add(ev.id);
+    }
     this.tiles.sync(this.state);
     this.syncItems();
-    this.syncEntities(moved);
+    this.syncEntities(moved, dying);
+    this.playCombat(events);
     this.playEvents(events);
+  }
+
+  // Attack feedback: the attacker jabs toward the target; a surviving target
+  // flashes white (a killed target's flash is part of its dissolve instead).
+  playCombat(events) {
+    for (const ev of events) {
+      if (ev.type !== EV.ATTACK) continue;
+      const attacker = this.entitySprites.get(ev.attackerId);
+      if (attacker) attacker.lungeToward(ev.x, ev.y);
+      if (ev.hit) {
+        const target = this.entitySprites.get(ev.targetId);
+        if (target) target.flash();
+      }
+    }
   }
 
   // Snap the camera to the player's tile, then smoothly follow the player
@@ -190,7 +209,10 @@ export class DungeonScene extends Phaser.Scene {
 
   // Reconcile entity sprites against state. `moved` (id → MOVE event) makes an
   // entity glide from→to this turn; without it (or for non-movers) it snaps.
-  syncEntities(moved) {
+  // `dying` ids (from DEATH events) are dissolved rather than destroyed — the
+  // simulation has already removed the enemy from state, but its sprite is kept
+  // just long enough to animate its death.
+  syncEntities(moved, dying) {
     const alive = new Set();
     const playerId = this.state.entities.playerId;
     for (const e of entitiesSorted(this.state)) {
@@ -204,13 +226,16 @@ export class DungeonScene extends Phaser.Scene {
       const mv = moved && moved.get(e.id);
       if (mv) se.moveStep(mv.from, mv.to);
       else se.placeAt(e.x, e.y);
+      // The player dies in place (kept for the game-over frame): show a hit cue.
+      if (dying && dying.has(e.id)) se.play('death');
       // The player is always shown; enemies only when currently in view.
       se.setVisible(e.id === playerId || isVisible(this.state, e.x, e.y));
     }
     for (const [id, se] of this.entitySprites) {
       if (!alive.has(id)) {
-        se.destroy();
         this.entitySprites.delete(id);
+        if (dying && dying.has(id)) se.dissolve();
+        else se.destroy();
       }
     }
   }

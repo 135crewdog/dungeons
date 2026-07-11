@@ -75,6 +75,56 @@ export class SpriteEntity {
     this.sprite.setFlipX(this.facing < 0);
   }
 
+  // A quick jab toward a target tile and back — the attacker's "bump". Returns
+  // to its exact resting position so it never desyncs from the tile grid.
+  lungeToward(tx, ty) {
+    const t = tileToFeet(tx, ty);
+    const ox = this.sprite.x;
+    const oy = this.sprite.y;
+    const dx = t.x - ox;
+    const dy = t.y - oy;
+    const len = Math.hypot(dx, dy) || 1;
+    const reach = 5;
+    this.faceByDelta(dx);
+    this.scene.tweens.add({
+      targets: this.sprite,
+      x: ox + (dx / len) * reach,
+      y: oy + (dy / len) * reach,
+      duration: 70,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+      onComplete: () => this.sprite.setPosition(ox, oy),
+    });
+  }
+
+  // A brief white silhouette when struck.
+  flash() {
+    this.sprite.setTintFill(0xffffff);
+    this.scene.time.delayedCall(70, () => {
+      if (this.sprite.active) this.sprite.clearTint();
+    });
+  }
+
+  // Death: a white pop, then fade + shrink + drift up, then gone. Detached from
+  // the entity map first (by the caller) so nothing re-places it mid-dissolve.
+  dissolve() {
+    this.stopMove();
+    this.sprite.setTintFill(0xffffff);
+    this.scene.time.delayedCall(80, () => {
+      if (this.sprite.active) this.sprite.clearTint();
+    });
+    this.scene.tweens.add({
+      targets: this.sprite,
+      alpha: 0,
+      scaleX: 0.55,
+      scaleY: 0.55,
+      y: this.sprite.y - 6,
+      duration: 320,
+      ease: 'Quad.easeIn',
+      onComplete: () => this.sprite.destroy(),
+    });
+  }
+
   // Switch animation only when it actually changes (avoids restarting a loop).
   play(action) {
     const key = entityAnimKey(this.kind, action);
