@@ -40,7 +40,10 @@ simulation is unaware of pixels.
 All procedural generation and combat randomness go through **one seedable RNG
 abstraction** (`mulberry32`), never `Math.random()` in gameplay code. A random seed is
 generated at startup, stored on the game state, and **logged to the console** (decimal
-+ base36) so any run can be reproduced.
++ base36) so any run can be reproduced. The seed is also shown in an on-screen chip
+(top-right) that copies it to the clipboard on click; reopening the page with
+`?seed=<value>` replays that run (a numeric URL seed is coerced back to a number so the
+round-trip is exact).
 
 ## Turn Order (strict, every turn)
 

@@ -2,6 +2,7 @@
 // layer. It wires the simulation, renderer, input, and UI overlays together,
 // but never contains gameplay rules itself.
 import { createGame, restart } from './core/gameState.js';
+import { coerceSeed } from './core/rng.js';
 import { EV } from './core/events.js';
 import { createPhaserGame } from './renderer/phaserConfig.js';
 import { createController } from './input/controller.js';
@@ -10,6 +11,7 @@ import { attachPointer } from './input/pointer.js';
 import { createHud } from './ui/hud.js';
 import { createMessageLog } from './ui/messageLog.js';
 import { createGameOver } from './ui/gameOver.js';
+import { createSeedTag } from './ui/seedTag.js';
 
 function randomSeed() {
   const buf = new Uint32Array(1);
@@ -18,9 +20,11 @@ function randomSeed() {
 }
 
 // Prefer an explicit ?seed= in the URL (to reproduce a run), else a fresh seed.
+// A numeric URL seed is coerced to a Number so it reproduces the run it was
+// copied from (see coerceSeed); custom text seeds are used verbatim.
 function chooseSeed() {
   const fromUrl = new URLSearchParams(window.location.search).get('seed');
-  if (fromUrl !== null && fromUrl !== '') return fromUrl;
+  if (fromUrl !== null && fromUrl.trim() !== '') return coerceSeed(fromUrl);
   return randomSeed();
 }
 
@@ -41,6 +45,8 @@ const game = createPhaserGame(parent, state);
 const hud = createHud(document.body);
 const messageLog = createMessageLog(document.body);
 const gameOver = createGameOver(document.body);
+const seedTag = createSeedTag(document.body);
+seedTag.update(state);
 
 function refreshUi() {
   hud.update(state);
@@ -54,6 +60,7 @@ function handleRestart() {
   gameOver.hide();
   const scene = game.registry.get('scene');
   if (scene) scene.rebuildFloor();
+  seedTag.update(state);
   refreshUi();
 }
 
