@@ -40,28 +40,34 @@ function openFrame(map, x, y) {
   return FLOOR_WEIGHTED[variantIndex(x, y, FLOOR_WEIGHTED.length)];
 }
 
-// A wall's appearance in the 2.5D scheme is chosen from its open (floor)
-// neighbours, tracing a lit outline around the darker brick — matching the
-// 0x72 dungeon look:
-//   • floor to the SOUTH  → a brick FACE here + a lit TOP cap raised one tile up
-//   • floor to the WEST   → brick with a lit LEFT edge
-//   • floor to the EAST   → brick with a lit RIGHT edge
-//   • otherwise           → plain brick (deep/interior, rarely seen through fog)
-// Corners (front + a side) take the matching edge-lit face and corner cap.
+// A wall's appearance follows the 0x72 2.5D model (per the art reference):
+//   • Horizontal walls (a room to the N or S) are BRICK WITH A TOP — a brick
+//     face plus a lit tan cap. A wall facing a room to the south raises its cap
+//     one tile up so it reads tall; a wall backing a room to the north caps its
+//     own top edge.
+//   • Vertical walls (a room to the E or W) are TOP ONLY — the tan top surface,
+//     no brick face (you look down their length, never at a face).
+//   • Deep/interior walls are plain brick (rarely seen through the fog).
 function wallSprites(map, x, y) {
+  const oN = !isWallAt(map, x, y - 1);
   const oS = !isWallAt(map, x, y + 1);
   const oE = !isWallAt(map, x + 1, y);
   const oW = !isWallAt(map, x - 1, y);
   if (oS) {
+    // North wall of a room to the south: brick face + a raised lit cap.
     let body = WALL_FRAMES.face;
     let cap = WALL_FRAMES.topMid;
     if (oW) { body = WALL_FRAMES.faceLeft; cap = WALL_FRAMES.topLeft; }
     else if (oE) { body = WALL_FRAMES.faceRight; cap = WALL_FRAMES.topRight; }
-    // [x, y] = face, [x, y-1] = raised cap.
     return [{ x, y, frame: body }, { x, y: y - 1, frame: cap }];
   }
-  if (oW) return [{ x, y, frame: WALL_FRAMES.faceLeft }];
-  if (oE) return [{ x, y, frame: WALL_FRAMES.faceRight }];
+  if (oN) {
+    // South wall of a room to the north: brick with a lit top edge.
+    return [{ x, y, frame: WALL_FRAMES.face }, { x, y, frame: WALL_FRAMES.topMid }];
+  }
+  // Vertical side walls: tan top only, lit edge facing the room.
+  if (oE) return [{ x, y, frame: WALL_FRAMES.edgeRight }];
+  if (oW) return [{ x, y, frame: WALL_FRAMES.edgeLeft }];
   return [{ x, y, frame: WALL_FRAMES.face }];
 }
 

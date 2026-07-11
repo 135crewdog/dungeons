@@ -48,6 +48,9 @@ export const WALL_FRAMES = Object.freeze({
   topMid: 'wall_top_mid',
   topLeft: 'wall_top_left',
   topRight: 'wall_top_right',
+  // Tan "top surface" strips for vertical (E/W) walls — no brick face.
+  edgeLeft: 'wall_edge_mid_left',
+  edgeRight: 'wall_edge_mid_right',
 });
 
 // The base sprite for an entity kind, defaulting to the player's if unknown so
