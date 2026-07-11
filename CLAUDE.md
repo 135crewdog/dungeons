@@ -91,7 +91,7 @@ on floor 1 with a **new random seed** (logged).
 ## Visual Style
 
 **Phase 2** renders the game in **pixel art** using the CC0 **0x72 Dungeon Tileset II**
-(committed at `0x72_DungeonTilesetII_v1.7/`): a single combined atlas addressed by named
+(committed at `src/assets/0x72_DungeonTilesetII_v1.7/`): a single combined atlas addressed by named
 frames from its `tile_list`, plus the tileset's dedicated **low-wall autotile sheet**
 (`atlas_walls_low-16x16.png`, a 3×3-minimal blob of 16×16 cells). Walls are driven from
 that sheet — each wall tile picks a cell from its floor neighbours, so faces, vertical
@@ -142,7 +142,7 @@ src/
               //   floatingText, autotile, tileset/ (manifest, loader, tileList)
   ui/         // HUD, message log, game-over (DOM overlays)
   input/      // keyboard, mouse, touch
-0x72_DungeonTilesetII_v1.7/  // CC0 pixel-art atlas + tile_list (Phase 2 art)
+  assets/     // 0x72_DungeonTilesetII_v1.7/ — CC0 pixel-art atlas + tile_list (Phase 2 art)
 ```
 
 The simulation layer is `core/`, `world/`, `entities/`, `systems/`. The renderer layer

@@ -13,11 +13,11 @@ import { spawnFloatingText } from './floatingText.js';
 
 // The combined 0x72 atlas image + its frame map, bundled by Vite (the ?raw
 // import keeps the atlas map in JS, so nothing extra needs precaching offline).
-import atlasUrl from '../../0x72_DungeonTilesetII_v1.7/0x72_DungeonTilesetII_v1.7.png';
-import tileListText from '../../0x72_DungeonTilesetII_v1.7/tile_list_v1.7?raw';
+import atlasUrl from '../assets/0x72_DungeonTilesetII_v1.7/0x72_DungeonTilesetII_v1.7.png';
+import tileListText from '../assets/0x72_DungeonTilesetII_v1.7/tile_list_v1.7?raw';
 // The dedicated low-wall autotile sheet (12x4 cells of 16x16), driven as an
 // autotile by TileLayer.
-import wallsLowUrl from '../../0x72_DungeonTilesetII_v1.7/atlas_walls_low-16x16.png';
+import wallsLowUrl from '../assets/0x72_DungeonTilesetII_v1.7/atlas_walls_low-16x16.png';
 import { WALLS_LOW_KEY, renderDebugGrid } from './tileset/lowWalls.js';
 
 // Item/entity tints under fog. Enemies are only drawn while visible, so they
