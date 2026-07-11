@@ -68,6 +68,33 @@
       #hud .hud-dim {
         opacity: 0.5;
       }
+      /* Seed chip, top-right (opposite the HUD). Only the button is interactive;
+         the .overlay wrapper stays click-through so map taps nearby still land. */
+      #seedtag {
+        top: max(8px, env(safe-area-inset-top));
+        right: max(10px, env(safe-area-inset-right));
+        font-size: 12px;
+      }
+      .seed-btn {
+        pointer-events: auto;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 0.3px;
+        color: #cdd3e0;
+        background: rgba(18, 22, 32, 0.55);
+        border: 1px solid rgba(205, 211, 224, 0.22);
+        border-radius: 6px;
+        padding: 3px 9px;
+        text-shadow: 0 1px 2px #000, 0 0 2px #000;
+      }
+      .seed-btn:hover {
+        background: rgba(38, 44, 60, 0.85);
+        color: #fff;
+      }
+      .seed-btn:active {
+        transform: translateY(1px);
+      }
       #msglog {
         left: max(10px, env(safe-area-inset-left));
         right: max(10px, env(safe-area-inset-right));

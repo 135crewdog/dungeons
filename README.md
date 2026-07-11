@@ -20,7 +20,8 @@ before you die.
   climb back up and the floor is exactly as you left it
 - HUD with HP + floor number and a scrolling message log
 - Permadeath: die and restart a fresh run
-- Deterministic: every run is driven by a single seed, logged to the console
+- Deterministic: every run is driven by a single seed — logged to the console and shown
+  in a top-right chip you can click to copy; reopen with `?seed=<value>` to replay it
 
 ## Controls
 

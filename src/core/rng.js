@@ -26,6 +26,18 @@ export function createRng(seed) {
   return { seed: s, s };
 }
 
+// Normalize a seed that may have arrived as text (e.g. a URL ?seed= param). A
+// canonical integer string becomes a Number so it folds through hashSeed's
+// idempotent number path — this is what lets a copied decimal seed reproduce its
+// run (hashSeed(number) === number, but hashSeed("123") FNV-hashes the text).
+// Non-integer text (custom string seeds) passes through unchanged.
+export function coerceSeed(input) {
+  if (typeof input !== 'string') return input;
+  const trimmed = input.trim();
+  const n = Number(trimmed);
+  return Number.isInteger(n) && String(n) === trimmed ? n : input;
+}
+
 // Advance the generator and return a float in [0, 1).
 export function nextFloat(rng) {
   rng.s = (rng.s + 0x6d2b79f5) >>> 0;
