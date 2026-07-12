@@ -53,7 +53,9 @@ const game = createPhaserGame(parent, state);
 
 const hud = createHud(document.body);
 const messageLog = createMessageLog(document.body);
-const gameOver = createGameOver(document.body);
+// The menu (created below) layers over the death screen; while it is open, its
+// seed form/input owns Enter/Space, so the death screen's restart shortcut stands down.
+const gameOver = createGameOver(document.body, { isKeyboardBlocked: () => menu.isOpen() });
 
 function refreshUi() {
   hud.update(state);
