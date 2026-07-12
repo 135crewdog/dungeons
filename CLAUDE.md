@@ -54,15 +54,17 @@ like the HP/Floor readouts) or pressing the **Escape** key, and closes the same 
 gameplay — the menu starts closed. While it is open the game is **paused** — the
 composition root gates player input and cancels any in-progress auto-walk — and no turn
 advances. Options: **Resume**, **New run** (fresh random seed), **Restart this seed**
-(replay the current run from floor 1), and a **Seed** section that shows/copies the current
-seed and lets the player paste a seed to regenerate its exact dungeon (routed through the
-same `coerceSeed` + `restart` lifecycle as a `?seed=` URL). The menu is **also reachable
-from the "You died" screen** (the Menu text stays above the death overlay; Escape works
-too) so a dead player can copy the seed or retry the same dungeon. The menu is a DOM
-overlay in `ui/` (like the HUD and game-over screen): it only reads the seed and invokes
-composition-root callbacks, never mutating simulation state or importing the renderer. Its
-look is deliberately plain and NetHack-ish so a future ASCII↔sprite art-style toggle can
-slot into the options list.
+(replay the current run from floor 1), an **Art style** toggle (ASCII ↔ pixel sprites; see
+Visual Style), and a **Seed** section that shows/copies the current seed and lets the player
+paste a seed to regenerate its exact dungeon (routed through the same `coerceSeed` +
+`restart` lifecycle as a `?seed=` URL). The menu is **also reachable from the "You died"
+screen** (the Menu text stays above the death overlay; Escape works too) so a dead player
+can copy the seed or retry the same dungeon. The menu is a DOM overlay in `ui/` (like the
+HUD and game-over screen): it only reads the seed/art-style and invokes composition-root
+callbacks, never mutating simulation state or importing the renderer. Its look is
+deliberately plain and NetHack-ish; the art-style toggle slots into the options list without
+disturbing it. The chosen style is persisted (localStorage, via `ui/settings.js`, owned by
+the composition root — the renderer never reads storage).
 
 ## Turn Order (strict, every turn)
 
@@ -116,12 +118,24 @@ on floor 1 with a **new random seed** (logged).
 
 ## Visual Style
 
-The entire game renders in **ASCII, monospace**. Floor `.` · Wall `#` · Player `@` ·
-Enemies single letters (`g` goblin, `s` skeleton) · Potion `!` · Stairs down `>` ·
-Stairs up `<` · Door `+` · Unexplored space · Explored-but-not-visible: same glyph,
-darker. This is the
-intentional Phase-1 art style, not a placeholder. The renderer is structured so sprites
-could swap in later (`tileStyle.js` is the seam) without touching game logic.
+Two interchangeable styles, chosen from the pause menu's **Art style** toggle and
+remembered across sessions:
+
+- **ASCII, monospace** (default). Floor `.` · Wall `#` · Player `@` · Enemies single letters
+  (`g` goblin, `s` skeleton) · Potion `!` · Stairs down `>` · Stairs up `<` · Door `+` ·
+  Unexplored space · Explored-but-not-visible: same glyph, darker. This is the intentional
+  Phase-1 art style, not a placeholder.
+- **Pixel** (Phase 2). Full-color 16×16 sprites for the same tiles/entities/items, vendored
+  under `public/sprites/spd/` (see that dir's `CREDITS.txt` for source + the licensing
+  caveat — the art is not openly licensed for reuse). Sprites are loaded lazily the first
+  time pixel mode is selected, so ASCII (which needs no assets) always paints first;
+  remembered tiles/items are dimmed with a tint, matching the ASCII darkening.
+
+The seam is designed for exactly this swap without touching game logic: **`tileStyle.js`** is
+the ASCII strategy, **`spriteStyle.js`** the pixel one (both pure — tile/entity/item → glyph
+or texture key), and **`painter.js`** adapts each to the scene's draw loops. The scene selects
+a painter (`setRenderStyle`) and rebuilds; nothing outside `renderer/` changes, and the menu
+stays Phaser-free (it calls a composition-root callback, per the architecture guard).
 
 ## Canvas and Resolution
 
