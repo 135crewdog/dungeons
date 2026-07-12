@@ -1,0 +1,29 @@
+Pixel-art sprites used by the game's "Pixel" render style.
+
+Source: Shattered Pixel Dungeon
+  https://github.com/00-Evan/shattered-pixel-dungeon
+  Pinned commit: 7b8b845a76fe76c6b7c031ae9e570852411f56db
+  Files: core/src/main/assets/{environment/tiles_sewers.png,
+         sprites/warrior.png, sprites/gnoll.png, sprites/skeleton.png,
+         sprites/items.png}
+
+Each PNG here is a single 16x16 (player is 12x15) cell cut from those atlases:
+  floor.png        <- tiles_sewers.png  cell (col 0,  row 0)
+  wall.png         <- tiles_sewers.png  cell (col 0,  row 5)
+  door.png         <- tiles_sewers.png  cell (col 8,  row 3)
+  stairs_down.png  <- tiles_sewers.png  cell (col 0,  row 4)
+  stairs_up.png    <- tiles_sewers.png  cell (col 12, row 3)
+  potion.png       <- items.png         cell (col 0,  row 22)
+  player.png       <- warrior.png       frame 0 (idle)
+  goblin.png       <- gnoll.png          frame 0 (idle)   [gnoll stands in for "goblin"]
+  skeleton.png     <- skeleton.png       frame 0 (idle)
+
+IMPORTANT — LICENSING
+  Shattered Pixel Dungeon's *source code* is GPLv3, but its *art and audio
+  assets are NOT covered by that license*. The author, Evan Debenham, does not
+  grant permission to reuse Shattered Pixel Dungeon's visual assets in other
+  projects. These sprites are included here at the project owner's explicit
+  request and should be treated as all-rights-reserved. Do NOT redistribute or
+  publish this build publicly without securing rights, or swap in freely
+  licensed art first (e.g. the CC0 "0x72 DungeonTileset II" already vendored at
+  the repository root).
