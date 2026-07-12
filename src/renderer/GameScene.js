@@ -3,7 +3,8 @@ import { getPlayer, entitiesSorted, isVisible, isExplored } from '../core/query.
 import { EV } from '../core/events.js';
 import { GlyphGrid, createGlyphTextures } from './glyphLayer.js';
 import { computeZoom, tileCenterWorld, worldToTile } from './camera.js';
-import { createAsciiPainter } from './painter.js';
+import { createAsciiPainter, createPixelPainter } from './painter.js';
+import { SPD_SPRITES, SPRITE_DIR } from './spriteStyle.js';
 import { spawnFloatingText } from './floatingText.js';
 
 // The one Phaser scene. It OBSERVES the game state and draws it — glyph grid,
@@ -22,7 +23,12 @@ export class DungeonScene extends Phaser.Scene {
     // ASCII is the default and needs no external assets, so it's always ready
     // to draw the first frame. The pixel painter (and its sprite load) is
     // swapped in later by setRenderStyle when the player opts into it.
-    this.painter = createAsciiPainter();
+    this.asciiPainter = createAsciiPainter();
+    this.pixelPainter = null; // created after its sprites finish loading
+    this.pixelAssetsLoaded = false;
+    this.pixelLoading = false;
+    this.renderStyle = 'ascii';
+    this.painter = this.asciiPainter;
 
     this.grid = new GlyphGrid(this, this.painter);
     this.grid.build(this.state.map);
@@ -43,6 +49,10 @@ export class DungeonScene extends Phaser.Scene {
     this.registry.set('scene', this);
 
     this.render();
+
+    // Honor a persisted "pixel" preference: the ASCII frame is already on
+    // screen, so this only kicks the sprite load and upgrades once it's ready.
+    if (this.registry.get('artStyle') === 'pixel') this.setRenderStyle('pixel');
 
     // Scale.NONE means we own the sizing: keep the device-pixel buffer, the CSS
     // display size, and the integer zoom in sync with the window.
@@ -87,6 +97,63 @@ export class DungeonScene extends Phaser.Scene {
     this.itemImages.clear();
     this.entityImages.clear();
     this.render();
+  }
+
+  // Switch art styles. ASCII is instant (its textures always exist). Pixel
+  // first ensures its sprites are loaded, then swaps the painter and rebuilds
+  // so the two styles' differing Image geometry is recreated cleanly — the
+  // painter is never swapped before its textures exist, so no frame ever draws
+  // a missing (green) texture.
+  setRenderStyle(style) {
+    const next = style === 'pixel' ? 'pixel' : 'ascii';
+    if (next === 'ascii') {
+      this.renderStyle = 'ascii';
+      this.painter = this.asciiPainter;
+      this.rebuildFloor();
+      return;
+    }
+    this.ensurePixelAssets(() => {
+      this.renderStyle = 'pixel';
+      if (!this.pixelPainter) this.pixelPainter = createPixelPainter();
+      this.painter = this.pixelPainter;
+      this.rebuildFloor();
+    });
+  }
+
+  // Lazily load the pixel sprite set once, invoking onReady when every texture
+  // is available. Loading is kicked from create()/setRenderStyle after the
+  // scene is live, which is a supported Phaser mid-scene load.
+  ensurePixelAssets(onReady) {
+    if (this.pixelAssetsLoaded) {
+      onReady();
+      return;
+    }
+    if (this.pixelLoading) {
+      this.load.once(Phaser.Loader.Events.COMPLETE, onReady);
+      return;
+    }
+    let queued = 0;
+    const base = import.meta.env.BASE_URL;
+    for (const { key, file } of SPD_SPRITES) {
+      if (this.textures.exists(key)) continue;
+      this.load.image(key, base + SPRITE_DIR + file);
+      queued++;
+    }
+    if (queued === 0) {
+      this.pixelAssetsLoaded = true;
+      onReady();
+      return;
+    }
+    this.pixelLoading = true;
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      this.pixelLoading = false;
+      this.pixelAssetsLoaded = true;
+      onReady();
+    });
+    this.load.once(Phaser.Loader.Events.FILE_LOAD_ERROR, (file) => {
+      console.warn(`[dungeons] failed to load pixel sprite: ${file?.key} (${file?.url})`);
+    });
+    this.load.start();
   }
 
   // Repaint everything from current state and recenter the camera.
