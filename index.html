@@ -72,7 +72,8 @@
          the .overlay wrapper stays click-through so map taps nearby still land. */
       #seedtag {
         top: max(8px, env(safe-area-inset-top));
-        right: max(10px, env(safe-area-inset-right));
+        /* Leave room for the menu button (☰), which sits at the far right. */
+        right: calc(max(10px, env(safe-area-inset-right)) + 40px);
         font-size: 12px;
       }
       .seed-btn {
@@ -108,6 +109,194 @@
         line-height: 1.35;
         text-shadow: 0 1px 2px #000, 0 0 2px #000;
       }
+      /* Menu button (☰): top-right corner, styled like the seed chip. Appended
+         straight to <body>, so it positions itself (no .overlay wrapper). */
+      #menubtn {
+        position: fixed;
+        z-index: 10;
+        top: max(8px, env(safe-area-inset-top));
+        right: max(10px, env(safe-area-inset-right));
+        width: 30px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        font-family: 'DejaVu Sans Mono', 'Courier New', monospace;
+        font-size: 16px;
+        line-height: 1;
+        color: #cdd3e0;
+        background: rgba(18, 22, 32, 0.55);
+        border: 1px solid rgba(205, 211, 224, 0.22);
+        border-radius: 6px;
+        cursor: pointer;
+        text-shadow: 0 1px 2px #000, 0 0 2px #000;
+      }
+      #menubtn:hover {
+        background: rgba(38, 44, 60, 0.85);
+        color: #fff;
+      }
+      #menubtn:active {
+        transform: translateY(1px);
+      }
+
+      /* Pause/options menu: a modal panel over a dimmed backdrop. The backdrop
+         captures pointer events so map taps behind it don't fall through. */
+      #menu {
+        inset: 0;
+        z-index: 20;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(5, 6, 10, 0.82);
+        pointer-events: auto;
+      }
+      #menu.show {
+        display: flex;
+      }
+      .menu-panel {
+        box-sizing: border-box;
+        width: min(340px, 88vw);
+        max-height: 88vh;
+        overflow-y: auto;
+        background: rgba(14, 18, 27, 0.97);
+        border: 1px solid rgba(205, 211, 224, 0.18);
+        border-radius: 10px;
+        padding: 16px 18px 18px;
+        box-shadow: 0 12px 44px rgba(0, 0, 0, 0.55);
+        outline: none;
+      }
+      .menu-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .menu-head h2 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: 2px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .menu-x {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        font-family: inherit;
+        font-size: 20px;
+        line-height: 1;
+        color: #cdd3e0;
+        background: transparent;
+        border: 0;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .menu-x:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .menu-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .menu-actions button {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        width: 100%;
+        padding: 10px 12px;
+        font-family: inherit;
+        font-size: 15px;
+        text-align: left;
+        color: #e7ebf3;
+        background: rgba(38, 44, 60, 0.6);
+        border: 1px solid rgba(205, 211, 224, 0.14);
+        border-radius: 7px;
+        cursor: pointer;
+      }
+      .menu-actions button:hover {
+        background: rgba(58, 66, 86, 0.9);
+        color: #fff;
+      }
+      .menu-actions button:active {
+        transform: translateY(1px);
+      }
+      .menu-sub {
+        font-size: 12px;
+        font-weight: 400;
+        opacity: 0.55;
+      }
+      .menu-seed {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(205, 211, 224, 0.12);
+      }
+      .menu-seed-label {
+        margin-bottom: 8px;
+        font-size: 12px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        opacity: 0.55;
+      }
+      .menu-seed-row {
+        display: flex;
+        gap: 8px;
+        align-items: stretch;
+        margin: 0 0 8px;
+      }
+      .menu-seed-val {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        padding: 7px 10px;
+        font-family: inherit;
+        font-size: 13px;
+        color: #cdd3e0;
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(205, 211, 224, 0.12);
+        border-radius: 6px;
+      }
+      .menu-seed-input {
+        flex: 1;
+        min-width: 0;
+        box-sizing: border-box;
+        padding: 7px 10px;
+        font-family: inherit;
+        font-size: 13px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(205, 211, 224, 0.18);
+        border-radius: 6px;
+      }
+      .menu-seed-input:focus {
+        outline: none;
+        border-color: rgba(122, 208, 122, 0.6);
+      }
+      .menu-seed button {
+        padding: 7px 14px;
+        font-family: inherit;
+        font-size: 13px;
+        color: #05060a;
+        background: #cdd3e0;
+        border: 0;
+        border-radius: 6px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .menu-seed button:hover {
+        background: #fff;
+      }
+      .menu-hint {
+        margin-top: 2px;
+        font-size: 12px;
+        opacity: 0.5;
+      }
+
       #gameover {
         inset: 0;
         display: none;

@@ -43,7 +43,22 @@ generated at startup, stored on the game state, and **logged to the console** (d
 + base36) so any run can be reproduced. The seed is also shown in an on-screen chip
 (top-right) that copies it to the clipboard on click; reopening the page with
 `?seed=<value>` replays that run (a numeric URL seed is coerced back to a number so the
-round-trip is exact).
+round-trip is exact). The active seed is kept in sync with the URL (`history.replaceState`,
+no reload) whenever a run starts, so a refresh reproduces the current run.
+
+## Pause Menu
+
+A menu overlay opens via the **☰ icon** (top-right, beside the seed chip) or the
+**Escape** key, and closes the same ways (Escape, the Resume/× button, or clicking the
+backdrop). While it is open the game is **paused** — the composition root gates player
+input and cancels any in-progress auto-walk — and no turn advances. Options: **Resume**,
+**New run** (fresh random seed), **Restart this seed** (replay the current run from floor
+1), and a **Seed** section that shows/copies the current seed and lets the player paste a
+seed to regenerate its exact dungeon (routed through the same `coerceSeed` + `restart`
+lifecycle as a `?seed=` URL). The menu is a DOM overlay in `ui/` (like the HUD and
+game-over screen): it only reads the seed and invokes composition-root callbacks, never
+mutating simulation state or importing the renderer. It stays deliberately small so a
+future ASCII↔sprite art-style toggle can slot into the options list.
 
 ## Turn Order (strict, every turn)
 

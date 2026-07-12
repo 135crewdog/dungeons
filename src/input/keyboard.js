@@ -29,6 +29,9 @@ const MOVE_BY_CODE = {
 // detach function.
 export function attachKeyboard(target, dispatch) {
   function onKeyDown(e) {
+    // Don't hijack keys while the user is typing in a field (e.g. the menu's
+    // seed input) — WASD must reach the input, not move the player.
+    if (isEditable(e.target)) return;
     const move = MOVE_BY_CODE[e.code];
     if (!move) return;
     e.preventDefault();
@@ -36,4 +39,10 @@ export function attachKeyboard(target, dispatch) {
   }
   target.addEventListener('keydown', onKeyDown);
   return () => target.removeEventListener('keydown', onKeyDown);
+}
+
+function isEditable(el) {
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
 }

@@ -47,8 +47,9 @@ export function createSeedTag(parent) {
 
 // Copy text to the clipboard, returning whether it succeeded. Uses the async
 // Clipboard API in secure contexts and falls back to a hidden textarea +
-// execCommand for older or non-secure ones.
-async function writeClipboard(text) {
+// execCommand for older or non-secure ones. Exported so the menu's seed copy
+// shares one implementation.
+export async function writeClipboard(text) {
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text);
