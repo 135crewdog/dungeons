@@ -81,7 +81,13 @@ export function createController(state, onTurn, schedule = defaultSchedule) {
     cancelTimer = schedule(stepAlongPath, STEP_DELAY_MS);
   }
 
-  return { dispatch };
+  // Cancel any in-progress auto-walk without issuing a command. Used when the
+  // game is paused (e.g. the menu opens) so the player doesn't keep stepping.
+  function cancel() {
+    stopAutoWalk();
+  }
+
+  return { dispatch, cancel };
 }
 
 // Default scheduler: setTimeout, returning a canceller. Injectable for tests.

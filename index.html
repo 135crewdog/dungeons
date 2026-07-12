@@ -68,33 +68,6 @@
       #hud .hud-dim {
         opacity: 0.5;
       }
-      /* Seed chip, top-right (opposite the HUD). Only the button is interactive;
-         the .overlay wrapper stays click-through so map taps nearby still land. */
-      #seedtag {
-        top: max(8px, env(safe-area-inset-top));
-        right: max(10px, env(safe-area-inset-right));
-        font-size: 12px;
-      }
-      .seed-btn {
-        pointer-events: auto;
-        cursor: pointer;
-        font-family: inherit;
-        font-size: 12px;
-        letter-spacing: 0.3px;
-        color: #cdd3e0;
-        background: rgba(18, 22, 32, 0.55);
-        border: 1px solid rgba(205, 211, 224, 0.22);
-        border-radius: 6px;
-        padding: 3px 9px;
-        text-shadow: 0 1px 2px #000, 0 0 2px #000;
-      }
-      .seed-btn:hover {
-        background: rgba(38, 44, 60, 0.85);
-        color: #fff;
-      }
-      .seed-btn:active {
-        transform: translateY(1px);
-      }
       #msglog {
         left: max(10px, env(safe-area-inset-left));
         right: max(10px, env(safe-area-inset-right));
@@ -108,6 +81,184 @@
         line-height: 1.35;
         text-shadow: 0 1px 2px #000, 0 0 2px #000;
       }
+      /* Menu trigger: plain HUD text ("Menu"), top-right, matching the HP/Floor
+         readouts. Appended straight to <body>, so it positions itself. Its
+         z-index sits above the death overlay (10) but below the open menu panel
+         (20), so it stays tappable on the "You died" screen. */
+      #menubtn {
+        position: fixed;
+        z-index: 15;
+        top: max(8px, env(safe-area-inset-top));
+        right: max(10px, env(safe-area-inset-right));
+        margin: 0;
+        padding: 0;
+        font-family: 'DejaVu Sans Mono', 'Courier New', monospace;
+        font-size: 15px;
+        color: #cdd3e0;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-shadow: 0 1px 2px #000, 0 0 2px #000;
+      }
+      #menubtn:hover {
+        color: #fff;
+      }
+      #menubtn:active {
+        transform: translateY(1px);
+      }
+      /* Keep it looking like plain text: no default focus box. Keyboard focus is
+         still indicated, just by brightening the text (same as hover). */
+      #menubtn:focus {
+        outline: none;
+      }
+      #menubtn:focus-visible {
+        color: #fff;
+      }
+
+      /* Pause/options menu: a plain terminal-style panel over a dimmed backdrop.
+         The backdrop captures pointer events so map taps behind it don't fall
+         through. Kept deliberately flat and monospace — NetHack-ish. */
+      #menu {
+        inset: 0;
+        z-index: 20;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(5, 6, 10, 0.82);
+        pointer-events: auto;
+      }
+      #menu.show {
+        display: flex;
+      }
+      .menu-panel {
+        box-sizing: border-box;
+        width: min(320px, 90vw);
+        max-height: 90vh;
+        overflow-y: auto;
+        background: #0b0d12;
+        border: 1px solid #3a4256;
+        padding: 12px 14px 14px;
+        outline: none;
+      }
+      .menu-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #232838;
+      }
+      .menu-head h2 {
+        margin: 0;
+        font-size: 15px;
+        letter-spacing: 1px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .menu-x {
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        font-family: inherit;
+        font-size: 17px;
+        line-height: 1;
+        color: #8a93a6;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+      }
+      .menu-x:hover {
+        color: #fff;
+      }
+      /* Options read as a plain text list; hover inverts the row like a
+         highlighted NetHack menu selection. */
+      .menu-actions {
+        display: flex;
+        flex-direction: column;
+      }
+      .menu-actions button {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        width: 100%;
+        padding: 5px 8px;
+        font-family: inherit;
+        font-size: 14px;
+        text-align: left;
+        color: #cdd3e0;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+      }
+      .menu-actions button:hover {
+        background: #cdd3e0;
+        color: #05060a;
+      }
+      .menu-seed {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid #232838;
+      }
+      .menu-seed-label {
+        margin-bottom: 6px;
+        font-size: 12px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: #8a93a6;
+      }
+      .menu-seed-row {
+        display: flex;
+        gap: 6px;
+        align-items: stretch;
+        margin: 0 0 6px;
+      }
+      .menu-seed-val {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        padding: 5px 8px;
+        font-family: inherit;
+        font-size: 13px;
+        color: #cdd3e0;
+        background: #05060a;
+        border: 1px solid #232838;
+      }
+      .menu-seed-input {
+        flex: 1;
+        min-width: 0;
+        box-sizing: border-box;
+        padding: 5px 8px;
+        font-family: inherit;
+        font-size: 13px;
+        color: #fff;
+        background: #05060a;
+        border: 1px solid #3a4256;
+      }
+      .menu-seed-input:focus {
+        outline: none;
+        border-color: #7ad07a;
+      }
+      .menu-seed button {
+        padding: 5px 12px;
+        font-family: inherit;
+        font-size: 13px;
+        color: #05060a;
+        background: #cdd3e0;
+        border: 0;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .menu-seed button:hover {
+        background: #fff;
+      }
+      .menu-hint {
+        margin-top: 2px;
+        font-size: 12px;
+        color: #8a93a6;
+      }
+
       #gameover {
         inset: 0;
         display: none;
@@ -146,6 +297,15 @@
       }
       .go-panel button:hover {
         background: #fff;
+      }
+      .go-hint {
+        opacity: 0.55;
+        font-size: 12px !important;
+        margin-top: 14px !important;
+      }
+      .go-hint b {
+        color: #cdd3e0;
+        font-weight: 700;
       }
     </style>
   </head>
