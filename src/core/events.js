@@ -8,6 +8,7 @@ export const EV = Object.freeze({
   ATTACK: 'attack',
   PICKUP: 'pickup',
   DESCEND: 'descend',
+  ASCEND: 'ascend',
   DEATH: 'death',
 });
 
@@ -25,6 +26,10 @@ export function pickupEvent(itemId, x, y, heal) {
 
 export function descendEvent(floor) {
   return { type: EV.DESCEND, floor };
+}
+
+export function ascendEvent(floor) {
+  return { type: EV.ASCEND, floor };
 }
 
 export function deathEvent(id, kind) {

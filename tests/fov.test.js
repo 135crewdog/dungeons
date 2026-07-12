@@ -41,10 +41,10 @@ describe('symmetric shadowcasting', () => {
     expect(v.has(4 * 5 + 2)).toBe(false);
   });
 
-  it('open doors do not block sight', () => {
-    const grid = parseGrid(['.....', '.....', '..+..', '.....', '.....']);
+  it('sees straight through open (non-blocking) tiles', () => {
+    const grid = parseGrid(['.....', '.....', '.....', '.....', '.....']);
     const v = fovSet(grid, 2, 0);
-    expect(v.has(4 * 5 + 2)).toBe(true); // visible straight through the door
+    expect(v.has(4 * 5 + 2)).toBe(true); // clear column, far tile visible
   });
 
   it('is symmetric: if O sees T then T sees O (over open tiles)', () => {
@@ -123,5 +123,41 @@ describe('visibility', () => {
     // A tile far outside the room is never visible from inside it.
     expect(state.vis.visible[idx(map, 0, 0)]).toBe(0);
     expect(state.vis.visible[idx(map, player.x, player.y)]).toBe(1);
+  });
+});
+
+// A 9x3 corridor along y=1 with a closed door at x=4, no rooms (roomAt all -1).
+function doorCorridorState(playerX) {
+  const width = 9;
+  const height = 3;
+  const tiles = new Uint8Array(width * height); // all WALL
+  const roomAt = new Int16Array(width * height).fill(-1);
+  const map = { width, height, tiles, rooms: [], roomAt, stairsDown: null, stairsUp: null };
+  for (let x = 1; x <= 7; x++) tiles[idx(map, x, 1)] = TILE.FLOOR;
+  tiles[idx(map, 4, 1)] = TILE.DOOR;
+  const player = { id: 1, kind: 'player', x: playerX, y: 1, hp: 20, maxHp: 20, damage: 4, glyph: '@' };
+  const state = {
+    map,
+    vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
+    entities: { nextId: 2, playerId: 1, byId: new Map([[1, player]]) },
+  };
+  return { state, map, player };
+}
+
+describe('closed doors block sight', () => {
+  it('you see the door but not the corridor beyond it', () => {
+    const { state, map } = doorCorridorState(2);
+    updateVisibility(state);
+    expect(state.vis.visible[idx(map, 3, 1)]).toBe(1); // near side, before the door
+    expect(state.vis.visible[idx(map, 4, 1)]).toBe(1); // the door itself is seen
+    expect(state.vis.visible[idx(map, 5, 1)]).toBe(0); // hidden beyond the door
+    expect(state.vis.visible[idx(map, 6, 1)]).toBe(0);
+  });
+
+  it('standing in the doorway reveals both sides', () => {
+    const { state, map } = doorCorridorState(4); // on the door tile
+    updateVisibility(state);
+    expect(state.vis.visible[idx(map, 2, 1)]).toBe(1);
+    expect(state.vis.visible[idx(map, 6, 1)]).toBe(1);
   });
 });

@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   ENTITY_SPRITE,
   FLOOR_FRAMES,
-  STAIRS_FRAME,
+  STAIRS_DOWN_FRAME,
+  STAIRS_UP_FRAME,
   POTION_FRAME,
   entitySprite,
   resolveAction,
@@ -90,10 +91,11 @@ describe('animSpecs / keys', () => {
 });
 
 describe('tile/item frame constants', () => {
-  it('exposes floor variants, stairs and potion', () => {
+  it('exposes floor variants, both stairs and potion', () => {
     expect(FLOOR_FRAMES.length).toBe(8);
     expect(FLOOR_FRAMES[0]).toBe('floor_1');
-    expect(STAIRS_FRAME).toBe('floor_stairs');
+    expect(STAIRS_DOWN_FRAME).toBe('floor_stairs');
+    expect(STAIRS_UP_FRAME).toBe('floor_ladder');
     expect(POTION_FRAME).toBe('flask_red');
   });
 });

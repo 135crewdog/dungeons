@@ -34,7 +34,10 @@ const LOOPING = Object.freeze({ idle: true, run: true, hit: false, death: false 
 export const FLOOR_FRAMES = Object.freeze([
   'floor_1', 'floor_2', 'floor_3', 'floor_4', 'floor_5', 'floor_6', 'floor_7', 'floor_8',
 ]);
-export const STAIRS_FRAME = 'floor_stairs';
+// Stairs are two tiles now (Phase 1a): a descending staircase and an ascending
+// ladder, drawn distinctly so the player can tell the exit from the way back.
+export const STAIRS_DOWN_FRAME = 'floor_stairs';
+export const STAIRS_UP_FRAME = 'floor_ladder';
 export const POTION_FRAME = 'flask_red';
 
 // Walls are NOT assembled from these named atlas pieces anymore — they come from

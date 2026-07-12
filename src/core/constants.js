@@ -9,8 +9,15 @@ export const TILE = Object.freeze({
   WALL: 0,
   FLOOR: 1,
   DOOR: 2,
-  STAIRS: 3,
+  STAIRS_DOWN: 3,
+  STAIRS_UP: 4,
 });
+
+// The player entity always uses this fixed id. Enemies/items on every floor
+// start allocating at 2, so the carried-over player never collides with them
+// and stays the lowest id (drawn first, and its slot is free when a cached
+// floor is restored).
+export const PLAYER_ID = 1;
 
 // Combat.
 export const HIT_CHANCE = 0.75;
@@ -46,6 +53,10 @@ export const MAX_POTIONS = 3;
 // Field of view: unbounded line of sight within walls (classic). A large radius
 // stands in for "unbounded" while bounding worst-case work on open maps.
 export const FOV_RADIUS = 40;
+
+// How many turns an aggroed enemy keeps hunting after it loses line of sight
+// before giving up (it heads to the last place it saw the player first).
+export const DEAGGRO_TURNS = 6;
 
 // Auto-walk pacing: ms between stored-path steps so movement is visible.
 export const STEP_DELAY_MS = 90;

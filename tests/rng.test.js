@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   hashSeed,
   createRng,
+  coerceSeed,
   nextFloat,
   nextInt,
   chance,
@@ -40,6 +41,20 @@ describe('rng', () => {
     const a = createRng('seed-string');
     const b = createRng('seed-string');
     expect(nextFloat(a)).toBe(nextFloat(b));
+  });
+
+  it('coerceSeed turns a numeric string into the equivalent number seed', () => {
+    // A run started from number N logs/copies "N"; reopening ?seed=N must
+    // reproduce it. coerceSeed makes the string fold to the same 32-bit seed.
+    const n = 2847619203;
+    expect(coerceSeed(String(n))).toBe(n);
+    expect(createRng(coerceSeed(String(n))).seed).toBe(createRng(n).seed);
+    // Whitespace tolerated; leading zeros / non-canonical forms stay strings.
+    expect(coerceSeed('  42  ')).toBe(42);
+    expect(coerceSeed('007')).toBe('007');
+    expect(coerceSeed('1e3')).toBe('1e3');
+    expect(coerceSeed('seed-string')).toBe('seed-string');
+    expect(coerceSeed(42)).toBe(42);
   });
 
   it('nextFloat stays in [0, 1)', () => {

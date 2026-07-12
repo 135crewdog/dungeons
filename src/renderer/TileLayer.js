@@ -12,7 +12,7 @@
 import { TILE, TILE_SIZE } from '../core/constants.js';
 import { idx } from '../core/query.js';
 import { isWallAt, variantIndex } from './autotile.js';
-import { ATLAS_KEY, FLOOR_FRAMES, STAIRS_FRAME } from './tileset/manifest.js';
+import { ATLAS_KEY, FLOOR_FRAMES, STAIRS_DOWN_FRAME, STAIRS_UP_FRAME } from './tileset/manifest.js';
 import { WALLS_LOW_KEY, lowWallFrame } from './tileset/lowWalls.js';
 
 // Tints: currently-lit tiles draw at full colour; remembered (explored but not
@@ -31,9 +31,11 @@ function isOpen(map, x, y) {
   return !isWallAt(map, x, y);
 }
 
-// Frame for an open tile: stairs get their own art; floors pick a variant.
+// Frame for an open tile: each stair type gets its own art; floors pick a variant.
 function openFrame(map, x, y) {
-  if (map.tiles[idx(map, x, y)] === TILE.STAIRS) return STAIRS_FRAME;
+  const t = map.tiles[idx(map, x, y)];
+  if (t === TILE.STAIRS_DOWN) return STAIRS_DOWN_FRAME;
+  if (t === TILE.STAIRS_UP) return STAIRS_UP_FRAME;
   return FLOOR_WEIGHTED[variantIndex(x, y, FLOOR_WEIGHTED.length)];
 }
 
@@ -61,7 +63,8 @@ export class TileLayer {
         const sprites = [];
         if (isOpen(map, x, y)) {
           const s = this.placeAtlas(x, y, openFrame(map, x, y));
-          if (map.tiles[i] === TILE.STAIRS) this.stairsSprite = s;
+          // Shimmer the down-stairs (the exit deeper) to draw the eye.
+          if (map.tiles[i] === TILE.STAIRS_DOWN) this.stairsSprite = s;
           sprites.push(s);
         } else {
           // Floor base under the wall (fills the face's lip / the room-side of
