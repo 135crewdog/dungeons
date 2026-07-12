@@ -11,7 +11,6 @@ import { attachPointer } from './input/pointer.js';
 import { createHud } from './ui/hud.js';
 import { createMessageLog } from './ui/messageLog.js';
 import { createGameOver } from './ui/gameOver.js';
-import { createSeedTag } from './ui/seedTag.js';
 import { createMenu } from './ui/menu.js';
 
 function randomSeed() {
@@ -55,8 +54,6 @@ const game = createPhaserGame(parent, state);
 const hud = createHud(document.body);
 const messageLog = createMessageLog(document.body);
 const gameOver = createGameOver(document.body);
-const seedTag = createSeedTag(document.body);
-seedTag.update(state);
 
 function refreshUi() {
   hud.update(state);
@@ -73,7 +70,6 @@ function startRun(seed) {
   gameOver.hide();
   const scene = game.registry.get('scene');
   if (scene) scene.rebuildFloor();
-  seedTag.update(state);
   menu.refresh();
   refreshUi();
 }
@@ -100,7 +96,9 @@ const controller = createController(state, (events) => {
 // lifecycle function); the menu itself never mutates state or touches Phaser.
 const menu = createMenu(document.body, {
   getSeed: () => state.seed,
-  canOpen: () => state.status === 'playing',
+  // Openable while playing and after death, so a dead player can grab the seed
+  // or retry the same dungeon (Restart this seed) from the menu.
+  canOpen: () => state.status === 'playing' || state.status === 'dead',
   onOpen: () => controller.cancel(), // stop any auto-walk while paused
   onNewRun: () => startRun(randomSeed()),
   onRestartSeed: () => startRun(state.seed),

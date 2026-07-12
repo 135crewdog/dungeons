@@ -8,7 +8,7 @@
 // is effectively paused. The menu deliberately stays small; a future ASCII↔
 // sprite toggle would slot into the actions list without restructuring it.
 
-import { writeClipboard } from './seedTag.js';
+import { writeClipboard } from './clipboard.js';
 
 // `actions` wires the menu to the composition root:
 //   getSeed()        → the current run's seed (for display / copy)
@@ -18,13 +18,13 @@ import { writeClipboard } from './seedTag.js';
 //   onRestartSeed()  → replay the current run from floor 1 (same seed)
 //   onLoadSeed(text) → start a run from a user-entered seed
 export function createMenu(parent, actions) {
+  // The trigger is plain HUD text ("Menu"), anchored top-right — same visual
+  // language as the HP/Floor readouts, not a boxed icon.
   const button = document.createElement('button');
   button.id = 'menubtn';
-  button.className = 'overlay-btn';
   button.type = 'button';
-  button.setAttribute('aria-label', 'Menu');
   button.setAttribute('aria-haspopup', 'dialog');
-  button.textContent = '☰';
+  button.textContent = 'Menu';
   parent.appendChild(button);
 
   const el = document.createElement('div');
@@ -36,8 +36,8 @@ export function createMenu(parent, actions) {
     '<button class="menu-x" type="button" data-act="resume" aria-label="Resume">×</button></div>' +
     '<div class="menu-actions">' +
     '<button type="button" data-act="resume">Resume</button>' +
-    '<button type="button" data-act="newrun">New run<span class="menu-sub">new seed</span></button>' +
-    '<button type="button" data-act="restart">Restart this seed<span class="menu-sub">replay from floor 1</span></button>' +
+    '<button type="button" data-act="newrun">New run</button>' +
+    '<button type="button" data-act="restart">Restart this seed</button>' +
     '</div>' +
     '<div class="menu-seed">' +
     '<div class="menu-seed-label">Seed</div>' +
