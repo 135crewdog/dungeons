@@ -8,7 +8,7 @@
 // so this module imports no Phaser. Selecting the painter (and recreating the
 // Images under it via rebuildFloor) is the whole art-style switch.
 
-import { TILE_SIZE } from '../core/constants.js';
+import { TILE_SIZE, TILE } from '../core/constants.js';
 import { tileToWorld } from './camera.js';
 import { glyphKey } from './glyphLayer.js';
 import {
@@ -21,7 +21,14 @@ import {
   itemColor,
   scaleColor,
 } from './tileStyle.js';
-import { tileSprite, entitySprite, itemSprite, REMEMBERED_TINT } from './spriteStyle.js';
+import {
+  tileSprite,
+  entitySprite,
+  itemSprite,
+  wallMask,
+  WALL_SHEET,
+  REMEMBERED_TINT,
+} from './spriteStyle.js';
 
 // ASCII: white glyph textures + per-image tint (the original renderer, verbatim).
 // Color carries identity, so remembered tiles/items dim by scaling the tint.
@@ -74,7 +81,20 @@ export function createPixelPainter() {
     newTileImage(scene, wx, wy) {
       return scene.add.image(wx, wy, 'spd:floor').setOrigin(0, 0).setVisible(false);
     },
-    paintTile(img, tileType, vis) {
+    paintTile(img, tileType, vis, map, x, y) {
+      if (tileType === TILE.WALL) {
+        // Autotiled: pick the frame from which neighbors are open to the room.
+        const mask = wallMask(x, y, (nx, ny) =>
+          nx < 0 || ny < 0 || nx >= map.width || ny >= map.height
+            ? true
+            : map.tiles[ny * map.width + nx] === TILE.WALL,
+        );
+        img.setTexture(WALL_SHEET.key, mask);
+        if (vis === VIS.VISIBLE) img.clearTint();
+        else img.setTint(REMEMBERED_TINT);
+        img.setVisible(true);
+        return;
+      }
       const key = tileSprite(tileType);
       if (!key) {
         img.setVisible(false);

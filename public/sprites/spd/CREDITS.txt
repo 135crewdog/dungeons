@@ -9,7 +9,10 @@ Source: Shattered Pixel Dungeon
 
 Each PNG here is a single 16x16 (player is 12x15) cell cut from those atlases:
   floor.png        <- tiles_sewers.png  cell (col 0,  row 0)
-  wall.png         <- tiles_sewers.png  cell (col 0,  row 5)
+  wall_autotile.png<- tiles_sewers.png  cell (col 0,  row 5), baked into a
+                      16-frame (4x4) autotile sheet: the brick with a lit edge
+                      "cap" added on each side that faces open floor (frame =
+                      4-bit open-neighbor mask, N=1 E=2 S=4 W=8)
   door.png         <- tiles_sewers.png  cell (col 8,  row 3)
   stairs_down.png  <- tiles_sewers.png  cell (col 0,  row 4)
   stairs_up.png    <- tiles_sewers.png  cell (col 12, row 3)

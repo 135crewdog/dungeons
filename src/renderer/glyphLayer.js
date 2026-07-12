@@ -84,7 +84,8 @@ export class GlyphGrid {
         img.setVisible(false);
         continue;
       }
-      this.painter.paintTile(img, map.tiles[i], vis);
+      // x,y let the pixel painter autotile walls from their neighbors.
+      this.painter.paintTile(img, map.tiles[i], vis, map, i % map.width, (i / map.width) | 0);
     }
   }
 }

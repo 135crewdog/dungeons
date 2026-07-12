@@ -4,7 +4,7 @@ import { EV } from '../core/events.js';
 import { GlyphGrid, createGlyphTextures } from './glyphLayer.js';
 import { computeZoom, tileCenterWorld, worldToTile } from './camera.js';
 import { createAsciiPainter, createPixelPainter } from './painter.js';
-import { SPD_SPRITES, SPRITE_DIR } from './spriteStyle.js';
+import { SPD_SPRITES, WALL_SHEET, SPRITE_DIR } from './spriteStyle.js';
 import { spawnFloatingText } from './floatingText.js';
 
 // The one Phaser scene. It OBSERVES the game state and draws it — glyph grid,
@@ -140,6 +140,13 @@ export class DungeonScene extends Phaser.Scene {
     for (const { key, file } of SPD_SPRITES) {
       if (this.textures.exists(key)) continue;
       this.load.image(key, base + SPRITE_DIR + file);
+      queued++;
+    }
+    if (!this.textures.exists(WALL_SHEET.key)) {
+      this.load.spritesheet(WALL_SHEET.key, base + SPRITE_DIR + WALL_SHEET.file, {
+        frameWidth: WALL_SHEET.frameWidth,
+        frameHeight: WALL_SHEET.frameHeight,
+      });
       queued++;
     }
     if (queued === 0) {
