@@ -3,10 +3,15 @@
 // draw as lightweight tinted Images. White + per-tile tint lets one texture
 // serve any color (lit, dimmed, entity), and pixelArt keeps it crisp under
 // integer zoom.
+//
+// The per-tile drawing decisions (which texture, which tint, whether to hide)
+// now live in a painter (see painter.js) so the grid can render either the
+// ASCII glyphs or the pixel sprites without changing this traversal. The grid
+// still owns the one-Image-per-tile buffer and the visibility read from state.
 
 import { TILE_SIZE } from '../core/constants.js';
 import { idx } from '../core/query.js';
-import { ALL_GLYPHS, tileGlyph, tileColor, VIS } from './tileStyle.js';
+import { ALL_GLYPHS, VIS } from './tileStyle.js';
 
 const FONT_PX = 16;
 
@@ -31,12 +36,14 @@ export function createGlyphTextures(scene) {
   }
 }
 
-// A full-map grid of tile glyph Images. One Image per tile is fine here: Images
-// are cheap batched quads (unlike Text), and the map is bounded. Camera zoom +
-// follow decide what's on screen. sync() repaints from state each turn.
+// A full-map grid of tile Images. One Image per tile is fine here: Images are
+// cheap batched quads (unlike Text), and the map is bounded. Camera zoom +
+// follow decide what's on screen. sync() repaints from state each turn, handing
+// each seen tile to the active painter; unseen tiles are simply hidden.
 export class GlyphGrid {
-  constructor(scene) {
+  constructor(scene, painter) {
     this.scene = scene;
+    this.painter = painter;
     this.map = null;
     this.images = null;
   }
@@ -46,10 +53,7 @@ export class GlyphGrid {
     this.images = new Array(map.width * map.height);
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        const img = this.scene.add
-          .image(x * TILE_SIZE, y * TILE_SIZE, glyphKey('.'))
-          .setOrigin(0, 0)
-          .setVisible(false);
+        const img = this.painter.newTileImage(this.scene, x * TILE_SIZE, y * TILE_SIZE);
         this.images[idx(map, x, y)] = img;
       }
     }
@@ -61,8 +65,8 @@ export class GlyphGrid {
     this.images = null;
   }
 
-  // Repaint every tile at its current visibility: lit if visible, dimmed if
-  // only remembered (explored), hidden if never seen.
+  // Repaint every tile at its current visibility: painted (lit or dimmed) if
+  // visible/remembered, hidden if never seen.
   sync(state) {
     const map = state.map;
     const { visible, explored } = state.vis;
@@ -75,15 +79,7 @@ export class GlyphGrid {
         img.setVisible(false);
         continue;
       }
-      const t = map.tiles[i];
-      const ch = tileGlyph(t);
-      if (ch === ' ') {
-        img.setVisible(false);
-        continue;
-      }
-      img.setTexture(glyphKey(ch));
-      img.setTint(tileColor(t, vis));
-      img.setVisible(true);
+      this.painter.paintTile(img, map.tiles[i], vis);
     }
   }
 }

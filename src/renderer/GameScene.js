@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { getPlayer, entitiesSorted, isVisible, isExplored } from '../core/query.js';
 import { EV } from '../core/events.js';
-import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
-import { computeZoom, tileToWorld, tileCenterWorld, worldToTile } from './camera.js';
-import { entityGlyph, entityColor, itemGlyph, itemColor, scaleColor } from './tileStyle.js';
+import { GlyphGrid, createGlyphTextures } from './glyphLayer.js';
+import { computeZoom, tileCenterWorld, worldToTile } from './camera.js';
+import { createAsciiPainter } from './painter.js';
 import { spawnFloatingText } from './floatingText.js';
 
 // The one Phaser scene. It OBSERVES the game state and draws it — glyph grid,
@@ -19,7 +19,12 @@ export class DungeonScene extends Phaser.Scene {
     this.state = this.registry.get('state');
     createGlyphTextures(this);
 
-    this.grid = new GlyphGrid(this);
+    // ASCII is the default and needs no external assets, so it's always ready
+    // to draw the first frame. The pixel painter (and its sprite load) is
+    // swapped in later by setRenderStyle when the player opts into it.
+    this.painter = createAsciiPainter();
+
+    this.grid = new GlyphGrid(this, this.painter);
     this.grid.build(this.state.map);
 
     // Items under entities under nothing; the grid is beneath both.
@@ -75,7 +80,7 @@ export class DungeonScene extends Phaser.Scene {
   // Discard the current floor's visuals and draw a freshly generated one.
   rebuildFloor() {
     this.grid.destroy();
-    this.grid = new GlyphGrid(this);
+    this.grid = new GlyphGrid(this, this.painter);
     this.grid.build(this.state.map);
     for (const img of this.itemImages.values()) img.destroy();
     for (const img of this.entityImages.values()) img.destroy();
@@ -117,17 +122,15 @@ export class DungeonScene extends Phaser.Scene {
       alive.add(item.id);
       let img = this.itemImages.get(item.id);
       if (!img) {
-        img = this.add.image(0, 0, glyphKey(itemGlyph(item))).setOrigin(0, 0);
+        img = this.painter.newItemImage(this);
         this.itemLayer.add(img);
         this.itemImages.set(item.id, img);
       }
-      const w = tileToWorld(item.x, item.y);
-      img.setPosition(w.x, w.y);
       // Remembered while explored; full color only when currently visible.
       const seen = isExplored(this.state, item.x, item.y);
       const lit = isVisible(this.state, item.x, item.y);
       img.setVisible(seen);
-      img.setTint(lit ? itemColor(item) : scaleColor(itemColor(item), 0.32));
+      this.painter.paintItem(img, item, lit);
     }
     for (const [id, img] of this.itemImages) {
       if (!alive.has(id)) {
@@ -144,16 +147,14 @@ export class DungeonScene extends Phaser.Scene {
       alive.add(e.id);
       let img = this.entityImages.get(e.id);
       if (!img) {
-        img = this.add.image(0, 0, glyphKey(entityGlyph(e))).setOrigin(0, 0);
+        img = this.painter.newEntityImage(this);
         this.entityLayer.add(img);
         this.entityImages.set(e.id, img);
       }
-      img.setTexture(glyphKey(entityGlyph(e)));
-      img.setTint(entityColor(e));
-      const w = tileToWorld(e.x, e.y);
-      img.setPosition(w.x, w.y);
       // The player is always shown; enemies only when currently in view.
-      img.setVisible(e.id === playerId || isVisible(this.state, e.x, e.y));
+      const visible = e.id === playerId || isVisible(this.state, e.x, e.y);
+      this.painter.paintEntity(img, e, visible);
+      img.setVisible(visible);
     }
     for (const [id, img] of this.entityImages) {
       if (!alive.has(id)) {
