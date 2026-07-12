@@ -10,13 +10,20 @@
 
 import { writeClipboard } from './clipboard.js';
 
+// Human label for an art-style id, shown on the toggle button.
+function artLabel(style) {
+  return style === 'pixel' ? 'Pixel' : 'ASCII';
+}
+
 // `actions` wires the menu to the composition root:
-//   getSeed()        → the current run's seed (for display / copy)
-//   canOpen()        → whether opening is allowed (only while playing)
-//   onOpen()         → side effects when opening (e.g. cancel auto-walk)
-//   onNewRun()       → start a fresh run with a new random seed
-//   onRestartSeed()  → replay the current run from floor 1 (same seed)
-//   onLoadSeed(text) → start a run from a user-entered seed
+//   getSeed()          → the current run's seed (for display / copy)
+//   canOpen()          → whether opening is allowed (only while playing)
+//   onOpen()           → side effects when opening (e.g. cancel auto-walk)
+//   onNewRun()         → start a fresh run with a new random seed
+//   onRestartSeed()    → replay the current run from floor 1 (same seed)
+//   onLoadSeed(text)   → start a run from a user-entered seed
+//   getArtStyle()      → current art style ('ascii' | 'pixel'), for the label
+//   onToggleArtStyle() → flip ASCII↔pixel; returns the new style
 export function createMenu(parent, actions) {
   // The trigger is plain HUD text ("Menu"), anchored top-right — same visual
   // language as the HP/Floor readouts, not a boxed icon.
@@ -38,6 +45,7 @@ export function createMenu(parent, actions) {
     '<button type="button" data-act="resume">Resume</button>' +
     '<button type="button" data-act="newrun">New run</button>' +
     '<button type="button" data-act="restart">Restart this seed</button>' +
+    '<button type="button" data-act="artstyle">Art style: <span class="menu-artval"></span></button>' +
     '</div>' +
     '<div class="menu-seed">' +
     '<div class="menu-seed-label">Seed</div>' +
@@ -53,6 +61,7 @@ export function createMenu(parent, actions) {
   parent.appendChild(el);
 
   const panel = el.querySelector('.menu-panel');
+  const artVal = el.querySelector('.menu-artval');
   const seedVal = el.querySelector('.menu-seed-val');
   const seedInput = el.querySelector('.menu-seed-input');
   const copyBtn = el.querySelector('[data-act="copy"]');
@@ -66,6 +75,7 @@ export function createMenu(parent, actions) {
   function open() {
     if (isOpen() || !actions.canOpen()) return;
     actions.onOpen?.();
+    artVal.textContent = artLabel(actions.getArtStyle?.());
     seedVal.textContent = String(actions.getSeed());
     seedInput.value = '';
     resetCopy();
@@ -129,6 +139,11 @@ export function createMenu(parent, actions) {
       case 'restart':
         close();
         actions.onRestartSeed();
+        break;
+      case 'artstyle':
+        // Toggle in place; the world updates behind the backdrop and is
+        // revealed on Resume, so we deliberately keep the menu open.
+        artVal.textContent = artLabel(actions.onToggleArtStyle());
         break;
       case 'copy':
         copySeed();

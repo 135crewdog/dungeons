@@ -6,7 +6,7 @@ import { DungeonScene } from './GameScene.js';
 // keeps it in sync and applies INTEGER camera zoom so a bigger screen reveals
 // MORE tiles (not bigger ones). Leftover space beyond the map edges shows the
 // neutral background — the letterbox.
-export function createPhaserGame(parent, state) {
+export function createPhaserGame(parent, state, artStyle) {
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
   return new Phaser.Game({
     type: Phaser.AUTO,
@@ -20,8 +20,11 @@ export function createPhaserGame(parent, state) {
       height: Math.max(1, Math.floor(window.innerHeight * dpr)),
     },
     callbacks: {
-      // Available before scenes boot, so DungeonScene.create can read it.
-      preBoot: (game) => game.registry.set('state', state),
+      // Available before scenes boot, so DungeonScene.create can read them.
+      preBoot: (game) => {
+        game.registry.set('state', state);
+        game.registry.set('artStyle', artStyle);
+      },
     },
     scene: [DungeonScene],
   });

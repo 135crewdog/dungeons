@@ -41,9 +41,13 @@ export function createGlyphTextures(scene) {
 // follow decide what's on screen. sync() repaints from state each turn, handing
 // each seen tile to the active painter; unseen tiles are simply hidden.
 export class GlyphGrid {
-  constructor(scene, painter) {
+  // `layer` is a persistent bottom layer the tiles live in, so a rebuild (floor
+  // change or art-style switch) re-adds tiles beneath the item/entity layers
+  // instead of on top of them — which matters once tiles are opaque sprites.
+  constructor(scene, painter, layer) {
     this.scene = scene;
     this.painter = painter;
+    this.layer = layer;
     this.map = null;
     this.images = null;
   }
@@ -54,6 +58,7 @@ export class GlyphGrid {
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const img = this.painter.newTileImage(this.scene, x * TILE_SIZE, y * TILE_SIZE);
+        this.layer.add(img);
         this.images[idx(map, x, y)] = img;
       }
     }

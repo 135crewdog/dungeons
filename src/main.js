@@ -12,6 +12,7 @@ import { createHud } from './ui/hud.js';
 import { createMessageLog } from './ui/messageLog.js';
 import { createGameOver } from './ui/gameOver.js';
 import { createMenu } from './ui/menu.js';
+import { loadArtStyle, saveArtStyle } from './ui/settings.js';
 
 function randomSeed() {
   const buf = new Uint32Array(1);
@@ -48,8 +49,13 @@ logSeed(state);
 syncUrlSeed(state.seed);
 window.__game = state; // exposed for debugging / reproducibility
 
+// Render-only preference, owned here (not on simulation state) and persisted
+// across sessions. Passed to the renderer via the registry; the renderer never
+// reads storage itself.
+let artStyle = loadArtStyle();
+
 const parent = document.getElementById('game');
-const game = createPhaserGame(parent, state);
+const game = createPhaserGame(parent, state, artStyle);
 
 const hud = createHud(document.body);
 const messageLog = createMessageLog(document.body);
@@ -103,6 +109,16 @@ const menu = createMenu(document.body, {
   onNewRun: () => startRun(randomSeed()),
   onRestartSeed: () => startRun(state.seed),
   onLoadSeed: (text) => startRun(coerceSeed(text)),
+  getArtStyle: () => artStyle,
+  // Flip ASCII↔pixel, remember it, and tell the (lazily reached) scene to
+  // switch. Returns the new style so the menu can update its label.
+  onToggleArtStyle: () => {
+    artStyle = artStyle === 'pixel' ? 'ascii' : 'pixel';
+    saveArtStyle(artStyle);
+    const scene = game.registry.get('scene');
+    if (scene) scene.setRenderStyle(artStyle);
+    return artStyle;
+  },
 });
 
 // While the menu is open the game is paused: swallow movement/tap commands so

@@ -30,10 +30,13 @@ export class DungeonScene extends Phaser.Scene {
     this.renderStyle = 'ascii';
     this.painter = this.asciiPainter;
 
-    this.grid = new GlyphGrid(this, this.painter);
+    // Tiles under items under entities. Tiles get their own persistent layer
+    // (created first, so it stays at the bottom) — a rebuild refills this layer
+    // rather than adding tiles on top of the actors above.
+    this.tileLayer = this.add.layer();
+    this.grid = new GlyphGrid(this, this.painter, this.tileLayer);
     this.grid.build(this.state.map);
 
-    // Items under entities under nothing; the grid is beneath both.
     this.itemLayer = this.add.layer();
     this.entityLayer = this.add.layer();
     this.itemImages = new Map();
@@ -90,7 +93,7 @@ export class DungeonScene extends Phaser.Scene {
   // Discard the current floor's visuals and draw a freshly generated one.
   rebuildFloor() {
     this.grid.destroy();
-    this.grid = new GlyphGrid(this, this.painter);
+    this.grid = new GlyphGrid(this, this.painter, this.tileLayer);
     this.grid.build(this.state.map);
     for (const img of this.itemImages.values()) img.destroy();
     for (const img of this.entityImages.values()) img.destroy();
