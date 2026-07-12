@@ -45,9 +45,8 @@ export function createMenu(parent, actions) {
     '<button type="button" data-act="copy">Copy</button></div>' +
     '<form class="menu-seed-row" data-act="loadform">' +
     '<input class="menu-seed-input" type="text" inputmode="text" autocomplete="off" ' +
-    'spellcheck="false" placeholder="paste a seed…" aria-label="Enter a seed" />' +
+    'spellcheck="false" placeholder="Enter seed" aria-label="Enter seed" />' +
     '<button type="submit" data-act="load">Play</button></form>' +
-    '<div class="menu-hint">Enter a seed to regenerate its exact dungeon.</div>' +
     '</div>' +
     '</div>';
   parent.appendChild(el);

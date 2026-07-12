@@ -11,7 +11,6 @@ export function createGameOver(parent) {
     '<h1>You died</h1>' +
     '<p class="go-sub"></p>' +
     '<button type="button">New run</button>' +
-    '<p class="go-hint">Press <b>Esc</b> or <b>Menu</b> for the seed &amp; retry.</p>' +
     '</div>';
   parent.appendChild(el);
 
