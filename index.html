@@ -68,6 +68,15 @@
       #hud .hud-dim {
         opacity: 0.5;
       }
+      /* Build version: dim watermark on the row under the Menu text, so
+         screenshots identify the build without crowding the gameplay stats. */
+      #hudversion {
+        top: calc(max(8px, env(safe-area-inset-top)) + 22px);
+        right: max(10px, env(safe-area-inset-right));
+        font-size: 15px;
+        opacity: 0.5;
+        text-shadow: 0 1px 2px #000, 0 0 2px #000;
+      }
       #msglog {
         left: max(10px, env(safe-area-inset-left));
         right: max(10px, env(safe-area-inset-right));
@@ -252,6 +261,16 @@
       }
       .menu-seed button:hover {
         background: #fff;
+      }
+      /* Footer line with the app version — same separator language as the
+         seed section, dimmer since it's reference info, not a control. */
+      .menu-version {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid #232838;
+        font-size: 12px;
+        letter-spacing: 1px;
+        color: #8a93a6;
       }
 
       #gameover {

@@ -9,6 +9,7 @@
 // sprite toggle would slot into the actions list without restructuring it.
 
 import { writeClipboard } from './clipboard.js';
+import { APP_VERSION } from './version.js';
 
 // `actions` wires the menu to the composition root:
 //   getSeed()        → the current run's seed (for display / copy)
@@ -48,6 +49,7 @@ export function createMenu(parent, actions) {
     'spellcheck="false" placeholder="Enter seed" aria-label="Enter seed" />' +
     '<button type="submit" data-act="load">Play</button></form>' +
     '</div>' +
+    '<div class="menu-version">Dungeons v' + APP_VERSION + '</div>' +
     '</div>';
   parent.appendChild(el);
 
