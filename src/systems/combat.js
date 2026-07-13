@@ -5,7 +5,8 @@
 import { HIT_CHANCE } from '../core/constants.js';
 import { chance, nextInt } from '../core/rng.js';
 import { attackEvent, deathEvent } from '../core/events.js';
-import { pushLog } from '../core/entity.js';
+import { pushLog, allocId } from '../core/entity.js';
+import { createBossChest } from '../entities/items.js';
 
 // Damage after armor. A >0 raw hit always lands for at least 1 (armor can't
 // make anyone invincible); a 0 raw hit stays 0.
@@ -48,6 +49,12 @@ export function resolveAttack(state, attackerId, targetId) {
       state.status = 'dead';
     } else {
       state.entities.byId.delete(target.id);
+      // A slain boss always leaves a bonus chest on its death tile.
+      if (target.kind === 'boss') {
+        const chest = createBossChest(state.rng, target.x, target.y);
+        chest.id = allocId(state);
+        state.items.push(chest);
+      }
     }
   }
   return events;

@@ -28,13 +28,14 @@ const ENTITY_COLOR = {
   player: 0xffffff,
   goblin: 0x86c25a,
   skeleton: 0xe9e6d6,
+  boss: 0xd05a5a,
 };
 
 const POTION_COLOR = 0xe0556b;
 const CHEST_COLOR = 0xe0b74a;
 
 // Every glyph the renderer can draw — used to pre-bake glyph textures.
-export const ALL_GLYPHS = ['#', '.', '+', '>', '<', '@', 'g', 's', '!', '$'];
+export const ALL_GLYPHS = ['#', '.', '+', '>', '<', '@', 'g', 's', 'B', '!', '$'];
 
 export function tileGlyph(tileType) {
   return TILE_GLYPH[tileType] ?? ' ';

@@ -37,3 +37,22 @@ export function createChest(rng, x, y) {
   }
   return { id: 0, type: 'chest', x, y, effect, amount };
 }
+
+// The chest a boss drops where it dies: always a bonus, never a trap —
+// 1/3 strength, 1/3 armor, 1/3 health. Same item shape as createChest.
+export function createBossChest(rng, x, y) {
+  const roll = nextInt(rng, 1, 3);
+  let effect;
+  let amount;
+  if (roll === 1) {
+    effect = CHEST_EFFECT.STRENGTH;
+    amount = CHEST_STRENGTH_BONUS;
+  } else if (roll === 2) {
+    effect = CHEST_EFFECT.ARMOR;
+    amount = CHEST_ARMOR_BONUS;
+  } else {
+    effect = CHEST_EFFECT.HEALTH;
+    amount = CHEST_HEALTH_BONUS;
+  }
+  return { id: 0, type: 'chest', x, y, effect, amount };
+}

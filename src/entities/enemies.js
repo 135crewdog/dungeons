@@ -1,9 +1,10 @@
 import { ENEMY_TYPES } from '../core/constants.js';
 
-// The enemy archetypes that can be spawned. Two types: goblins are weak and
-// quick; skeletons hit with the same die but are fragile and move at half
-// speed.
-export const SPAWNABLE_ENEMIES = Object.values(ENEMY_TYPES);
+// The enemy archetypes the random pool can spawn: goblins are weak and quick;
+// skeletons hit with the same die but are fragile and move at half speed. The
+// boss is deliberately NOT in this list — it is placed by spawnBoss on boss
+// floors only.
+export const SPAWNABLE_ENEMIES = [ENEMY_TYPES.goblin, ENEMY_TYPES.skeleton];
 
 // Factory for an enemy of a given archetype at integer tile coordinates.
 // `aggro` starts false: enemies hold until they see the player. Once aggroed,

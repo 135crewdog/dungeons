@@ -37,7 +37,16 @@ export const ENEMY_DAMAGE_DIE = 4;
 export const ENEMY_TYPES = Object.freeze({
   goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 1 },
   skeleton: { kind: 'skeleton', glyph: 's', maxHp: 3, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 2 },
+  // The level boss: one guards the down-stairs on every BOSS_FLOOR_INTERVAL-th
+  // floor (never the random pool). HP is tuned so the first boss (floor 5) is
+  // ~97% winnable at full chest-fed strength but deadly to an early diver;
+  // damage is double the goblin die (2/4/6/8). Same hit chance and AI as
+  // everyone else.
+  boss: { kind: 'boss', glyph: 'B', maxHp: 30, damageDie: ENEMY_DAMAGE_DIE, damageMult: 2, moveEvery: 1 },
 });
+
+// Every Nth floor spawns a boss in the room with the down-stairs.
+export const BOSS_FLOOR_INTERVAL = 5;
 
 // Items.
 export const POTION_HEAL = 8;
