@@ -40,21 +40,24 @@ export const ENEMY_TYPES = Object.freeze({
   // The level boss: one guards the down-stairs on every BOSS_FLOOR_INTERVAL-th
   // floor (never the random pool). maxHp/damageMult here are the tier-1 (floor
   // 5) values — deeper lairs escalate via the depth-scaling constants below.
-  // Tuned by simulation: the first boss is ~97% winnable at full chest-fed
-  // strength but deadly to an early diver. Same hit chance and AI as everyone.
+  // Simulator-tuned (npm run balance): a hard peak, but no longer the majority
+  // of all deaths — pressure lives in the floors, not just the lairs. Same hit
+  // chance and AI as everyone.
   boss: { kind: 'boss', glyph: 'B', maxHp: 26, damageDie: ENEMY_DAMAGE_DIE, damageMult: 2, moveEvery: 1 },
 });
 
 // Every Nth floor spawns a boss in the room with the down-stairs.
 export const BOSS_FLOOR_INTERVAL = 5;
 
-// Depth scaling (simulation-tuned so chest income no longer outruns the
-// dungeon: ~2/3 of thorough players clear floor 10, stair-rushers rarely do).
-// Regular enemies gain +1 damage on every roll per DMG floors and +1 max HP
-// per HP floors. Bosses keep their own curve instead of the HP drip: each lair
-// tier (floor/5) adds BOSS_HP_PER_TIER max HP and raises the damage multiplier
-// by 1 (floor 5: 2xd4, floor 10: 3xd4, ...); the flat damage bonus applies to
-// them too.
+// Depth scaling (tuned with the headless simulator, npm run balance: under
+// identical careful bot play the floor-10 clear rate halved versus the old
+// numbers, with deaths spread across the descent instead of spiking at the
+// lairs). Regular enemies gain +1 damage on every roll per DMG floors and
+// +1 max HP per HP floors. Bosses keep their own curve instead: each lair
+// tier (floor/5) adds BOSS_HP_PER_TIER max HP and raises the damage
+// multiplier by 1 (floor 5: 2xd4, floor 10: 3xd4, ...); they are exempt from
+// the flat damage drip — stacking it on the multiplier made deep lairs
+// pierce armor twice over.
 export const SCALE_DMG_EVERY_FLOORS = 3;
 export const SCALE_HP_EVERY_FLOORS = 3;
 export const BOSS_HP_PER_TIER = 12;

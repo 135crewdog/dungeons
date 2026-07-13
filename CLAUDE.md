@@ -116,22 +116,26 @@ invincibility; a 0-damage attack stays 0). The player's damage is flat (4 + stre
 (rolled only after the 75% hit roll succeeds). Strength and armor are player stats
 that start at 0 and stack via treasure chests.
 
-**Goblin is the baseline enemy** (5 HP, d4 damage, full speed — the floor-1
-reference). Skeletons are "about half a goblin": **3 HP** and **half movement speed**
+**Goblin is the baseline enemy** (7 HP, d4 damage, full speed — the floor-1
+reference). Skeletons are "about half a goblin": **4 HP** and **half movement speed**
 — one tile every 2 turns (first step after aggro is immediate) — but they swing the
 same d4 and still attack **every** turn when adjacent. A **boss** (`B`) guards the
 down-stairs room on **every 5th floor**, full speed, same hit chance and
 aggro/chase/give-up AI as everyone else; a slain boss always drops a bonus chest on
 its death tile — ⅓ Strength / ⅓ Armor / ⅓ Health, never a trap.
 
-**Depth scaling** (simulation-tuned so chest income no longer outruns the dungeon —
-~2/3 of thorough players clear floor 10, stair-rushers rarely do): regular enemies
-gain **+1 max HP per 2 floors** and **+1 damage on every roll per 3 floors** (a floor-7
-goblin has 8 HP and hits for 3–6). Bosses skip the HP drip and escalate per lair tier
-(floor/5): **+15 max HP and +1 to the damage die multiplier per tier** — floor 5:
-30 HP at 2×d4, floor 10: 45 HP at 3×d4, floor 15: 60 HP at 4×d4 — plus the flat
-damage bonus. Scaled stats are stamped on the enemy instance at spawn, so cached
-floors keep their numbers.
+**Depth scaling** (tuned with the headless balance simulator, `npm run balance` —
+under identical careful bot play the floor-10 clear rate halved versus the old
+numbers, and deaths spread across the whole descent instead of piling up at the boss
+lairs): regular enemies gain **+1 max HP and +1 damage on every roll per 3 floors**
+(a floor-7 goblin has 9 HP and hits for 3–6). **Floor population also scales**: the
+enemy count gains +1 per 3 floors over its 5–8 base (capped at 12), and the spawn mix
+drifts from 50/50 toward goblins by +3%/floor (capped at 80%). Bosses have their own
+curve per lair tier (floor/5): **+12 max HP and +1 to the damage die multiplier per
+tier** — floor 5: 26 HP at 2×d4, floor 10: 38 HP at 3×d4, floor 15: 50 HP at 4×d4 —
+and are **exempt from the flat damage drip** (the multiplier is their damage scaling;
+stacking both made deep lairs pierce armor twice over). Scaled stats are stamped on
+the enemy instance at spawn, so cached floors keep their numbers.
 
 ## Death
 
@@ -200,21 +204,30 @@ scrolling message log) · shadowcasting FOV with explored memory · installable 
 PWA. Phase 2 (pixel art) was skipped in favor of Phase 3 (complexity).
 
 Phase 3a (complete): **treasure chests** (`$`, 1–2 per floor) that open when walked
-over — contents rolled at spawn from the seeded RNG: 30% **+1 Strength** · 30%
-**+1 Armor** · 30% **+5 max HP + full heal** · 10% **trap** (rolls 1–4 at spawn, like
-a goblin hit; armor applies, can kill). Bonuses stack for the whole run and show in
-the HUD once earned · **enemy differentiation**: skeletons at half movement speed with
-goblin baseline damage.
+over — contents rolled at spawn from the seeded RNG (current `CHEST_TABLE`): 30%
+**+1 Strength** · 25% **+1 Armor** · 30% **+4 max HP + full heal** · 15% **trap**
+(rolls 1–4 at spawn, like a goblin hit; armor applies, can kill). Bonuses stack for
+the whole run and show in the HUD once earned · **enemy differentiation**: skeletons
+at half movement speed with goblin baseline damage.
 
 Phase 3b (complete): **per-attack damage dice** — enemies roll a d4 on every landed
-hit (the player's damage stays flat) · **skeleton rebalance** to 3 HP ("half a
-goblin") · **boss enemies** — one boss on every 5th floor guarding the down-stairs
-room, dropping a guaranteed no-trap bonus chest on death.
+hit (the player's damage stays flat) · **skeleton rebalance** ("half a goblin") ·
+**boss enemies** — one boss on every 5th floor guarding the down-stairs room,
+dropping a guaranteed no-trap bonus chest on death.
 
-Phase 3c (complete): **depth scaling** — regular enemies +1 max HP per 2 floors and
-+1 damage per 3 floors; bosses escalate per lair (+15 HP and +1 damage-die
-multiplier per tier). Constants in `core/constants.js` (`SCALE_*`,
-`BOSS_HP_PER_TIER`); scaling applied in `createEnemy`.
+Phase 3c (complete): **depth scaling** — regular enemies gain max HP and flat damage
+with depth; bosses escalate per lair (HP and damage-die multiplier per tier).
+Constants in `core/constants.js` (`SCALE_*`, `BOSS_HP_PER_TIER`); scaling applied in
+`createEnemy`.
+
+Phase 3d (complete): **difficulty rebalance**, tuned empirically with a new
+**headless balance simulator** (`npm run balance`, `scripts/balance/`) that drives
+the real engine with two bot policies (thorough / stair-rusher) over hundreds of
+seeded runs. Changes: goblin 7 HP · skeleton 4 HP · **enemy count depth scaling**
+(+1 per 3 floors, cap 12) · **depth-weighted spawn mix** (goblin share 50% +3%/floor,
+cap 80%) · chest table 30/25/30/15 with `CHEST_TABLE` thresholds · health chest +4 ·
+boss 26 HP base, +12/tier, exempt from the flat damage drip. The current numbers in
+the Combat section above are authoritative.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
@@ -225,6 +238,11 @@ Each major module has browser-free unit tests (Vitest). The simulation is kept
 independent enough that dungeon generation, combat, pathfinding, and FOV are tested
 without instantiating Phaser. Determinism is guarded: no `Math.random()` and no Phaser
 import under the simulation directories.
+
+Balance is guarded empirically: `npm run balance` runs the headless simulator
+(`scripts/balance-sim.js`) — seeded bot-driven runs through the real engine that
+report per-floor survival curves. Run it before and after touching any combat,
+loot, or spawning constant; the before/after tables belong in the commit message.
 
 ## PWA
 
