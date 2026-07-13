@@ -111,11 +111,19 @@ number** on a hit. Two entities never share a tile.
 
 Damage on a hit is `attacker damage + strength − target armor`, floored so a hit that
 would deal >0 raw damage always lands for **at least 1** (armor never grants
-invincibility; a 0-damage attack stays 0). Strength and armor are player stats that
-start at 0 and stack via treasure chests. **Goblin is the baseline enemy**; skeletons
-deal goblin-level damage and have more HP but move at **half speed** — one tile every
-2 turns (first step after aggro is immediate) — while still attacking **every** turn
-when adjacent.
+invincibility; a 0-damage attack stays 0). The player's damage is flat (4 + strength);
+**enemy damage is a d4 rolled fresh on every landed hit** through the seeded RNG
+(rolled only after the 75% hit roll succeeds). Strength and armor are player stats
+that start at 0 and stack via treasure chests.
+
+**Goblin is the baseline enemy** (5 HP, d4 damage, full speed). Skeletons are "about
+half a goblin": **3 HP** and **half movement speed** — one tile every 2 turns (first
+step after aggro is immediate) — but they swing the same d4 and still attack **every**
+turn when adjacent. A **boss** (`B`) guards the down-stairs room on **every 5th floor**:
+30 HP, **2×d4 damage** (2/4/6/8), full speed, same hit chance and aggro/chase/give-up
+AI as everyone else. Boss HP is simulation-tuned (~27% player win rate on floor 1,
+~97% by floor 5 at full chest-fed strength). A slain boss always drops a bonus chest
+on its death tile — ⅓ Strength / ⅓ Armor / ⅓ Health, never a trap.
 
 ## Death
 
@@ -125,7 +133,7 @@ on floor 1 with a **new random seed** (logged).
 ## Visual Style
 
 The entire game renders in **ASCII, monospace**. Floor `.` · Wall `#` · Player `@` ·
-Enemies single letters (`g` goblin, `s` skeleton) · Potion `!` · Chest `$` ·
+Enemies single letters (`g` goblin, `s` skeleton, `B` boss) · Potion `!` · Chest `$` ·
 Stairs down `>` · Stairs up `<` · Door `+` · Unexplored space ·
 Explored-but-not-visible: same glyph, darker. This is the
 intentional art style, not a placeholder. The renderer is structured so sprites
@@ -178,10 +186,15 @@ PWA. Phase 2 (pixel art) was skipped in favor of Phase 3 (complexity).
 
 Phase 3a (complete): **treasure chests** (`$`, 1–2 per floor) that open when walked
 over — contents rolled at spawn from the seeded RNG: 30% **+1 Strength** · 30%
-**+1 Armor** · 30% **+5 max HP + full heal** · 10% **trap** (goblin-level damage,
-armor applies, can kill). Bonuses stack for the whole run and show in the HUD once
-earned · **enemy differentiation**: skeletons at half movement speed with goblin
-baseline damage. Phase 3b (boss enemies) is next.
+**+1 Armor** · 30% **+5 max HP + full heal** · 10% **trap** (rolls 1–4 at spawn, like
+a goblin hit; armor applies, can kill). Bonuses stack for the whole run and show in
+the HUD once earned · **enemy differentiation**: skeletons at half movement speed with
+goblin baseline damage.
+
+Phase 3b (complete): **per-attack damage dice** — enemies roll a d4 on every landed
+hit (the player's damage stays flat) · **skeleton rebalance** to 3 HP ("half a
+goblin") · **boss enemies** — one boss on every 5th floor guarding the down-stairs
+room, 30 HP / 2×d4 damage, dropping a guaranteed no-trap bonus chest on death.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
