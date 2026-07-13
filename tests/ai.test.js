@@ -6,7 +6,7 @@ import { ENEMY_TYPES, TILE, DEAGGRO_TURNS } from '../src/core/constants.js';
 import { idx } from '../src/core/query.js';
 
 // An 11x3 corridor along y=1 (x=1..9) with a closed door at x=5. No rooms.
-function corridorState({ playerX, enemyX }) {
+function corridorState({ playerX, enemyX, enemyType = ENEMY_TYPES.goblin }) {
   const width = 11;
   const height = 3;
   const tiles = new Uint8Array(width * height); // all WALL
@@ -16,7 +16,7 @@ function corridorState({ playerX, enemyX }) {
   tiles[idx(map, 5, 1)] = TILE.DOOR;
 
   const player = { id: 1, kind: 'player', x: playerX, y: 1, hp: 20, maxHp: 20, damage: 4, glyph: '@' };
-  const enemy = createEnemy(ENEMY_TYPES.goblin, enemyX, 1);
+  const enemy = createEnemy(enemyType, enemyX, 1);
   enemy.id = 2;
   const state = {
     rng: { seed: 1, s: 1 },
@@ -46,6 +46,56 @@ describe('enemy aggro through doors', () => {
     updateVisibility(state);
     enemyTurn(state, 2);
     expect(enemy.aggro).toBe(true);
+  });
+});
+
+describe('skeleton cadence (moveEvery 2)', () => {
+  it('moves immediately on aggro, then only every other turn', () => {
+    const { state, enemy } = corridorState({ playerX: 1, enemyX: 4, enemyType: ENEMY_TYPES.skeleton });
+    updateVisibility(state);
+    enemyTurn(state, 2);
+    expect(enemy.x).toBe(3); // first step is immediate
+    enemyTurn(state, 2);
+    expect(enemy.x).toBe(3); // rests
+    enemyTurn(state, 2);
+    expect(enemy.x).toBe(2); // steps again, now adjacent
+  });
+
+  it('attacks every turn once adjacent — only movement is slowed', () => {
+    const { state, enemy } = corridorState({ playerX: 1, enemyX: 2, enemyType: ENEMY_TYPES.skeleton });
+    updateVisibility(state);
+    for (let i = 0; i < 4; i++) {
+      const events = enemyTurn(state, 2);
+      expect(events.some((e) => e.type === 'attack')).toBe(true);
+      expect(enemy.x).toBe(2);
+    }
+  });
+
+  it('a goblin (moveEvery 1) still moves every turn', () => {
+    const { state, enemy } = corridorState({ playerX: 1, enemyX: 4, enemyType: ENEMY_TYPES.goblin });
+    updateVisibility(state);
+    enemyTurn(state, 2);
+    expect(enemy.x).toBe(3);
+    enemyTurn(state, 2);
+    expect(enemy.x).toBe(2);
+  });
+
+  it('skeletons hit as hard as goblins (baseline damage)', () => {
+    expect(ENEMY_TYPES.skeleton.damage).toBe(ENEMY_TYPES.goblin.damage);
+  });
+
+  it('giving up the chase resets the cooldown so re-aggro steps immediately', () => {
+    const { state, player, enemy } = corridorState({ playerX: 3, enemyX: 4, enemyType: ENEMY_TYPES.skeleton });
+    updateVisibility(state);
+    enemyTurn(state, 2); // adjacent: attacks, aggroed, lastSeen = (3,1)
+    player.x = 9; // flee past the door, out of sight
+    updateVisibility(state);
+    enemyTurn(state, 2); // blind: steps onto the last-seen tile, cooldown spent
+    expect(enemy.x).toBe(3);
+    expect(enemy.moveCooldown).toBe(1);
+    enemyTurn(state, 2); // trail runs cold: gives up
+    expect(enemy.aggro).toBe(false);
+    expect(enemy.moveCooldown).toBe(0);
   });
 });
 

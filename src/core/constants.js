@@ -26,11 +26,13 @@ export const HIT_CHANCE = 0.75;
 export const PLAYER_MAX_HP = 20;
 export const PLAYER_DAMAGE = 4;
 
-// Two enemy types with distinct HP and damage. `glyph` is a presentation hint;
-// the renderer's tileStyle owns the final glyph/color.
+// Two enemy types. Goblin is the baseline; skeletons hit just as hard but are
+// tougher and slow — `moveEvery: 2` means one tile every 2 turns (attacks are
+// never slowed). `glyph` is a presentation hint; the renderer's tileStyle owns
+// the final glyph/color.
 export const ENEMY_TYPES = Object.freeze({
-  goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damage: 2 },
-  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 11, damage: 4 },
+  goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damage: 2, moveEvery: 1 },
+  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 11, damage: 2, moveEvery: 2 },
 });
 
 // Items.
