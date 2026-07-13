@@ -11,6 +11,8 @@ export function createPlayer(x, y) {
     hp: PLAYER_MAX_HP,
     maxHp: PLAYER_MAX_HP,
     damage: PLAYER_DAMAGE,
+    strength: 0, // chest bonuses: extra damage dealt per stack
+    armor: 0, // chest bonuses: damage taken reduced per stack (hits floor at 1)
     glyph: '@',
   };
 }

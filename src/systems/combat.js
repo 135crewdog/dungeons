@@ -7,6 +7,13 @@ import { chance } from '../core/rng.js';
 import { attackEvent, deathEvent } from '../core/events.js';
 import { pushLog } from '../core/entity.js';
 
+// Damage after armor. A >0 raw hit always lands for at least 1 (armor can't
+// make anyone invincible); a 0 raw hit stays 0.
+export function mitigatedDamage(raw, armor) {
+  if (raw <= 0) return 0;
+  return Math.max(1, raw - armor);
+}
+
 // Resolve one attack from attacker to target. Returns the events produced.
 export function resolveAttack(state, attackerId, targetId) {
   const events = [];
@@ -20,7 +27,8 @@ export function resolveAttack(state, attackerId, targetId) {
     return events;
   }
 
-  const damage = attacker.damage;
+  const raw = attacker.damage + (attacker.strength ?? 0);
+  const damage = mitigatedDamage(raw, target.armor ?? 0);
   target.hp -= damage;
   events.push(attackEvent(attackerId, targetId, true, damage, target.x, target.y));
   pushLog(state, 'hit', { attacker: attacker.kind, target: target.kind, damage });
