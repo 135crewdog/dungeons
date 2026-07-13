@@ -1,13 +1,25 @@
 import { describe, it, expect } from 'vitest';
 import { resolveAttack, areHostile, mitigatedDamage } from '../src/systems/combat.js';
-import { createRng } from '../src/core/rng.js';
+import { createRng, chance, nextInt } from '../src/core/rng.js';
 
 function combatState(
   seed,
-  { attackerDamage = 3, attackerStrength = 0, targetHp = 10, targetArmor = 0, targetKind = 'goblin' } = {},
+  {
+    attackerDamage = 3,
+    attackerDamageDie,
+    attackerDamageMult,
+    attackerStrength = 0,
+    targetHp = 10,
+    targetArmor = 0,
+    targetKind = 'goblin',
+  } = {},
 ) {
   const rng = createRng(seed);
-  const attacker = { id: 1, kind: 'player', x: 0, y: 0, hp: 20, maxHp: 20, damage: attackerDamage, strength: attackerStrength, glyph: '@' };
+  const attacker = {
+    id: 1, kind: 'player', x: 0, y: 0, hp: 20, maxHp: 20,
+    damage: attackerDamage, damageDie: attackerDamageDie, damageMult: attackerDamageMult,
+    strength: attackerStrength, glyph: '@',
+  };
   const target = { id: 2, kind: targetKind, x: 1, y: 0, hp: targetHp, maxHp: targetHp, damage: 2, armor: targetArmor, glyph: 'g' };
   const state = {
     rng,
@@ -104,6 +116,51 @@ describe('combat', () => {
     const { state, target } = combatState(2024, { attackerDamage: 0, targetHp: 100, targetArmor: 3 });
     for (let i = 0; i < 20; i++) resolveAttack(state, 1, 2); // guaranteed to include hits
     expect(target.hp).toBe(100);
+  });
+
+  it('a damage die rolls fresh per landed hit, always within 1..die', () => {
+    const { state } = combatState(42, { attackerDamageDie: 4, targetHp: 1e9 });
+    const seen = new Set();
+    for (let i = 0; i < 200; i++) {
+      const evs = resolveAttack(state, 1, 2);
+      if (!evs[0].hit) continue;
+      expect(evs[0].damage).toBeGreaterThanOrEqual(1);
+      expect(evs[0].damage).toBeLessThanOrEqual(4);
+      seen.add(evs[0].damage);
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(3); // varies per hit, not fixed per entity
+  });
+
+  it('a damage multiplier doubles the die roll (boss: 2/4/6/8)', () => {
+    const { state } = combatState(42, { attackerDamageDie: 4, attackerDamageMult: 2, targetHp: 1e9 });
+    for (let i = 0; i < 200; i++) {
+      const evs = resolveAttack(state, 1, 2);
+      if (evs[0].hit) expect([2, 4, 6, 8]).toContain(evs[0].damage);
+    }
+  });
+
+  it('strength stacks on top of a damage die', () => {
+    const { state } = combatState(42, { attackerDamageDie: 4, attackerStrength: 2, targetHp: 1e9 });
+    for (let i = 0; i < 100; i++) {
+      const evs = resolveAttack(state, 1, 2);
+      if (evs[0].hit) {
+        expect(evs[0].damage).toBeGreaterThanOrEqual(3);
+        expect(evs[0].damage).toBeLessThanOrEqual(6);
+      }
+    }
+  });
+
+  it('rolls the die only after a hit, one draw per landed hit (RNG order locked)', () => {
+    const { state } = combatState(1337, { attackerDamageDie: 4, targetHp: 1e9 });
+    // Replay the exact same draws by hand on a twin RNG: hit roll first, then
+    // one die draw only when the hit landed.
+    const twin = createRng(1337);
+    for (let i = 0; i < 300; i++) {
+      const evs = resolveAttack(state, 1, 2);
+      const hit = chance(twin, 0.75);
+      expect(evs[0].hit).toBe(hit);
+      if (hit) expect(evs[0].damage).toBe(nextInt(twin, 1, 4));
+    }
   });
 
   it('mitigatedDamage floors real hits at 1 and passes zero through', () => {

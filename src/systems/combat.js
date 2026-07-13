@@ -3,9 +3,10 @@
 // renderer can float numbers. All randomness goes through the game RNG.
 
 import { HIT_CHANCE } from '../core/constants.js';
-import { chance } from '../core/rng.js';
+import { chance, nextInt } from '../core/rng.js';
 import { attackEvent, deathEvent } from '../core/events.js';
-import { pushLog } from '../core/entity.js';
+import { pushLog, allocId } from '../core/entity.js';
+import { createBossChest } from '../entities/items.js';
 
 // Damage after armor. A >0 raw hit always lands for at least 1 (armor can't
 // make anyone invincible); a 0 raw hit stays 0.
@@ -27,7 +28,14 @@ export function resolveAttack(state, attackerId, targetId) {
     return events;
   }
 
-  const raw = attacker.damage + (attacker.strength ?? 0);
+  // Enemies roll their damage die fresh on every landed hit (only after the
+  // hit roll, so a miss costs one RNG draw and a landed hit costs two); the
+  // player's damage is flat. dmgBonus is the enemy depth-scaling drip;
+  // strength is the player's chest-fed bonus.
+  const base = attacker.damageDie
+    ? nextInt(state.rng, 1, attacker.damageDie) * (attacker.damageMult ?? 1)
+    : attacker.damage;
+  const raw = base + (attacker.dmgBonus ?? 0) + (attacker.strength ?? 0);
   const damage = mitigatedDamage(raw, target.armor ?? 0);
   target.hp -= damage;
   events.push(attackEvent(attackerId, targetId, true, damage, target.x, target.y));
@@ -42,6 +50,12 @@ export function resolveAttack(state, attackerId, targetId) {
       state.status = 'dead';
     } else {
       state.entities.byId.delete(target.id);
+      // A slain boss always leaves a bonus chest on its death tile.
+      if (target.kind === 'boss') {
+        const chest = createBossChest(state.rng, target.x, target.y);
+        chest.id = allocId(state);
+        state.items.push(chest);
+      }
     }
   }
   return events;

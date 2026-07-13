@@ -4,7 +4,7 @@ import {
   CHEST_STRENGTH_BONUS,
   CHEST_ARMOR_BONUS,
   CHEST_HEALTH_BONUS,
-  CHEST_TRAP_DAMAGE,
+  CHEST_TRAP_DIE,
 } from '../core/constants.js';
 import { nextInt } from '../core/rng.js';
 
@@ -33,7 +33,26 @@ export function createChest(rng, x, y) {
     amount = CHEST_HEALTH_BONUS;
   } else {
     effect = CHEST_EFFECT.TRAP;
-    amount = CHEST_TRAP_DAMAGE;
+    amount = nextInt(rng, 1, CHEST_TRAP_DIE); // a trap hits like a goblin: 1..4
+  }
+  return { id: 0, type: 'chest', x, y, effect, amount };
+}
+
+// The chest a boss drops where it dies: always a bonus, never a trap —
+// 1/3 strength, 1/3 armor, 1/3 health. Same item shape as createChest.
+export function createBossChest(rng, x, y) {
+  const roll = nextInt(rng, 1, 3);
+  let effect;
+  let amount;
+  if (roll === 1) {
+    effect = CHEST_EFFECT.STRENGTH;
+    amount = CHEST_STRENGTH_BONUS;
+  } else if (roll === 2) {
+    effect = CHEST_EFFECT.ARMOR;
+    amount = CHEST_ARMOR_BONUS;
+  } else {
+    effect = CHEST_EFFECT.HEALTH;
+    amount = CHEST_HEALTH_BONUS;
   }
   return { id: 0, type: 'chest', x, y, effect, amount };
 }
