@@ -6,7 +6,7 @@ import { HIT_CHANCE, TILE, DIRS8 } from '../core/constants.js';
 import { chance, nextInt } from '../core/rng.js';
 import { attackEvent, deathEvent } from '../core/events.js';
 import { pushLog, allocId } from '../core/entity.js';
-import { tileAt } from '../core/query.js';
+import { tileAt, entityAt } from '../core/query.js';
 import { createBossChest } from '../entities/items.js';
 
 // Damage after armor. A >0 raw hit always lands for at least 1 (armor can't
@@ -59,8 +59,11 @@ export function resolveAttack(state, attackerId, targetId) {
 
 // A slain boss always leaves a bonus chest. Stairs tiles swallow pickups — a
 // player stepping onto stairs changes floor before pickups resolve — so a
-// death on the staircase shifts the drop to the first adjacent item-free
-// floor/door tile (deterministic DIRS8 scan; no RNG draw, so replays match).
+// death on the staircase shifts the drop to the first adjacent unoccupied,
+// item-free floor/door tile (deterministic DIRS8 scan; no RNG draw, so
+// replays match). Occupied tiles are excluded so the chest can't land under
+// the attacking player (which would open it instantly via resolvePickups) or
+// under another enemy.
 function dropBossChest(state, x, y) {
   let dropX = x;
   let dropY = y;
@@ -69,6 +72,7 @@ function dropBossChest(state, x, y) {
     for (const { dx, dy } of DIRS8) {
       const nt = tileAt(state.map, x + dx, y + dy);
       const free = (nt === TILE.FLOOR || nt === TILE.DOOR) &&
+        !entityAt(state, x + dx, y + dy) &&
         !state.items.some((it) => it.x === x + dx && it.y === y + dy);
       if (free) {
         dropX = x + dx;
