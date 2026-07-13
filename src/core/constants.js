@@ -38,15 +38,26 @@ export const ENEMY_TYPES = Object.freeze({
   goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 1 },
   skeleton: { kind: 'skeleton', glyph: 's', maxHp: 3, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 2 },
   // The level boss: one guards the down-stairs on every BOSS_FLOOR_INTERVAL-th
-  // floor (never the random pool). HP is tuned so the first boss (floor 5) is
-  // ~97% winnable at full chest-fed strength but deadly to an early diver;
-  // damage is double the goblin die (2/4/6/8). Same hit chance and AI as
-  // everyone else.
+  // floor (never the random pool). maxHp/damageMult here are the tier-1 (floor
+  // 5) values — deeper lairs escalate via the depth-scaling constants below.
+  // Tuned by simulation: the first boss is ~97% winnable at full chest-fed
+  // strength but deadly to an early diver. Same hit chance and AI as everyone.
   boss: { kind: 'boss', glyph: 'B', maxHp: 30, damageDie: ENEMY_DAMAGE_DIE, damageMult: 2, moveEvery: 1 },
 });
 
 // Every Nth floor spawns a boss in the room with the down-stairs.
 export const BOSS_FLOOR_INTERVAL = 5;
+
+// Depth scaling (simulation-tuned so chest income no longer outruns the
+// dungeon: ~2/3 of thorough players clear floor 10, stair-rushers rarely do).
+// Regular enemies gain +1 damage on every roll per DMG floors and +1 max HP
+// per HP floors. Bosses keep their own curve instead of the HP drip: each lair
+// tier (floor/5) adds BOSS_HP_PER_TIER max HP and raises the damage multiplier
+// by 1 (floor 5: 2xd4, floor 10: 3xd4, ...); the flat damage bonus applies to
+// them too.
+export const SCALE_DMG_EVERY_FLOORS = 3;
+export const SCALE_HP_EVERY_FLOORS = 2;
+export const BOSS_HP_PER_TIER = 15;
 
 // Items.
 export const POTION_HEAL = 8;

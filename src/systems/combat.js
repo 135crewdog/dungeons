@@ -30,11 +30,12 @@ export function resolveAttack(state, attackerId, targetId) {
 
   // Enemies roll their damage die fresh on every landed hit (only after the
   // hit roll, so a miss costs one RNG draw and a landed hit costs two); the
-  // player's damage is flat.
+  // player's damage is flat. dmgBonus is the enemy depth-scaling drip;
+  // strength is the player's chest-fed bonus.
   const base = attacker.damageDie
     ? nextInt(state.rng, 1, attacker.damageDie) * (attacker.damageMult ?? 1)
     : attacker.damage;
-  const raw = base + (attacker.strength ?? 0);
+  const raw = base + (attacker.dmgBonus ?? 0) + (attacker.strength ?? 0);
   const damage = mitigatedDamage(raw, target.armor ?? 0);
   target.hp -= damage;
   events.push(attackEvent(attackerId, targetId, true, damage, target.x, target.y));

@@ -34,8 +34,8 @@ export function randomFreeFloorInRoom(state, room) {
 }
 
 export function populateFloor(state, floorNumber) {
-  spawnEnemies(state);
-  if (floorNumber % BOSS_FLOOR_INTERVAL === 0) spawnBoss(state);
+  spawnEnemies(state, floorNumber);
+  if (floorNumber % BOSS_FLOOR_INTERVAL === 0) spawnBoss(state, floorNumber);
   spawnPotions(state);
   spawnChests(state);
 }
@@ -44,7 +44,7 @@ export function populateFloor(state, floorNumber) {
 // room farthest from the start room, so the lair is never where the player
 // arrives. Falls back to a random non-start room if the stairs room has no
 // free tile (same tolerance as regular spawns).
-function spawnBoss(state) {
+function spawnBoss(state, floorNumber) {
   const map = state.map;
   const rooms = map.rooms;
   if (rooms.length < 2 || !map.stairsDown) return;
@@ -52,10 +52,10 @@ function spawnBoss(state) {
   let tile = stairsRoom ? randomFreeFloorInRoom(state, stairsRoom) : null;
   if (!tile) tile = randomFreeFloorInRoom(state, rooms[nextInt(state.rng, 1, rooms.length - 1)]);
   if (!tile) return;
-  addEntity(state, createEnemy(ENEMY_TYPES.boss, tile.x, tile.y));
+  addEntity(state, createEnemy(ENEMY_TYPES.boss, tile.x, tile.y, floorNumber));
 }
 
-function spawnEnemies(state) {
+function spawnEnemies(state, floorNumber) {
   const rooms = state.map.rooms;
   if (rooms.length < 2) return; // room 0 is the player's; need somewhere else
   const count = nextInt(state.rng, MIN_ENEMIES, MAX_ENEMIES);
@@ -65,7 +65,7 @@ function spawnEnemies(state) {
     const tile = randomFreeFloorInRoom(state, room);
     if (!tile) continue;
     const type = pick(state.rng, SPAWNABLE_ENEMIES);
-    addEntity(state, createEnemy(type, tile.x, tile.y));
+    addEntity(state, createEnemy(type, tile.x, tile.y, floorNumber));
   }
 }
 

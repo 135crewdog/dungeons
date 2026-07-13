@@ -116,14 +116,22 @@ invincibility; a 0-damage attack stays 0). The player's damage is flat (4 + stre
 (rolled only after the 75% hit roll succeeds). Strength and armor are player stats
 that start at 0 and stack via treasure chests.
 
-**Goblin is the baseline enemy** (5 HP, d4 damage, full speed). Skeletons are "about
-half a goblin": **3 HP** and **half movement speed** — one tile every 2 turns (first
-step after aggro is immediate) — but they swing the same d4 and still attack **every**
-turn when adjacent. A **boss** (`B`) guards the down-stairs room on **every 5th floor**:
-30 HP, **2×d4 damage** (2/4/6/8), full speed, same hit chance and aggro/chase/give-up
-AI as everyone else. Boss HP is simulation-tuned (~27% player win rate on floor 1,
-~97% by floor 5 at full chest-fed strength). A slain boss always drops a bonus chest
-on its death tile — ⅓ Strength / ⅓ Armor / ⅓ Health, never a trap.
+**Goblin is the baseline enemy** (5 HP, d4 damage, full speed — the floor-1
+reference). Skeletons are "about half a goblin": **3 HP** and **half movement speed**
+— one tile every 2 turns (first step after aggro is immediate) — but they swing the
+same d4 and still attack **every** turn when adjacent. A **boss** (`B`) guards the
+down-stairs room on **every 5th floor**, full speed, same hit chance and
+aggro/chase/give-up AI as everyone else; a slain boss always drops a bonus chest on
+its death tile — ⅓ Strength / ⅓ Armor / ⅓ Health, never a trap.
+
+**Depth scaling** (simulation-tuned so chest income no longer outruns the dungeon —
+~2/3 of thorough players clear floor 10, stair-rushers rarely do): regular enemies
+gain **+1 max HP per 2 floors** and **+1 damage on every roll per 3 floors** (a floor-7
+goblin has 8 HP and hits for 3–6). Bosses skip the HP drip and escalate per lair tier
+(floor/5): **+15 max HP and +1 to the damage die multiplier per tier** — floor 5:
+30 HP at 2×d4, floor 10: 45 HP at 3×d4, floor 15: 60 HP at 4×d4 — plus the flat
+damage bonus. Scaled stats are stamped on the enemy instance at spawn, so cached
+floors keep their numbers.
 
 ## Death
 
@@ -194,7 +202,12 @@ goblin baseline damage.
 Phase 3b (complete): **per-attack damage dice** — enemies roll a d4 on every landed
 hit (the player's damage stays flat) · **skeleton rebalance** to 3 HP ("half a
 goblin") · **boss enemies** — one boss on every 5th floor guarding the down-stairs
-room, 30 HP / 2×d4 damage, dropping a guaranteed no-trap bonus chest on death.
+room, dropping a guaranteed no-trap bonus chest on death.
+
+Phase 3c (complete): **depth scaling** — regular enemies +1 max HP per 2 floors and
++1 damage per 3 floors; bosses escalate per lair (+15 HP and +1 damage-die
+multiplier per tier). Constants in `core/constants.js` (`SCALE_*`,
+`BOSS_HP_PER_TIER`); scaling applied in `createEnemy`.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
