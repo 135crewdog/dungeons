@@ -18,6 +18,20 @@ function format(entry) {
     case 'death':
       return d.kind === 'player' ? 'You die...' : `The ${d.kind} dies.`;
     case 'pickup':
+      if (d.item === 'chest') {
+        switch (d.effect) {
+          case 'strength':
+            return `You open a chest: +${d.amount} Strength.`;
+          case 'armor':
+            return `You open a chest: +${d.amount} Armor.`;
+          case 'health':
+            return `You open a chest: +${d.amount} max HP, fully restored.`;
+          case 'trap':
+            return `You open a chest: a trap hits you for ${d.amount}!`;
+          default:
+            return 'You open a chest.';
+        }
+      }
       return `You drink a potion (+${d.heal} HP).`;
     case 'descend':
       return `You descend to floor ${d.floor}.`;

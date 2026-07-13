@@ -109,6 +109,14 @@ sighting — so breaking line of sight (e.g. slipping through a door) can shake 
 Base hit chance **75%**: show a floating **"Miss!"** on a miss and a floating **damage
 number** on a hit. Two entities never share a tile.
 
+Damage on a hit is `attacker damage + strength − target armor`, floored so a hit that
+would deal >0 raw damage always lands for **at least 1** (armor never grants
+invincibility; a 0-damage attack stays 0). Strength and armor are player stats that
+start at 0 and stack via treasure chests. **Goblin is the baseline enemy**; skeletons
+deal goblin-level damage and have more HP but move at **half speed** — one tile every
+2 turns (first step after aggro is immediate) — while still attacking **every** turn
+when adjacent.
+
 ## Death
 
 Permadeath. At 0 HP a minimal "You died" overlay appears; restarting begins a fresh run
@@ -117,10 +125,10 @@ on floor 1 with a **new random seed** (logged).
 ## Visual Style
 
 The entire game renders in **ASCII, monospace**. Floor `.` · Wall `#` · Player `@` ·
-Enemies single letters (`g` goblin, `s` skeleton) · Potion `!` · Stairs down `>` ·
-Stairs up `<` · Door `+` · Unexplored space · Explored-but-not-visible: same glyph,
-darker. This is the
-intentional Phase-1 art style, not a placeholder. The renderer is structured so sprites
+Enemies single letters (`g` goblin, `s` skeleton) · Potion `!` · Chest `$` ·
+Stairs down `>` · Stairs up `<` · Door `+` · Unexplored space ·
+Explored-but-not-visible: same glyph, darker. This is the
+intentional art style, not a placeholder. The renderer is structured so sprites
 could swap in later (`tileStyle.js` is the seam) without touching game logic.
 
 ## Canvas and Resolution
@@ -157,16 +165,25 @@ is `renderer/` and `ui/`. `input/` bridges them by translating user actions into
 simulation calls (it must not import the renderer). Only `src/main.js` imports the
 renderer.
 
-## Phase 1 Scope — build exactly this, then stop
+## Scope — build exactly this, then stop
 
-Procedural dungeon generation (rooms + corridors, each floor different) · ASCII
-rendering · click/tap A\* + keyboard movement · two enemy types with different HP/damage
-that chase and attack · 75%-hit combat with floating numbers · health potions that
-restore HP when walked over · **persistent floors** connected by down- and up-stairs
-(floors are cached per run, so climbing back up returns to the same floor exactly as it
-was left — layout, fog memory, items, and surviving enemies) · HUD (HP, floor number,
+Phase 1 (complete): procedural dungeon generation (rooms + corridors, each floor
+different) · ASCII rendering · click/tap A\* + keyboard movement · two enemy types that
+chase and attack · 75%-hit combat with floating numbers · health potions that restore
+HP when walked over · **persistent floors** connected by down- and up-stairs (floors
+are cached per run, so climbing back up returns to the same floor exactly as it was
+left — layout, fog memory, items, and surviving enemies) · HUD (HP, floor number,
 scrolling message log) · shadowcasting FOV with explored memory · installable offline
-PWA. **Do not** implement inventory, equipment, leveling, save files, quests, or any
+PWA. Phase 2 (pixel art) was skipped in favor of Phase 3 (complexity).
+
+Phase 3a (complete): **treasure chests** (`$`, 1–2 per floor) that open when walked
+over — contents rolled at spawn from the seeded RNG: 30% **+1 Strength** · 30%
+**+1 Armor** · 30% **+5 max HP + full heal** · 10% **trap** (goblin-level damage,
+armor applies, can kill). Bonuses stack for the whole run and show in the HUD once
+earned · **enemy differentiation**: skeletons at half movement speed with goblin
+baseline damage. Phase 3b (boss enemies) is next.
+
+**Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
 
 ## Testing

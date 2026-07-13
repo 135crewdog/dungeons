@@ -31,9 +31,10 @@ const ENTITY_COLOR = {
 };
 
 const POTION_COLOR = 0xe0556b;
+const CHEST_COLOR = 0xe0b74a;
 
 // Every glyph the renderer can draw — used to pre-bake glyph textures.
-export const ALL_GLYPHS = ['#', '.', '+', '>', '<', '@', 'g', 's', '!'];
+export const ALL_GLYPHS = ['#', '.', '+', '>', '<', '@', 'g', 's', '!', '$'];
 
 export function tileGlyph(tileType) {
   return TILE_GLYPH[tileType] ?? ' ';
@@ -64,10 +65,10 @@ export function entityColor(entity) {
   return ENTITY_COLOR[entity.kind] ?? 0xffffff;
 }
 
-export function itemGlyph() {
-  return '!';
+export function itemGlyph(item) {
+  return item.type === 'chest' ? '$' : '!';
 }
 
-export function itemColor() {
-  return POTION_COLOR;
+export function itemColor(item) {
+  return item.type === 'chest' ? CHEST_COLOR : POTION_COLOR;
 }

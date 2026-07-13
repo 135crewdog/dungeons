@@ -3,13 +3,14 @@
 // place (the single source of truth) but never touches the renderer.
 
 import { getPlayer, enemiesSorted, tileAt, isKnownWalkable } from './query.js';
-import { TILE } from './constants.js';
+import { TILE, CHEST_EFFECT } from './constants.js';
 import { tryMove } from './movement.js';
 import { descend, ascend } from './gameState.js';
 import { pushLog } from './entity.js';
-import { pickupEvent, descendEvent, ascendEvent } from './events.js';
+import { pickupEvent, descendEvent, ascendEvent, deathEvent } from './events.js';
 import { updateVisibility } from '../systems/visibility.js';
 import { enemyTurn } from '../systems/ai.js';
+import { mitigatedDamage } from '../systems/combat.js';
 import { aStar } from '../systems/pathfinding.js';
 
 // Run a turn from a player command. Returns events, or an empty array if the
@@ -75,19 +76,58 @@ function advanceWorld(state, events) {
 }
 
 // If the player stands on an item, apply it and remove it. Potions heal up to
-// max HP (the excess is wasted).
+// max HP (the excess is wasted). Chests grant their spawn-rolled bonus — or
+// spring their trap, which respects armor and can kill.
 function resolvePickups(state, events) {
+  if (state.status !== 'playing') return; // killed in the enemy phase: no loot
   const player = getPlayer(state);
   const i = state.items.findIndex((it) => it.x === player.x && it.y === player.y);
   if (i === -1) return;
   const item = state.items[i];
+
   if (item.type === 'potion') {
     const before = player.hp;
     player.hp = Math.min(player.maxHp, player.hp + item.heal);
     const healed = player.hp - before;
     state.items.splice(i, 1);
-    events.push(pickupEvent(item.id, item.x, item.y, healed));
+    events.push(pickupEvent(item.id, item.x, item.y, { item: 'potion', heal: healed }));
     pushLog(state, 'pickup', { item: 'potion', heal: healed });
+    return;
+  }
+
+  if (item.type === 'chest') {
+    state.items.splice(i, 1);
+    openChest(state, player, item, events);
+  }
+}
+
+function openChest(state, player, item, events) {
+  const { effect } = item;
+  let amount = item.amount;
+  let heal = 0;
+
+  if (effect === CHEST_EFFECT.STRENGTH) {
+    player.strength = (player.strength ?? 0) + amount;
+  } else if (effect === CHEST_EFFECT.ARMOR) {
+    player.armor = (player.armor ?? 0) + amount;
+  } else if (effect === CHEST_EFFECT.HEALTH) {
+    player.maxHp += amount;
+    heal = player.maxHp - player.hp;
+    player.hp = player.maxHp;
+  } else if (effect === CHEST_EFFECT.TRAP) {
+    amount = mitigatedDamage(item.amount, player.armor ?? 0); // report applied damage
+    player.hp -= amount;
+  }
+
+  events.push(pickupEvent(item.id, item.x, item.y, { item: 'chest', effect, amount, heal }));
+  pushLog(state, 'pickup', { item: 'chest', effect, amount });
+
+  if (player.hp <= 0) {
+    player.hp = 0;
+    events.push(deathEvent(player.id, 'player'));
+    pushLog(state, 'death', { kind: 'player' });
+    // Keep the player entity in place for the game-over frame; stop the run.
+    state.status = 'dead';
   }
 }
 

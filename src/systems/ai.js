@@ -35,8 +35,7 @@ export function enemyTurn(state, enemyId) {
 
   // In sight: close in on the player directly (lastSeen == player right now).
   if (canSee) {
-    const step = stepToward(state, enemy, enemy.lastSeen);
-    if (step) tryMove(state, enemy, step.dx, step.dy, events);
+    moveIfReady(state, enemy, enemy.lastSeen, events);
     return events;
   }
 
@@ -50,12 +49,28 @@ export function enemyTurn(state, enemyId) {
     enemy.aggro = false;
     enemy.lastSeen = null;
     enemy.lostSightTurns = 0;
+    enemy.moveCooldown = 0; // a fresh re-aggro gets an immediate first step
     return events;
   }
 
-  const step = stepToward(state, enemy, enemy.lastSeen);
-  if (step) tryMove(state, enemy, step.dx, step.dy, events);
+  moveIfReady(state, enemy, enemy.lastSeen, events);
   return events;
+}
+
+// Movement gate for slow enemies: a moveEvery-N enemy steps once, then rests
+// N-1 turns. The cooldown ticks only on turns the enemy is trying to move —
+// attacking never consumes or advances it — and is spent only on a successful
+// step, so a blocked enemy keeps its charge and retries next turn.
+function moveIfReady(state, enemy, goal, events) {
+  if ((enemy.moveCooldown ?? 0) > 0) {
+    enemy.moveCooldown--;
+    return;
+  }
+  const step = stepToward(state, enemy, goal);
+  if (!step) return;
+  if (tryMove(state, enemy, step.dx, step.dy, events)) {
+    enemy.moveCooldown = (enemy.moveEvery ?? 1) - 1;
+  }
 }
 
 // First step of an A* path from the enemy to a goal tile. Enemies see the whole

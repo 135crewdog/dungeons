@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { resolveAttack, areHostile } from '../src/systems/combat.js';
+import { resolveAttack, areHostile, mitigatedDamage } from '../src/systems/combat.js';
 import { createRng } from '../src/core/rng.js';
 
-function combatState(seed, { attackerDamage = 3, targetHp = 10, targetKind = 'goblin' } = {}) {
+function combatState(
+  seed,
+  { attackerDamage = 3, attackerStrength = 0, targetHp = 10, targetArmor = 0, targetKind = 'goblin' } = {},
+) {
   const rng = createRng(seed);
-  const attacker = { id: 1, kind: 'player', x: 0, y: 0, hp: 20, maxHp: 20, damage: attackerDamage, glyph: '@' };
-  const target = { id: 2, kind: targetKind, x: 1, y: 0, hp: targetHp, maxHp: targetHp, damage: 2, glyph: 'g' };
+  const attacker = { id: 1, kind: 'player', x: 0, y: 0, hp: 20, maxHp: 20, damage: attackerDamage, strength: attackerStrength, glyph: '@' };
+  const target = { id: 2, kind: targetKind, x: 1, y: 0, hp: targetHp, maxHp: targetHp, damage: 2, armor: targetArmor, glyph: 'g' };
   const state = {
     rng,
     status: 'playing',
@@ -71,6 +74,44 @@ describe('combat', () => {
     for (let i = 0; i < 30 && state.status === 'playing'; i++) resolveAttack(state, 1, 2);
     expect(state.status).toBe('dead');
     expect(state.entities.byId.has(2)).toBe(true); // player kept for the game-over frame
+  });
+
+  it('strength adds to the damage dealt on a hit', () => {
+    const { state, target } = combatState(7, { attackerDamage: 3, attackerStrength: 2, targetHp: 100 });
+    const before = target.hp;
+    const evs = resolveAttack(state, 1, 2);
+    if (evs[0].hit) expect(target.hp).toBe(before - 5);
+    else expect(target.hp).toBe(before);
+  });
+
+  it('armor reduces the damage taken on a hit', () => {
+    const { state, target } = combatState(7, { attackerDamage: 4, targetHp: 100, targetArmor: 2 });
+    const before = target.hp;
+    const evs = resolveAttack(state, 1, 2);
+    if (evs[0].hit) expect(target.hp).toBe(before - 2);
+    else expect(target.hp).toBe(before);
+  });
+
+  it('armor never reduces a real hit below 1 damage', () => {
+    const { state, target } = combatState(7, { attackerDamage: 2, targetHp: 100, targetArmor: 5 });
+    const before = target.hp;
+    const evs = resolveAttack(state, 1, 2);
+    if (evs[0].hit) expect(target.hp).toBe(before - 1);
+    else expect(target.hp).toBe(before);
+  });
+
+  it('a zero-damage attack stays zero even against armor', () => {
+    const { state, target } = combatState(2024, { attackerDamage: 0, targetHp: 100, targetArmor: 3 });
+    for (let i = 0; i < 20; i++) resolveAttack(state, 1, 2); // guaranteed to include hits
+    expect(target.hp).toBe(100);
+  });
+
+  it('mitigatedDamage floors real hits at 1 and passes zero through', () => {
+    expect(mitigatedDamage(0, 5)).toBe(0);
+    expect(mitigatedDamage(-1, 0)).toBe(0);
+    expect(mitigatedDamage(2, 5)).toBe(1);
+    expect(mitigatedDamage(4, 1)).toBe(3);
+    expect(mitigatedDamage(4, 0)).toBe(4);
   });
 
   it('areHostile is true only across the player/enemy line', () => {

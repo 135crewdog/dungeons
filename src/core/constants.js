@@ -26,15 +26,31 @@ export const HIT_CHANCE = 0.75;
 export const PLAYER_MAX_HP = 20;
 export const PLAYER_DAMAGE = 4;
 
-// Two enemy types with distinct HP and damage. `glyph` is a presentation hint;
-// the renderer's tileStyle owns the final glyph/color.
+// Two enemy types. Goblin is the baseline; skeletons hit just as hard but are
+// tougher and slow — `moveEvery: 2` means one tile every 2 turns (attacks are
+// never slowed). `glyph` is a presentation hint; the renderer's tileStyle owns
+// the final glyph/color.
 export const ENEMY_TYPES = Object.freeze({
-  goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damage: 2 },
-  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 11, damage: 4 },
+  goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damage: 2, moveEvery: 1 },
+  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 11, damage: 2, moveEvery: 2 },
 });
 
 // Items.
 export const POTION_HEAL = 8;
+
+// Treasure chests. Contents are decided at spawn time (deterministic per seed)
+// and stored on the item. Bonuses stack across a run; the trap hits like a
+// goblin and respects armor (same rule as enemy attacks).
+export const CHEST_EFFECT = Object.freeze({
+  STRENGTH: 'strength',
+  ARMOR: 'armor',
+  HEALTH: 'health',
+  TRAP: 'trap',
+});
+export const CHEST_STRENGTH_BONUS = 1; // +1 damage dealt per stack
+export const CHEST_ARMOR_BONUS = 1; // -1 damage taken per stack
+export const CHEST_HEALTH_BONUS = 5; // +5 max HP, and refill to full
+export const CHEST_TRAP_DAMAGE = ENEMY_TYPES.goblin.damage;
 
 // Map + generation.
 export const MAP_WIDTH = 72;
@@ -49,6 +65,8 @@ export const MIN_ENEMIES = 5;
 export const MAX_ENEMIES = 8;
 export const MIN_POTIONS = 1;
 export const MAX_POTIONS = 3;
+export const MIN_CHESTS = 1;
+export const MAX_CHESTS = 2;
 
 // Field of view: unbounded line of sight within walls (classic). A large radius
 // stands in for "unbounded" while bounding worst-case work on open maps.
