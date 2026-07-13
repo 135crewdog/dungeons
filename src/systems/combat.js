@@ -3,7 +3,7 @@
 // renderer can float numbers. All randomness goes through the game RNG.
 
 import { HIT_CHANCE } from '../core/constants.js';
-import { chance } from '../core/rng.js';
+import { chance, nextInt } from '../core/rng.js';
 import { attackEvent, deathEvent } from '../core/events.js';
 import { pushLog } from '../core/entity.js';
 
@@ -27,7 +27,13 @@ export function resolveAttack(state, attackerId, targetId) {
     return events;
   }
 
-  const raw = attacker.damage + (attacker.strength ?? 0);
+  // Enemies roll their damage die fresh on every landed hit (only after the
+  // hit roll, so a miss costs one RNG draw and a landed hit costs two); the
+  // player's damage is flat.
+  const base = attacker.damageDie
+    ? nextInt(state.rng, 1, attacker.damageDie) * (attacker.damageMult ?? 1)
+    : attacker.damage;
+  const raw = base + (attacker.strength ?? 0);
   const damage = mitigatedDamage(raw, target.armor ?? 0);
   target.hp -= damage;
   events.push(attackEvent(attackerId, targetId, true, damage, target.x, target.y));

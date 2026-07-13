@@ -1,7 +1,8 @@
 import { ENEMY_TYPES } from '../core/constants.js';
 
 // The enemy archetypes that can be spawned. Two types: goblins are weak and
-// quick; skeletons hit just as hard but are tougher and move at half speed.
+// quick; skeletons hit with the same die but are fragile and move at half
+// speed.
 export const SPAWNABLE_ENEMIES = Object.values(ENEMY_TYPES);
 
 // Factory for an enemy of a given archetype at integer tile coordinates.
@@ -20,7 +21,8 @@ export function createEnemy(type, x, y) {
     y,
     hp: type.maxHp,
     maxHp: type.maxHp,
-    damage: type.damage,
+    damageDie: type.damageDie,
+    damageMult: type.damageMult ?? 1,
     moveEvery: type.moveEvery ?? 1,
     moveCooldown: 0,
     aggro: false,

@@ -26,13 +26,17 @@ export const HIT_CHANCE = 0.75;
 export const PLAYER_MAX_HP = 20;
 export const PLAYER_DAMAGE = 4;
 
-// Two enemy types. Goblin is the baseline; skeletons hit just as hard but are
-// tougher and slow — `moveEvery: 2` means one tile every 2 turns (attacks are
-// never slowed). `glyph` is a presentation hint; the renderer's tileStyle owns
-// the final glyph/color.
+// Enemy damage is a die rolled fresh on every landed hit (through the seeded
+// RNG, after the hit roll succeeds) — the player's damage stays flat.
+export const ENEMY_DAMAGE_DIE = 4;
+
+// Enemy types. Goblin is the baseline; skeletons are "about half a goblin" —
+// fragile AND slow (`moveEvery: 2` = one tile every 2 turns; attacks are never
+// slowed) — but hit with the same die. `glyph` is a presentation hint; the
+// renderer's tileStyle owns the final glyph/color.
 export const ENEMY_TYPES = Object.freeze({
-  goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damage: 2, moveEvery: 1 },
-  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 11, damage: 2, moveEvery: 2 },
+  goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 1 },
+  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 3, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 2 },
 });
 
 // Items.
@@ -50,7 +54,7 @@ export const CHEST_EFFECT = Object.freeze({
 export const CHEST_STRENGTH_BONUS = 1; // +1 damage dealt per stack
 export const CHEST_ARMOR_BONUS = 1; // -1 damage taken per stack
 export const CHEST_HEALTH_BONUS = 5; // +5 max HP, and refill to full
-export const CHEST_TRAP_DAMAGE = ENEMY_TYPES.goblin.damage;
+export const CHEST_TRAP_DIE = ENEMY_DAMAGE_DIE; // rolled 1..die at spawn — a trap hits like a goblin
 
 // Map + generation.
 export const MAP_WIDTH = 72;

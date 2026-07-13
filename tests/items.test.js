@@ -3,6 +3,7 @@ import { processCommand } from '../src/core/turnEngine.js';
 import { createGame, descend, ascend } from '../src/core/gameState.js';
 import { getPlayer } from '../src/core/query.js';
 import { createRng } from '../src/core/rng.js';
+import { createChest } from '../src/entities/items.js';
 import { TILE, PLAYER_MAX_HP } from '../src/core/constants.js';
 import { idx } from '../src/core/query.js';
 
@@ -121,6 +122,18 @@ describe('chests', () => {
     expect(events.some((e) => e.type === 'death')).toBe(true);
     expect(state.entities.byId.has(1)).toBe(true); // kept for the game-over frame
     expect(state.items).toHaveLength(0);
+  });
+
+  it('trap chests roll their damage at spawn, 1..4 like a goblin hit', () => {
+    const amounts = new Set();
+    for (let seed = 1; seed <= 500; seed++) {
+      const chest = createChest(createRng(seed), 0, 0);
+      if (chest.effect !== 'trap') continue;
+      expect(chest.amount).toBeGreaterThanOrEqual(1);
+      expect(chest.amount).toBeLessThanOrEqual(4);
+      amounts.add(chest.amount);
+    }
+    expect(amounts.size).toBeGreaterThanOrEqual(2); // rolled, not a constant
   });
 
   it('chest contents are seed-deterministic', () => {

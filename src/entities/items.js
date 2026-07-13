@@ -4,7 +4,7 @@ import {
   CHEST_STRENGTH_BONUS,
   CHEST_ARMOR_BONUS,
   CHEST_HEALTH_BONUS,
-  CHEST_TRAP_DAMAGE,
+  CHEST_TRAP_DIE,
 } from '../core/constants.js';
 import { nextInt } from '../core/rng.js';
 
@@ -33,7 +33,7 @@ export function createChest(rng, x, y) {
     amount = CHEST_HEALTH_BONUS;
   } else {
     effect = CHEST_EFFECT.TRAP;
-    amount = CHEST_TRAP_DAMAGE;
+    amount = nextInt(rng, 1, CHEST_TRAP_DIE); // a trap hits like a goblin: 1..4
   }
   return { id: 0, type: 'chest', x, y, effect, amount };
 }
