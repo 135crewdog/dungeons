@@ -34,7 +34,7 @@ function miniState(width, height, walls = []) {
     y: 2,
     hp: 20,
     maxHp: 20,
-    damage: 4,
+    attackDie: 8,
     glyph: '@',
   };
   const state = {

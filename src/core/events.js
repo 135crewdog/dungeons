@@ -16,8 +16,9 @@ export function moveEvent(id, from, to) {
   return { type: EV.MOVE, id, from, to };
 }
 
-export function attackEvent(attackerId, targetId, hit, damage, x, y) {
-  return { type: EV.ATTACK, attackerId, targetId, hit, damage, x, y };
+// `roll` is the attacker's to-hit d20 result, so the UI can show the dice.
+export function attackEvent(attackerId, targetId, hit, damage, x, y, roll = 0) {
+  return { type: EV.ATTACK, attackerId, targetId, hit, damage, x, y, roll };
 }
 
 export function pickupEvent(itemId, x, y, { item = 'potion', heal = 0, effect = null, amount = 0 } = {}) {

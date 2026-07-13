@@ -106,38 +106,39 @@ enters their line of sight, then give chase. A chasing enemy that **loses sight*
 player heads for the tile it last saw them on; if it arrives empty-handed (or stays
 blind for several turns) it **gives up** and holds position, re-aggroing only on a fresh
 sighting — so breaking line of sight (e.g. slipping through a door) can shake pursuit.
-Base hit chance **75%**: show a floating **"Miss!"** on a miss and a floating **damage
-number** on a hit. Two entities never share a tile.
+**Every attack is two visible rolls, identical for every combatant** (all through
+the seeded RNG, tabletop style):
 
-Damage on a hit is `attacker damage + strength − target armor`, floored so a hit that
-would deal >0 raw damage always lands for **at least 1** (armor never grants
-invincibility; a 0-damage attack stays 0). **Both sides roll dice**: the player deals
-**d4+2 (+strength)** and enemies deal **d4 (+depth bonus)** — every landed hit rolls
-fresh through the seeded RNG (rolled only after the 75% hit roll succeeds), tabletop
-style. Strength and armor are player stats that start at 0 and stack via treasure
-chests.
+1. **To-hit** — roll a **d20**: a natural 1 always misses; otherwise the attack lands
+   if `roll + skill ≥ 6` (75% at skill 0, +5% per skill point, capped at 95% by the
+   natural-1 rule).
+2. **Damage** — roll the attacker's **damage die + strength − target armor**, floored
+   so a hit that would deal >0 raw damage always lands for **at least 1** (armor
+   never grants invincibility; a 0-damage attack stays 0).
 
-**Goblin is the baseline enemy** (7 HP, d4 damage, full speed — the floor-1
-reference). Skeletons are "about half a goblin": **4 HP** and **half movement speed**
-— one tile every 2 turns (first step after aggro is immediate) — but they swing the
-same d4 and still attack **every** turn when adjacent. A **boss** (`B`) guards the
-down-stairs room on **every 5th floor**, full speed, same hit chance and
+The message log prints the to-hit rolls (`You roll 14: hit the goblin for 5.`); the
+renderer floats a **"Miss!"** or the **damage number** per swing. Skill, strength,
+and armor are player stats that start at 0 and stack via treasure chests. The player
+rolls a **d8** for damage. Two entities never share a tile.
+
+**Goblin is the baseline enemy** (6 HP, d4 damage die, full speed — the floor-1
+reference). Skeletons are "about half a goblin": **3 HP** and **half movement speed**
+— one tile every 2 turns (first step after aggro is immediate) — but they roll the
+same damage die and still attack **every** turn when adjacent. A **boss** (`B`)
+guards the down-stairs room on **every 5th floor**, full speed, same to-hit rule and
 aggro/chase/give-up AI as everyone else; a slain boss always drops a bonus chest on
 its death tile — ⅓ Strength / ⅓ Armor / ⅓ Health, never a trap.
 
-**Depth scaling** (tuned with the headless balance simulator, `npm run balance` —
-under identical careful bot play the floor-10 clear rate halved versus the old
-numbers, and deaths spread across the whole descent instead of piling up at the boss
-lairs): regular enemies gain **+1 max HP per 2 floors** and **+1 damage on every roll
-per 3 floors** (a floor-7 goblin has 10 HP and hits for 3–6). **Floor population also
-scales**: the
-enemy count gains +1 per 3 floors over its 5–8 base (capped at 12), and the spawn mix
-drifts from 50/50 toward goblins by +3%/floor (capped at 80%). Bosses have their own
-curve per lair tier (floor/5): **+12 max HP and +1 to the damage die multiplier per
-tier** — floor 5: 26 HP at 2×d4, floor 10: 38 HP at 3×d4, floor 15: 50 HP at 4×d4 —
-and are **exempt from the flat damage drip** (the multiplier is their damage scaling;
-stacking both made deep lairs pierce armor twice over). Scaled stats are stamped on
-the enemy instance at spawn, so cached floors keep their numbers.
+**Depth scaling — deeper monsters roll bigger dice** (tuned with the headless
+balance simulator, `npm run balance`): regular enemies climb the damage-die ladder
+**one rung per 4 floors** — floors 1–4 d4, 5–8 d6, 9–12 d8, 13+ d10 (clamped) — and
+gain **+1 max HP per 2 floors**. **Floor population also scales**: the enemy count
+gains +1 per 3 floors over its 5–8 base (capped at 12), and the spawn mix drifts
+from 50/50 toward goblins by +3%/floor (capped at 80%). Bosses skip the ladder:
+each lair tier (floor/5) rolls its own die — **floor 5: d8 (the player's own die),
+floor 10: d12, floor 15+: d20** — and adds **+12 max HP per tier** over the 24 HP
+base. Scaled stats are stamped on the enemy instance at spawn, so cached floors
+keep their numbers.
 
 ## Death
 
@@ -206,11 +207,12 @@ scrolling message log) · shadowcasting FOV with explored memory · installable 
 PWA. Phase 2 (pixel art) was skipped in favor of Phase 3 (complexity).
 
 Phase 3a (complete): **treasure chests** (`$`, 1–2 per floor) that open when walked
-over — contents rolled at spawn from the seeded RNG (current `CHEST_TABLE`): 30%
-**+1 Strength** · 25% **+1 Armor** · 30% **+4 max HP + full heal** · 15% **trap**
-(rolls 1–4 at spawn, like a goblin hit; armor applies, can kill). Bonuses stack for
-the whole run and show in the HUD once earned · **enemy differentiation**: skeletons
-at half movement speed with goblin baseline damage.
+over — contents rolled at spawn from the seeded RNG (current `CHEST_TABLE`): 25%
+**+1 Strength** · 20% **+1 Skill** · 25% **+1 Armor** · 20% **+4 max HP + full
+heal** · 10% **trap** (rolls 1–4 at spawn, like a floor-1 goblin hit; armor applies,
+can kill). Bonuses stack for the whole run and show in the HUD once earned ·
+**enemy differentiation**: skeletons at half movement speed with goblin baseline
+damage.
 
 Phase 3b (complete): **per-attack damage dice** — enemies roll a d4 on every landed
 hit · **skeleton rebalance** ("half a goblin") · **boss enemies** — one boss on every
@@ -231,11 +233,22 @@ cap 80%) · chest table 30/25/30/15 with `CHEST_TABLE` thresholds · health ches
 boss 26 HP base, +12/tier, exempt from the flat damage drip. The current numbers in
 the Combat section above are authoritative.
 
-Phase 3e (complete): **player damage die** — the player rolls **d4+2 (+strength)**
-per landed hit instead of dealing a flat 4 (`PLAYER_DAMAGE_DIE`,
-`PLAYER_DAMAGE_BONUS`), so combat is dice on both sides; the regular-enemy HP drip
-returned to +1 per 2 floors to absorb the higher damage mean (the simulator's
-floor-10 clear rate for careful bot play stays ~14%, deaths spread across the run).
+Phase 3e (complete, superseded by 3f): **player damage die** — the player rolled
+d4+2 (+strength) per landed hit instead of a flat 4, making combat dice on both
+sides.
+
+Phase 3f (complete): **two-roll combat** — every attack is a visible **d20 to-hit
+roll** (natural 1 misses; `roll + skill ≥ 6`) followed by a **damage-die roll**,
+identical for all combatants; this deleted the flat hit chance, the player's d4+2,
+the boss damage multiplier, and the flat depth-damage drip (the 3b/3e damage
+formulas are superseded). Enemies scale by climbing the die ladder; bosses roll
+d8/d12/d20 per tier; chests gained the **+1 Skill** effect (accuracy). Constants:
+`HIT_DIE`/`HIT_THRESHOLD`, `PLAYER_ATTACK_DIE`, `ENEMY_DIE_LADDER` +
+`DIE_LADDER_EVERY_FLOORS`, `BOSS_DICE`, five-way `CHEST_TABLE`. Simulator-retuned:
+the careful bot's floor-10 clear rate stays ~14% (cross-validated), floor-1 deaths
+~18%, boss share of deaths ~33% — the wide-dice lesson is that the min-1 armor
+floor makes big dice pierce armor harder than their mean suggests, so die
+assignments, not modifiers, carry the curve.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.

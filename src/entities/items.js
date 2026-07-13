@@ -2,6 +2,7 @@ import {
   POTION_HEAL,
   CHEST_EFFECT,
   CHEST_STRENGTH_BONUS,
+  CHEST_SKILL_BONUS,
   CHEST_ARMOR_BONUS,
   CHEST_HEALTH_BONUS,
   CHEST_TRAP_DIE,
@@ -26,6 +27,9 @@ export function createChest(rng, x, y) {
   if (roll <= CHEST_TABLE.strength) {
     effect = CHEST_EFFECT.STRENGTH;
     amount = CHEST_STRENGTH_BONUS;
+  } else if (roll <= CHEST_TABLE.skill) {
+    effect = CHEST_EFFECT.SKILL;
+    amount = CHEST_SKILL_BONUS;
   } else if (roll <= CHEST_TABLE.armor) {
     effect = CHEST_EFFECT.ARMOR;
     amount = CHEST_ARMOR_BONUS;
@@ -34,7 +38,7 @@ export function createChest(rng, x, y) {
     amount = CHEST_HEALTH_BONUS;
   } else {
     effect = CHEST_EFFECT.TRAP;
-    amount = nextInt(rng, 1, CHEST_TRAP_DIE); // a trap hits like a goblin: 1..4
+    amount = nextInt(rng, 1, CHEST_TRAP_DIE); // a trap hits like a floor-1 goblin: 1..4
   }
   return { id: 0, type: 'chest', x, y, effect, amount };
 }

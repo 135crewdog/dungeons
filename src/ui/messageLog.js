@@ -9,12 +9,12 @@ function format(entry) {
   switch (entry.type) {
     case 'hit':
       return d.attacker === 'player'
-        ? `You hit the ${d.target} for ${d.damage}.`
-        : `The ${d.attacker} hits you for ${d.damage}.`;
+        ? `You roll ${d.roll}: hit the ${d.target} for ${d.damage}.`
+        : `The ${d.attacker} rolls ${d.roll}: hits you for ${d.damage}.`;
     case 'miss':
       return d.attacker === 'player'
-        ? `You miss the ${d.target}.`
-        : `The ${d.attacker} misses you.`;
+        ? `You roll ${d.roll}: miss the ${d.target}.`
+        : `The ${d.attacker} rolls ${d.roll}: miss.`;
     case 'death':
       return d.kind === 'player' ? 'You die...' : `The ${d.kind} dies.`;
     case 'pickup':
@@ -22,6 +22,8 @@ function format(entry) {
         switch (d.effect) {
           case 'strength':
             return `You open a chest: +${d.amount} Strength.`;
+          case 'skill':
+            return `You open a chest: +${d.amount} Skill.`;
           case 'armor':
             return `You open a chest: +${d.amount} Armor.`;
           case 'health':

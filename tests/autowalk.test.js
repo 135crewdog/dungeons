@@ -17,7 +17,7 @@ function corridorState(exploredTo = 8) {
     tiles[idx(map, x, 1)] = TILE.FLOOR;
     if (x <= exploredTo) explored[idx(map, x, 1)] = 1;
   }
-  const player = { id: 1, kind: 'player', x: 1, y: 1, hp: 20, maxHp: 20, damage: 4, glyph: '@' };
+  const player = { id: 1, kind: 'player', x: 1, y: 1, hp: 20, maxHp: 20, attackDie: 8, glyph: '@' };
   const state = {
     rng: createRng(1),
     status: 'playing',

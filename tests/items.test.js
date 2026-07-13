@@ -26,7 +26,7 @@ function miniState({ playerHp = PLAYER_MAX_HP, playerArmor = 0, stairsAt = null,
     tiles[idx(map, stairsAt.x, stairsAt.y)] = TILE.STAIRS_DOWN;
     map.stairsDown = { ...stairsAt };
   }
-  const player = { id: 1, kind: 'player', x: 2, y: 2, hp: playerHp, maxHp: PLAYER_MAX_HP, damage: 4, strength: 0, armor: playerArmor, glyph: '@' };
+  const player = { id: 1, kind: 'player', x: 2, y: 2, hp: playerHp, maxHp: PLAYER_MAX_HP, attackDie: 8, skill: 0, strength: 0, armor: playerArmor, glyph: '@' };
   const state = {
     rng: createRng(1),
     status: 'playing',
@@ -86,6 +86,15 @@ describe('chests', () => {
     expect(state.items).toHaveLength(0);
   });
 
+  it('a skill chest raises player skill and is consumed', () => {
+    const { state, player } = miniState({ chest: { x: 3, y: 2, effect: 'skill', amount: 1 } });
+    const events = walkOntoChest(state);
+    expect(player.skill).toBe(1);
+    expect(state.items).toHaveLength(0);
+    const pickup = events.find((e) => e.type === 'pickup');
+    expect(pickup).toMatchObject({ item: 'chest', effect: 'skill', amount: 1 });
+  });
+
   it('a health chest raises max HP and refills to full', () => {
     const { state, player } = miniState({ playerHp: 5, chest: { x: 3, y: 2, effect: 'health', amount: 5 } });
     const events = walkOntoChest(state);
@@ -136,15 +145,16 @@ describe('chests', () => {
     expect(amounts.size).toBeGreaterThanOrEqual(2); // rolled, not a constant
   });
 
-  it('chest contents follow the 30/25/30/15 table', () => {
+  it('chest contents follow the 25/20/25/20/10 table', () => {
     const rng = createRng(42);
-    const tally = { strength: 0, armor: 0, health: 0, trap: 0 };
-    const n = 600;
+    const tally = { strength: 0, skill: 0, armor: 0, health: 0, trap: 0 };
+    const n = 3000;
     for (let i = 0; i < n; i++) tally[createChest(rng, 0, 0).effect]++;
-    expect(tally.strength / n).toBeCloseTo(0.3, 1);
+    expect(tally.strength / n).toBeCloseTo(0.25, 1);
+    expect(tally.skill / n).toBeCloseTo(0.2, 1);
     expect(tally.armor / n).toBeCloseTo(0.25, 1);
-    expect(tally.health / n).toBeCloseTo(0.3, 1);
-    expect(tally.trap / n).toBeCloseTo(0.15, 1);
+    expect(tally.health / n).toBeCloseTo(0.2, 1);
+    expect(tally.trap / n).toBeCloseTo(0.1, 1);
   });
 
   it('chest contents are seed-deterministic', () => {

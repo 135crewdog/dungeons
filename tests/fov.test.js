@@ -85,7 +85,7 @@ function roomState() {
       roomAt[idx(map, x, y)] = 0;
     }
   }
-  const player = { id: 1, kind: 'player', x: 4, y: 4, hp: 20, maxHp: 20, damage: 4, glyph: '@' };
+  const player = { id: 1, kind: 'player', x: 4, y: 4, hp: 20, maxHp: 20, attackDie: 8, glyph: '@' };
   const state = {
     map,
     vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
@@ -135,7 +135,7 @@ function doorCorridorState(playerX) {
   const map = { width, height, tiles, rooms: [], roomAt, stairsDown: null, stairsUp: null };
   for (let x = 1; x <= 7; x++) tiles[idx(map, x, 1)] = TILE.FLOOR;
   tiles[idx(map, 4, 1)] = TILE.DOOR;
-  const player = { id: 1, kind: 'player', x: playerX, y: 1, hp: 20, maxHp: 20, damage: 4, glyph: '@' };
+  const player = { id: 1, kind: 'player', x: playerX, y: 1, hp: 20, maxHp: 20, attackDie: 8, glyph: '@' };
   const state = {
     map,
     vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },

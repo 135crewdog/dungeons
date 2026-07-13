@@ -22,6 +22,7 @@ export function createHud(parent) {
       `<span class="hud-item">Floor <b>${state.floor}</b></span>` +
       // Chest-earned stats appear once the first bonus is banked.
       (p.strength > 0 ? `<span class="hud-item">STR <b>+${p.strength}</b></span>` : '') +
+      (p.skill > 0 ? `<span class="hud-item">SKL <b>+${p.skill}</b></span>` : '') +
       (p.armor > 0 ? `<span class="hud-item">ARM <b>+${p.armor}</b></span>` : '');
   }
 

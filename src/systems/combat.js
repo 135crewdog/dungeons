@@ -2,8 +2,8 @@
 // state and returns events describing what happened (hit/miss/death) so the
 // renderer can float numbers. All randomness goes through the game RNG.
 
-import { HIT_CHANCE, TILE, DIRS8 } from '../core/constants.js';
-import { chance, nextInt } from '../core/rng.js';
+import { HIT_DIE, HIT_THRESHOLD, TILE, DIRS8 } from '../core/constants.js';
+import { nextInt } from '../core/rng.js';
 import { attackEvent, deathEvent } from '../core/events.js';
 import { pushLog, allocId } from '../core/entity.js';
 import { tileAt, entityAt } from '../core/query.js';
@@ -23,25 +23,23 @@ export function resolveAttack(state, attackerId, targetId) {
   const target = state.entities.byId.get(targetId);
   if (!attacker || !target) return events;
 
-  if (!chance(state.rng, HIT_CHANCE)) {
-    events.push(attackEvent(attackerId, targetId, false, 0, target.x, target.y));
-    pushLog(state, 'miss', { attacker: attacker.kind, target: target.kind });
+  // To-hit: roll a d20 — a natural 1 always misses; otherwise the attack
+  // lands if roll + skill clears the threshold. Every combatant resolves
+  // through this same pair of rolls (a miss costs one RNG draw, a landed hit
+  // two): d20 to hit, then the attacker's damage die + strength, minus armor.
+  const roll = nextInt(state.rng, 1, HIT_DIE);
+  const hit = roll > 1 && roll + (attacker.skill ?? 0) >= HIT_THRESHOLD;
+  if (!hit) {
+    events.push(attackEvent(attackerId, targetId, false, 0, target.x, target.y, roll));
+    pushLog(state, 'miss', { attacker: attacker.kind, target: target.kind, roll });
     return events;
   }
 
-  // Everyone rolls their damage die fresh on every landed hit (only after the
-  // hit roll, so a miss costs one RNG draw and a landed hit costs two); flat
-  // `damage` is the fallback for die-less entities. dmgBonus is the enemy
-  // depth-scaling drip and the player's baked-in +2; strength is the player's
-  // chest-fed bonus.
-  const base = attacker.damageDie
-    ? nextInt(state.rng, 1, attacker.damageDie) * (attacker.damageMult ?? 1)
-    : attacker.damage;
-  const raw = base + (attacker.dmgBonus ?? 0) + (attacker.strength ?? 0);
+  const raw = nextInt(state.rng, 1, attacker.attackDie) + (attacker.strength ?? 0);
   const damage = mitigatedDamage(raw, target.armor ?? 0);
   target.hp -= damage;
-  events.push(attackEvent(attackerId, targetId, true, damage, target.x, target.y));
-  pushLog(state, 'hit', { attacker: attacker.kind, target: target.kind, damage });
+  events.push(attackEvent(attackerId, targetId, true, damage, target.x, target.y, roll));
+  pushLog(state, 'hit', { attacker: attacker.kind, target: target.kind, damage, roll });
 
   if (target.hp <= 0) {
     target.hp = 0;
