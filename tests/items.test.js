@@ -136,6 +136,17 @@ describe('chests', () => {
     expect(amounts.size).toBeGreaterThanOrEqual(2); // rolled, not a constant
   });
 
+  it('chest contents follow the 30/25/30/15 table', () => {
+    const rng = createRng(42);
+    const tally = { strength: 0, armor: 0, health: 0, trap: 0 };
+    const n = 600;
+    for (let i = 0; i < n; i++) tally[createChest(rng, 0, 0).effect]++;
+    expect(tally.strength / n).toBeCloseTo(0.3, 1);
+    expect(tally.armor / n).toBeCloseTo(0.25, 1);
+    expect(tally.health / n).toBeCloseTo(0.3, 1);
+    expect(tally.trap / n).toBeCloseTo(0.15, 1);
+  });
+
   it('chest contents are seed-deterministic', () => {
     const summary = (state) => state.items.map((it) => ({ type: it.type, x: it.x, y: it.y, effect: it.effect }));
     expect(summary(createGame(777))).toEqual(summary(createGame(777)));

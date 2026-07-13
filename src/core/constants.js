@@ -35,14 +35,14 @@ export const ENEMY_DAMAGE_DIE = 4;
 // slowed) — but hit with the same die. `glyph` is a presentation hint; the
 // renderer's tileStyle owns the final glyph/color.
 export const ENEMY_TYPES = Object.freeze({
-  goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 1 },
-  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 3, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 2 },
+  goblin: { kind: 'goblin', glyph: 'g', maxHp: 7, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 1 },
+  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 4, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 2 },
   // The level boss: one guards the down-stairs on every BOSS_FLOOR_INTERVAL-th
   // floor (never the random pool). maxHp/damageMult here are the tier-1 (floor
   // 5) values — deeper lairs escalate via the depth-scaling constants below.
   // Tuned by simulation: the first boss is ~97% winnable at full chest-fed
   // strength but deadly to an early diver. Same hit chance and AI as everyone.
-  boss: { kind: 'boss', glyph: 'B', maxHp: 30, damageDie: ENEMY_DAMAGE_DIE, damageMult: 2, moveEvery: 1 },
+  boss: { kind: 'boss', glyph: 'B', maxHp: 26, damageDie: ENEMY_DAMAGE_DIE, damageMult: 2, moveEvery: 1 },
 });
 
 // Every Nth floor spawns a boss in the room with the down-stairs.
@@ -56,8 +56,8 @@ export const BOSS_FLOOR_INTERVAL = 5;
 // by 1 (floor 5: 2xd4, floor 10: 3xd4, ...); the flat damage bonus applies to
 // them too.
 export const SCALE_DMG_EVERY_FLOORS = 3;
-export const SCALE_HP_EVERY_FLOORS = 2;
-export const BOSS_HP_PER_TIER = 15;
+export const SCALE_HP_EVERY_FLOORS = 3;
+export const BOSS_HP_PER_TIER = 12;
 
 // Items.
 export const POTION_HEAL = 8;
@@ -73,8 +73,18 @@ export const CHEST_EFFECT = Object.freeze({
 });
 export const CHEST_STRENGTH_BONUS = 1; // +1 damage dealt per stack
 export const CHEST_ARMOR_BONUS = 1; // -1 damage taken per stack
-export const CHEST_HEALTH_BONUS = 5; // +5 max HP, and refill to full
+export const CHEST_HEALTH_BONUS = 4; // +4 max HP, and refill to full
 export const CHEST_TRAP_DIE = ENEMY_DAMAGE_DIE; // rolled 1..die at spawn — a trap hits like a goblin
+
+// Chest contents table: cumulative d100 thresholds rolled at spawn. Armor is
+// the strongest stat against small damage dice, so it gets the thinnest slice;
+// the trap share is what makes greedy chest-opening a gamble.
+export const CHEST_TABLE = Object.freeze({
+  strength: 30, // 1-30   → +strength (30%)
+  armor: 55, //    31-55  → +armor    (25%)
+  health: 85, //   56-85  → +max HP   (30%)
+  // 86-100 → trap (15%)
+});
 
 // Map + generation.
 export const MAP_WIDTH = 72;
@@ -84,9 +94,17 @@ export const MAX_ROOMS = 12;
 export const MIN_ROOM_SIZE = 4;
 export const MAX_ROOM_SIZE = 10;
 
-// Population per floor (mildly RNG-varied; no depth curve in Phase 1).
+// Population per floor (mildly RNG-varied). Enemy count grows with depth:
+// +1 per ENEMY_COUNT_EVERY_FLOORS floors of descent, capped at
+// ENEMY_COUNT_CAP. The spawn mix also drifts toward goblins (the tougher
+// archetype) as the player descends.
 export const MIN_ENEMIES = 5;
 export const MAX_ENEMIES = 8;
+export const ENEMY_COUNT_EVERY_FLOORS = 3;
+export const ENEMY_COUNT_CAP = 12;
+export const GOBLIN_WEIGHT_BASE = 0.5; // goblin share of the mix on floor 1
+export const GOBLIN_WEIGHT_PER_FLOOR = 0.03; // added per floor below the first
+export const GOBLIN_WEIGHT_MAX = 0.8;
 export const MIN_POTIONS = 1;
 export const MAX_POTIONS = 3;
 export const MIN_CHESTS = 1;

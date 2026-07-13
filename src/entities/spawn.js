@@ -2,11 +2,16 @@
 // potions, treasure chests). Placement uses the game RNG and never puts two
 // things on the same tile, never on a wall, stairs, door, or on the player.
 
-import { nextInt, pick } from '../core/rng.js';
+import { nextInt, pick, chance } from '../core/rng.js';
 import {
   TILE,
   MIN_ENEMIES,
   MAX_ENEMIES,
+  ENEMY_COUNT_EVERY_FLOORS,
+  ENEMY_COUNT_CAP,
+  GOBLIN_WEIGHT_BASE,
+  GOBLIN_WEIGHT_PER_FLOOR,
+  GOBLIN_WEIGHT_MAX,
   MIN_POTIONS,
   MAX_POTIONS,
   MIN_CHESTS,
@@ -16,7 +21,7 @@ import {
 } from '../core/constants.js';
 import { idx, entityAt } from '../core/query.js';
 import { addEntity, allocId } from '../core/entity.js';
-import { createEnemy, SPAWNABLE_ENEMIES } from './enemies.js';
+import { createEnemy } from './enemies.js';
 import { createPotion, createChest } from './items.js';
 
 // A random unoccupied FLOOR tile within a room, or null if none found quickly.
@@ -55,16 +60,30 @@ function spawnBoss(state, floorNumber) {
   addEntity(state, createEnemy(ENEMY_TYPES.boss, tile.x, tile.y, floorNumber));
 }
 
+// How many regular enemies a floor gets: the Phase-1 RNG band plus a depth
+// bonus, so pressure keeps rising even after per-enemy stats plateau.
+export function enemyCountFor(rng, floorNumber) {
+  const depthBonus = Math.floor((floorNumber - 1) / ENEMY_COUNT_EVERY_FLOORS);
+  return Math.min(ENEMY_COUNT_CAP, nextInt(rng, MIN_ENEMIES, MAX_ENEMIES) + depthBonus);
+}
+
+// The goblin share of the spawn mix: 50/50 on floor 1, drifting toward the
+// tougher archetype with depth (capped so skeletons never vanish).
+export function goblinShareFor(floorNumber) {
+  return Math.min(GOBLIN_WEIGHT_MAX, GOBLIN_WEIGHT_BASE + GOBLIN_WEIGHT_PER_FLOOR * (floorNumber - 1));
+}
+
 function spawnEnemies(state, floorNumber) {
   const rooms = state.map.rooms;
   if (rooms.length < 2) return; // room 0 is the player's; need somewhere else
-  const count = nextInt(state.rng, MIN_ENEMIES, MAX_ENEMIES);
+  const count = enemyCountFor(state.rng, floorNumber);
+  const goblinShare = goblinShareFor(floorNumber);
   for (let i = 0; i < count; i++) {
     // Never spawn in the starting room, so the player gets a beat to orient.
     const room = rooms[nextInt(state.rng, 1, rooms.length - 1)];
     const tile = randomFreeFloorInRoom(state, room);
     if (!tile) continue;
-    const type = pick(state.rng, SPAWNABLE_ENEMIES);
+    const type = chance(state.rng, goblinShare) ? ENEMY_TYPES.goblin : ENEMY_TYPES.skeleton;
     addEntity(state, createEnemy(type, tile.x, tile.y, floorNumber));
   }
 }

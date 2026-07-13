@@ -39,7 +39,9 @@ export function createEnemy(type, x, y, floorNumber = 1) {
     maxHp,
     damageDie: type.damageDie,
     damageMult: isBoss ? tier + 1 : (type.damageMult ?? 1),
-    dmgBonus: Math.floor((floorNumber - 1) / SCALE_DMG_EVERY_FLOORS),
+    // Bosses scale damage through their multiplier alone; stacking the flat
+    // drip on top made deep lairs pierce armor twice over.
+    dmgBonus: isBoss ? 0 : Math.floor((floorNumber - 1) / SCALE_DMG_EVERY_FLOORS),
     moveEvery: type.moveEvery ?? 1,
     moveCooldown: 0,
     aggro: false,

@@ -49,8 +49,8 @@ describe('boss spawning', () => {
     expect(boss).toMatchObject({
       kind: 'boss',
       glyph: 'B',
-      hp: 30,
-      maxHp: 30,
+      hp: 26,
+      maxHp: 26,
       damageDie: 4,
       damageMult: 2,
       moveEvery: 1,

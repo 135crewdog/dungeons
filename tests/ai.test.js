@@ -80,9 +80,9 @@ describe('skeleton cadence (moveEvery 2)', () => {
     expect(enemy.x).toBe(2);
   });
 
-  it('skeletons hit as hard as goblins but are fragile (half a goblin)', () => {
+  it('skeletons hit as hard as goblins but are fragile (about half a goblin)', () => {
     expect(ENEMY_TYPES.skeleton.damageDie).toBe(ENEMY_TYPES.goblin.damageDie);
-    expect(ENEMY_TYPES.skeleton.maxHp).toBe(3);
+    expect(ENEMY_TYPES.skeleton.maxHp).toBe(4);
   });
 
   it('giving up the chase resets the cooldown so re-aggro steps immediately', () => {

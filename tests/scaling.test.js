@@ -8,35 +8,35 @@ import { ENEMY_TYPES } from '../src/core/constants.js';
 describe('depth scaling — regular enemies', () => {
   it('floor 1 is the unscaled baseline', () => {
     const g = createEnemy(ENEMY_TYPES.goblin, 0, 0, 1);
-    expect(g.maxHp).toBe(5);
+    expect(g.maxHp).toBe(7);
     expect(g.dmgBonus).toBe(0);
     const s = createEnemy(ENEMY_TYPES.skeleton, 0, 0); // default floor
-    expect(s.maxHp).toBe(3);
+    expect(s.maxHp).toBe(4);
     expect(s.dmgBonus).toBe(0);
   });
 
-  it('gains +1 max HP per 2 floors and +1 damage per 3 floors', () => {
+  it('gains +1 max HP and +1 damage per 3 floors', () => {
     const g7 = createEnemy(ENEMY_TYPES.goblin, 0, 0, 7);
-    expect(g7.maxHp).toBe(5 + 3); // floors 3,5,7
+    expect(g7.maxHp).toBe(7 + 2); // floors 4,7
     expect(g7.hp).toBe(g7.maxHp);
     expect(g7.dmgBonus).toBe(2); // floors 4,7
     const s7 = createEnemy(ENEMY_TYPES.skeleton, 0, 0, 7);
-    expect(s7.maxHp).toBe(3 + 3);
+    expect(s7.maxHp).toBe(4 + 2);
     expect(s7.dmgBonus).toBe(2);
   });
 });
 
 describe('depth scaling — boss tiers', () => {
-  it('tier 1 (floor 5) is the base boss with the floor damage drip', () => {
+  it('tier 1 (floor 5) is the base boss, exempt from the floor damage drip', () => {
     const b = createEnemy(ENEMY_TYPES.boss, 0, 0, 5);
-    expect(b).toMatchObject({ maxHp: 30, damageMult: 2, dmgBonus: 1 });
+    expect(b).toMatchObject({ maxHp: 26, damageMult: 2, dmgBonus: 0 });
   });
 
-  it('each lair adds 15 HP and +1 to the damage multiplier', () => {
+  it('each lair adds 12 HP and +1 to the damage multiplier', () => {
     const b10 = createEnemy(ENEMY_TYPES.boss, 0, 0, 10);
-    expect(b10).toMatchObject({ maxHp: 45, hp: 45, damageMult: 3, dmgBonus: 3 });
+    expect(b10).toMatchObject({ maxHp: 38, hp: 38, damageMult: 3, dmgBonus: 0 });
     const b15 = createEnemy(ENEMY_TYPES.boss, 0, 0, 15);
-    expect(b15).toMatchObject({ maxHp: 60, damageMult: 4, dmgBonus: 4 });
+    expect(b15).toMatchObject({ maxHp: 50, damageMult: 4, dmgBonus: 0 });
   });
 });
 
@@ -60,15 +60,15 @@ describe('depth scaling — combat integration', () => {
   }
 
   it('the flat bonus rides on top of every die roll', () => {
-    const damages = duel({ kind: 'goblin', hp: 5, maxHp: 5, damageDie: 4, damageMult: 1, dmgBonus: 2, glyph: 'g' });
+    const damages = duel({ kind: 'goblin', hp: 7, maxHp: 7, damageDie: 4, damageMult: 1, dmgBonus: 2, glyph: 'g' });
     expect(Math.min(...damages)).toBeGreaterThanOrEqual(3); // 1+2
     expect(Math.max(...damages)).toBeLessThanOrEqual(6); // 4+2
   });
 
-  it('a tier-2 boss hits for 3xd4 plus its floor bonus', () => {
-    const damages = duel({ kind: 'boss', hp: 45, maxHp: 45, damageDie: 4, damageMult: 3, dmgBonus: 3, glyph: 'B' });
-    expect(Math.min(...damages)).toBeGreaterThanOrEqual(6); // 3*1+3
-    expect(Math.max(...damages)).toBeLessThanOrEqual(15); // 3*4+3
+  it('a tier-2 boss hits for 3xd4 with no flat bonus', () => {
+    const damages = duel({ kind: 'boss', hp: 38, maxHp: 38, damageDie: 4, damageMult: 3, dmgBonus: 0, glyph: 'B' });
+    expect(Math.min(...damages)).toBeGreaterThanOrEqual(3); // 3*1
+    expect(Math.max(...damages)).toBeLessThanOrEqual(12); // 3*4
     expect(new Set(damages).size).toBeGreaterThanOrEqual(3);
   });
 });
@@ -80,9 +80,9 @@ describe('depth scaling — full game integration', () => {
     expect(state.floor).toBe(10);
     const enemies = [...state.entities.byId.values()].filter((e) => e.kind !== 'player');
     const boss = enemies.find((e) => e.kind === 'boss');
-    expect(boss).toMatchObject({ maxHp: 45, damageMult: 3, dmgBonus: 3 });
+    expect(boss).toMatchObject({ maxHp: 38, damageMult: 3, dmgBonus: 0 });
     for (const e of enemies.filter((e) => e.kind !== 'boss')) {
-      expect(e.maxHp).toBe((e.kind === 'goblin' ? 5 : 3) + 4); // floors 3,5,7,9
+      expect(e.maxHp).toBe((e.kind === 'goblin' ? 7 : 4) + 3); // floors 4,7,10
       expect(e.dmgBonus).toBe(3); // floors 4,7,10
     }
   });
