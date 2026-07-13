@@ -162,6 +162,13 @@ unless they solve a clear current problem. Only runtime deps are **Phaser** and
 readable code; favor composition; keep systems loosely coupled; avoid circular
 dependencies.
 
+## PR Watching
+
+Whenever a session creates a pull request, or is asked to work on or monitor an
+existing one, it must immediately subscribe to that PR's activity
+(`subscribe_pr_activity`) and follow through on the events — respond to review
+comments, fix CI failures — until the PR is merged or closed.
+
 ## Project Structure
 
 ```
