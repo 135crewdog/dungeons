@@ -10,6 +10,7 @@ import {
   CHEST_STRENGTH_BONUS,
   CHEST_ARMOR_BONUS,
   CHEST_HEALTH_BONUS,
+  TILE,
 } from '../src/core/constants.js';
 
 const bosses = (state) =>
@@ -70,16 +71,24 @@ describe('boss spawning', () => {
 });
 
 describe('boss chest drop', () => {
-  function bossFight(seed) {
+  // A 4x3 all-floor arena; `bossTile` optionally retypes the boss's tile
+  // (e.g. stairs) to test drop placement, and `playerAt` repositions the
+  // player (default: west of the boss).
+  function bossFight(seed, { bossTile = null, playerAt = { x: 0, y: 1 } } = {}) {
     const rng = createRng(seed);
-    const player = { id: 1, kind: 'player', x: 0, y: 0, hp: 20, maxHp: 20, damage: 100, strength: 0, armor: 0, glyph: '@' };
-    const boss = { id: 2, kind: 'boss', x: 1, y: 0, hp: 30, maxHp: 30, damageDie: 4, damageMult: 2, glyph: 'B' };
+    const width = 4;
+    const height = 3;
+    const map = { width, height, tiles: new Uint8Array(width * height).fill(TILE.FLOOR) };
+    const player = { id: 1, kind: 'player', x: playerAt.x, y: playerAt.y, hp: 20, maxHp: 20, damage: 100, strength: 0, armor: 0, glyph: '@' };
+    const boss = { id: 2, kind: 'boss', x: 1, y: 1, hp: 30, maxHp: 30, damageDie: 4, damageMult: 2, glyph: 'B' };
+    if (bossTile !== null) map.tiles[boss.y * width + boss.x] = bossTile;
     const state = {
       rng,
       status: 'playing',
       turn: 0,
       log: [],
       items: [],
+      map,
       entities: { nextId: 3, playerId: 1, byId: new Map([[1, player], [2, boss]]) },
     };
     return { state, boss };
@@ -97,6 +106,31 @@ describe('boss chest drop', () => {
     const chest = state.items[0];
     expect(chest).toMatchObject({ type: 'chest', x: boss.x, y: boss.y });
     expect(chest.id).toBeGreaterThan(0);
+  });
+
+  it('a boss dying on the stairs drops the chest on an adjacent floor tile instead', () => {
+    // Stairs swallow pickups (stepping onto them changes floor before pickups
+    // resolve), so a stair-tile death must not strand the reward there.
+    const { state, boss } = bossFight(3, { bossTile: TILE.STAIRS_DOWN });
+    for (let i = 0; i < 30 && state.entities.byId.has(2); i++) resolveAttack(state, 1, 2);
+    expect(state.items).toHaveLength(1);
+    const chest = state.items[0];
+    expect(chest.x === boss.x && chest.y === boss.y).toBe(false); // not on the stairs
+    expect(Math.max(Math.abs(chest.x - boss.x), Math.abs(chest.y - boss.y))).toBe(1); // adjacent
+    expect(state.map.tiles[chest.y * state.map.width + chest.x]).toBe(TILE.FLOOR);
+  });
+
+  it('a relocated drop never lands under the player (or any entity)', () => {
+    // Player directly north of the stairs: the first tile in the DIRS8 scan
+    // is the player's own — dropping there would auto-open the chest via
+    // resolvePickups without the player ever stepping onto it.
+    const { state, boss } = bossFight(3, { bossTile: TILE.STAIRS_DOWN, playerAt: { x: 1, y: 0 } });
+    for (let i = 0; i < 30 && state.entities.byId.has(2); i++) resolveAttack(state, 1, 2);
+    expect(state.items).toHaveLength(1);
+    const chest = state.items[0];
+    expect(chest.x === 1 && chest.y === 0).toBe(false); // not under the player
+    expect(chest.x === boss.x && chest.y === boss.y).toBe(false); // not on the stairs
+    expect(state.map.tiles[chest.y * state.map.width + chest.x]).toBe(TILE.FLOOR);
   });
 
   it('never drops a trap; all three bonuses occur across seeds', () => {
