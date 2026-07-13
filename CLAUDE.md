@@ -170,6 +170,17 @@ unless they solve a clear current problem. Only runtime deps are **Phaser** and
 readable code; favor composition; keep systems loosely coupled; avoid circular
 dependencies.
 
+## Versioning
+
+**SemVer 0.x** while the game is in active development: bump the **minor** for each
+completed phase, the **patch** for fixes and balance tweaks (retroactively, Phase 1 ≈
+0.1.0 and Phases 3a–3f ≈ 0.3.1–0.3.6; the version display shipped as **0.4.0**).
+`package.json`'s `version` field is the **single source of truth**; Vite injects it at
+build time as the `__APP_VERSION__` constant (`define` in `vite.config.js`), read via
+`src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim `v0.4.0`
+item at the end of the HUD row and in the pause-menu footer, so screenshots identify
+the build. Bump the version in the same commit as the change it describes.
+
 ## PR Watching
 
 Whenever a session creates a pull request, or is asked to work on or monitor an

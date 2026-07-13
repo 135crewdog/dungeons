@@ -1,7 +1,7 @@
 {
   "name": "dungeons",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "A browser-based roguelike dungeon crawler (Phaser + Vite PWA).",
   "scripts": {
