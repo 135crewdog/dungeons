@@ -29,10 +29,11 @@ export function resolveAttack(state, attackerId, targetId) {
     return events;
   }
 
-  // Enemies roll their damage die fresh on every landed hit (only after the
-  // hit roll, so a miss costs one RNG draw and a landed hit costs two); the
-  // player's damage is flat. dmgBonus is the enemy depth-scaling drip;
-  // strength is the player's chest-fed bonus.
+  // Everyone rolls their damage die fresh on every landed hit (only after the
+  // hit roll, so a miss costs one RNG draw and a landed hit costs two); flat
+  // `damage` is the fallback for die-less entities. dmgBonus is the enemy
+  // depth-scaling drip and the player's baked-in +2; strength is the player's
+  // chest-fed bonus.
   const base = attacker.damageDie
     ? nextInt(state.rng, 1, attacker.damageDie) * (attacker.damageMult ?? 1)
     : attacker.damage;

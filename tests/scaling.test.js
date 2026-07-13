@@ -15,13 +15,13 @@ describe('depth scaling — regular enemies', () => {
     expect(s.dmgBonus).toBe(0);
   });
 
-  it('gains +1 max HP and +1 damage per 3 floors', () => {
+  it('gains +1 max HP per 2 floors and +1 damage per 3 floors', () => {
     const g7 = createEnemy(ENEMY_TYPES.goblin, 0, 0, 7);
-    expect(g7.maxHp).toBe(7 + 2); // floors 4,7
+    expect(g7.maxHp).toBe(7 + 3); // floors 3,5,7
     expect(g7.hp).toBe(g7.maxHp);
     expect(g7.dmgBonus).toBe(2); // floors 4,7
     const s7 = createEnemy(ENEMY_TYPES.skeleton, 0, 0, 7);
-    expect(s7.maxHp).toBe(4 + 2);
+    expect(s7.maxHp).toBe(4 + 3);
     expect(s7.dmgBonus).toBe(2);
   });
 });
@@ -82,7 +82,7 @@ describe('depth scaling — full game integration', () => {
     const boss = enemies.find((e) => e.kind === 'boss');
     expect(boss).toMatchObject({ maxHp: 38, damageMult: 3, dmgBonus: 0 });
     for (const e of enemies.filter((e) => e.kind !== 'boss')) {
-      expect(e.maxHp).toBe((e.kind === 'goblin' ? 7 : 4) + 3); // floors 4,7,10
+      expect(e.maxHp).toBe((e.kind === 'goblin' ? 7 : 4) + 4); // floors 3,5,7,9
       expect(e.dmgBonus).toBe(3); // floors 4,7,10
     }
   });

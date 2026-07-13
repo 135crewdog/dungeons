@@ -22,12 +22,17 @@ export const PLAYER_ID = 1;
 // Combat.
 export const HIT_CHANCE = 0.75;
 
-// Player.
+// Player. Damage is d4+2 (+strength) — rolled fresh on every landed hit like
+// everyone else's, so combat is two sides throwing dice. The +2 floor keeps a
+// landed hit from feeling like a whiff on top of the 25% miss chance, and the
+// die smooths strength breakpoints: each +1 raises the odds of the faster
+// kill instead of toggling it.
 export const PLAYER_MAX_HP = 20;
-export const PLAYER_DAMAGE = 4;
+export const PLAYER_DAMAGE_DIE = 4;
+export const PLAYER_DAMAGE_BONUS = 2;
 
 // Enemy damage is a die rolled fresh on every landed hit (through the seeded
-// RNG, after the hit roll succeeds) — the player's damage stays flat.
+// RNG, after the hit roll succeeds).
 export const ENEMY_DAMAGE_DIE = 4;
 
 // Enemy types. Goblin is the baseline; skeletons are "about half a goblin" —
@@ -59,7 +64,7 @@ export const BOSS_FLOOR_INTERVAL = 5;
 // the flat damage drip — stacking it on the multiplier made deep lairs
 // pierce armor twice over.
 export const SCALE_DMG_EVERY_FLOORS = 3;
-export const SCALE_HP_EVERY_FLOORS = 3;
+export const SCALE_HP_EVERY_FLOORS = 2;
 export const BOSS_HP_PER_TIER = 12;
 
 // Items.

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolveAttack, areHostile, mitigatedDamage } from '../src/systems/combat.js';
 import { createRng, chance, nextInt } from '../src/core/rng.js';
+import { createPlayer } from '../src/entities/player.js';
 
 function combatState(
   seed,
@@ -160,6 +161,38 @@ describe('combat', () => {
       const hit = chance(twin, 0.75);
       expect(evs[0].hit).toBe(hit);
       if (hit) expect(evs[0].damage).toBe(nextInt(twin, 1, 4));
+    }
+  });
+
+  it('the player rolls d4+2 per landed hit: 3..6, varying, plus strength', () => {
+    const player = { ...createPlayer(0, 0), id: 1 };
+    const target = { id: 2, kind: 'goblin', x: 1, y: 0, hp: 1e9, maxHp: 1e9, damage: 2, armor: 0, glyph: 'g' };
+    const state = {
+      rng: createRng(42),
+      status: 'playing',
+      turn: 0,
+      log: [],
+      entities: { nextId: 3, playerId: 1, byId: new Map([[1, player], [2, target]]) },
+    };
+    const seen = new Set();
+    for (let i = 0; i < 200; i++) {
+      const evs = resolveAttack(state, 1, 2);
+      if (!evs[0].hit) continue;
+      expect(evs[0].damage).toBeGreaterThanOrEqual(3);
+      expect(evs[0].damage).toBeLessThanOrEqual(6);
+      seen.add(evs[0].damage);
+    }
+    expect(seen.size).toBe(4); // the die actually rolls, not a flat number
+
+    player.strength = 2; // chest bonuses shift the whole range
+    const evs = [];
+    while (evs.length < 20) {
+      const e = resolveAttack(state, 1, 2)[0];
+      if (e.hit) evs.push(e);
+    }
+    for (const e of evs) {
+      expect(e.damage).toBeGreaterThanOrEqual(5);
+      expect(e.damage).toBeLessThanOrEqual(8);
     }
   });
 

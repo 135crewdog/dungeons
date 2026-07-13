@@ -111,10 +111,11 @@ number** on a hit. Two entities never share a tile.
 
 Damage on a hit is `attacker damage + strength − target armor`, floored so a hit that
 would deal >0 raw damage always lands for **at least 1** (armor never grants
-invincibility; a 0-damage attack stays 0). The player's damage is flat (4 + strength);
-**enemy damage is a d4 rolled fresh on every landed hit** through the seeded RNG
-(rolled only after the 75% hit roll succeeds). Strength and armor are player stats
-that start at 0 and stack via treasure chests.
+invincibility; a 0-damage attack stays 0). **Both sides roll dice**: the player deals
+**d4+2 (+strength)** and enemies deal **d4 (+depth bonus)** — every landed hit rolls
+fresh through the seeded RNG (rolled only after the 75% hit roll succeeds), tabletop
+style. Strength and armor are player stats that start at 0 and stack via treasure
+chests.
 
 **Goblin is the baseline enemy** (7 HP, d4 damage, full speed — the floor-1
 reference). Skeletons are "about half a goblin": **4 HP** and **half movement speed**
@@ -127,8 +128,9 @@ its death tile — ⅓ Strength / ⅓ Armor / ⅓ Health, never a trap.
 **Depth scaling** (tuned with the headless balance simulator, `npm run balance` —
 under identical careful bot play the floor-10 clear rate halved versus the old
 numbers, and deaths spread across the whole descent instead of piling up at the boss
-lairs): regular enemies gain **+1 max HP and +1 damage on every roll per 3 floors**
-(a floor-7 goblin has 9 HP and hits for 3–6). **Floor population also scales**: the
+lairs): regular enemies gain **+1 max HP per 2 floors** and **+1 damage on every roll
+per 3 floors** (a floor-7 goblin has 10 HP and hits for 3–6). **Floor population also
+scales**: the
 enemy count gains +1 per 3 floors over its 5–8 base (capped at 12), and the spawn mix
 drifts from 50/50 toward goblins by +3%/floor (capped at 80%). Bosses have their own
 curve per lair tier (floor/5): **+12 max HP and +1 to the damage die multiplier per
@@ -211,9 +213,9 @@ the whole run and show in the HUD once earned · **enemy differentiation**: skel
 at half movement speed with goblin baseline damage.
 
 Phase 3b (complete): **per-attack damage dice** — enemies roll a d4 on every landed
-hit (the player's damage stays flat) · **skeleton rebalance** ("half a goblin") ·
-**boss enemies** — one boss on every 5th floor guarding the down-stairs room,
-dropping a guaranteed no-trap bonus chest on death.
+hit · **skeleton rebalance** ("half a goblin") · **boss enemies** — one boss on every
+5th floor guarding the down-stairs room, dropping a guaranteed no-trap bonus chest on
+death.
 
 Phase 3c (complete): **depth scaling** — regular enemies gain max HP and flat damage
 with depth; bosses escalate per lair (HP and damage-die multiplier per tier).
@@ -228,6 +230,12 @@ seeded runs. Changes: goblin 7 HP · skeleton 4 HP · **enemy count depth scalin
 cap 80%) · chest table 30/25/30/15 with `CHEST_TABLE` thresholds · health chest +4 ·
 boss 26 HP base, +12/tier, exempt from the flat damage drip. The current numbers in
 the Combat section above are authoritative.
+
+Phase 3e (complete): **player damage die** — the player rolls **d4+2 (+strength)**
+per landed hit instead of dealing a flat 4 (`PLAYER_DAMAGE_DIE`,
+`PLAYER_DAMAGE_BONUS`), so combat is dice on both sides; the regular-enemy HP drip
+returned to +1 per 2 floors to absorb the higher damage mean (the simulator's
+floor-10 clear rate for careful bot play stays ~14%, deaths spread across the run).
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
