@@ -2,9 +2,11 @@ import {
   POTION_HEAL,
   CHEST_EFFECT,
   CHEST_STRENGTH_BONUS,
+  CHEST_SKILL_BONUS,
   CHEST_ARMOR_BONUS,
   CHEST_HEALTH_BONUS,
   CHEST_TRAP_DIE,
+  CHEST_TABLE,
 } from '../core/constants.js';
 import { nextInt } from '../core/rng.js';
 
@@ -15,25 +17,28 @@ export function createPotion(x, y) {
   return { id: 0, type: 'potion', x, y, heal: POTION_HEAL };
 }
 
-// Factory for a treasure chest. Contents are rolled once here, at spawn:
-// 30% strength / 30% armor / 30% health / 10% trap — so what a chest holds is
-// fixed by the run's seed and survives floor snapshots.
+// Factory for a treasure chest. Contents are rolled once here, at spawn, from
+// the CHEST_TABLE d100 thresholds — so what a chest holds is fixed by the
+// run's seed and survives floor snapshots.
 export function createChest(rng, x, y) {
   const roll = nextInt(rng, 1, 100);
   let effect;
   let amount;
-  if (roll <= 30) {
+  if (roll <= CHEST_TABLE.strength) {
     effect = CHEST_EFFECT.STRENGTH;
     amount = CHEST_STRENGTH_BONUS;
-  } else if (roll <= 60) {
+  } else if (roll <= CHEST_TABLE.skill) {
+    effect = CHEST_EFFECT.SKILL;
+    amount = CHEST_SKILL_BONUS;
+  } else if (roll <= CHEST_TABLE.armor) {
     effect = CHEST_EFFECT.ARMOR;
     amount = CHEST_ARMOR_BONUS;
-  } else if (roll <= 90) {
+  } else if (roll <= CHEST_TABLE.health) {
     effect = CHEST_EFFECT.HEALTH;
     amount = CHEST_HEALTH_BONUS;
   } else {
     effect = CHEST_EFFECT.TRAP;
-    amount = nextInt(rng, 1, CHEST_TRAP_DIE); // a trap hits like a goblin: 1..4
+    amount = nextInt(rng, 1, CHEST_TRAP_DIE); // a trap hits like a floor-1 goblin: 1..4
   }
   return { id: 0, type: 'chest', x, y, effect, amount };
 }

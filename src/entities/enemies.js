@@ -2,7 +2,9 @@ import {
   ENEMY_TYPES,
   BOSS_FLOOR_INTERVAL,
   BOSS_HP_PER_TIER,
-  SCALE_DMG_EVERY_FLOORS,
+  BOSS_DICE,
+  ENEMY_DIE_LADDER,
+  DIE_LADDER_EVERY_FLOORS,
   SCALE_HP_EVERY_FLOORS,
 } from '../core/constants.js';
 
@@ -14,9 +16,10 @@ export const SPAWNABLE_ENEMIES = [ENEMY_TYPES.goblin, ENEMY_TYPES.skeleton];
 
 // Factory for an enemy of a given archetype at integer tile coordinates,
 // depth-scaled by the floor it spawns on (stats live on the instance, so
-// cached floors keep their numbers). Regular enemies drip extra max HP and a
-// flat damage bonus with depth; bosses trade the HP drip for their own tier
-// curve (more HP and a bigger damage multiplier per lair).
+// cached floors keep their numbers). Deeper monsters roll bigger damage dice:
+// regulars climb ENEMY_DIE_LADDER one rung per DIE_LADDER_EVERY_FLOORS and
+// drip extra max HP; bosses pick their die from BOSS_DICE by lair tier and
+// gain BOSS_HP_PER_TIER max HP per tier instead.
 // `aggro` starts false: enemies hold until they see the player. Once aggroed,
 // `lastSeen` remembers the last tile the player was seen on and
 // `lostSightTurns` counts how long it has been since — used to give up the
@@ -29,6 +32,13 @@ export function createEnemy(type, x, y, floorNumber = 1) {
   const maxHp = isBoss
     ? type.maxHp + BOSS_HP_PER_TIER * (tier - 1)
     : type.maxHp + Math.floor((floorNumber - 1) / SCALE_HP_EVERY_FLOORS);
+  const rung = Math.min(
+    Math.floor((floorNumber - 1) / DIE_LADDER_EVERY_FLOORS),
+    ENEMY_DIE_LADDER.length - 1,
+  );
+  const attackDie = isBoss
+    ? BOSS_DICE[Math.min(tier - 1, BOSS_DICE.length - 1)]
+    : ENEMY_DIE_LADDER[rung];
   return {
     id: 0,
     kind: type.kind,
@@ -37,9 +47,7 @@ export function createEnemy(type, x, y, floorNumber = 1) {
     y,
     hp: maxHp,
     maxHp,
-    damageDie: type.damageDie,
-    damageMult: isBoss ? tier + 1 : (type.damageMult ?? 1),
-    dmgBonus: Math.floor((floorNumber - 1) / SCALE_DMG_EVERY_FLOORS),
+    attackDie,
     moveEvery: type.moveEvery ?? 1,
     moveCooldown: 0,
     aggro: false,

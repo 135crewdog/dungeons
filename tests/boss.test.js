@@ -3,7 +3,7 @@ import { createGame, descend, ascend } from '../src/core/gameState.js';
 import { getPlayer, idx } from '../src/core/query.js';
 import { createRng } from '../src/core/rng.js';
 import { resolveAttack } from '../src/systems/combat.js';
-import { SPAWNABLE_ENEMIES } from '../src/entities/enemies.js';
+import { SPAWNABLE_ENEMIES, createEnemy } from '../src/entities/enemies.js';
 import {
   ENEMY_TYPES,
   BOSS_FLOOR_INTERVAL,
@@ -49,10 +49,9 @@ describe('boss spawning', () => {
     expect(boss).toMatchObject({
       kind: 'boss',
       glyph: 'B',
-      hp: 30,
-      maxHp: 30,
-      damageDie: 4,
-      damageMult: 2,
+      hp: 24,
+      maxHp: 24,
+      attackDie: 8,
       moveEvery: 1,
       aggro: false,
     });
@@ -79,8 +78,9 @@ describe('boss chest drop', () => {
     const width = 4;
     const height = 3;
     const map = { width, height, tiles: new Uint8Array(width * height).fill(TILE.FLOOR) };
-    const player = { id: 1, kind: 'player', x: playerAt.x, y: playerAt.y, hp: 20, maxHp: 20, damage: 100, strength: 0, armor: 0, glyph: '@' };
-    const boss = { id: 2, kind: 'boss', x: 1, y: 1, hp: 30, maxHp: 30, damageDie: 4, damageMult: 2, glyph: 'B' };
+    // The player's +100 strength makes any landed hit lethal to the boss.
+    const player = { id: 1, kind: 'player', x: playerAt.x, y: playerAt.y, hp: 20, maxHp: 20, attackDie: 8, skill: 0, strength: 100, armor: 0, glyph: '@' };
+    const boss = { id: 2, kind: 'boss', x: 1, y: 1, hp: 30, maxHp: 30, attackDie: 10, glyph: 'B' };
     if (bossTile !== null) map.tiles[boss.y * width + boss.x] = bossTile;
     const state = {
       rng,
@@ -149,8 +149,10 @@ describe('boss chest drop', () => {
 });
 
 describe('boss constants', () => {
-  it('is twice a goblin in damage and part of ENEMY_TYPES for stats only', () => {
-    expect(ENEMY_TYPES.boss.damageDie).toBe(ENEMY_TYPES.goblin.damageDie);
-    expect(ENEMY_TYPES.boss.damageMult).toBe(2);
+  it('rolls the tier die from BOSS_DICE, above the regular ladder', () => {
+    const goblin = createEnemy(ENEMY_TYPES.goblin, 0, 0, 5);
+    const boss = createEnemy(ENEMY_TYPES.boss, 0, 0, 5);
+    expect(boss.attackDie).toBe(8);
+    expect(boss.attackDie).toBeGreaterThan(goblin.attackDie);
   });
 });

@@ -108,6 +108,8 @@ function openChest(state, player, item, events) {
 
   if (effect === CHEST_EFFECT.STRENGTH) {
     player.strength = (player.strength ?? 0) + amount;
+  } else if (effect === CHEST_EFFECT.SKILL) {
+    player.skill = (player.skill ?? 0) + amount;
   } else if (effect === CHEST_EFFECT.ARMOR) {
     player.armor = (player.armor ?? 0) + amount;
   } else if (effect === CHEST_EFFECT.HEALTH) {

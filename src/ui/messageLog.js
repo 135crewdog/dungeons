@@ -22,6 +22,8 @@ function format(entry) {
         switch (d.effect) {
           case 'strength':
             return `You open a chest: +${d.amount} Strength.`;
+          case 'skill':
+            return `You open a chest: +${d.amount} Skill.`;
           case 'armor':
             return `You open a chest: +${d.amount} Armor.`;
           case 'health':

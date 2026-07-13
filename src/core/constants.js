@@ -19,45 +19,50 @@ export const TILE = Object.freeze({
 // floor is restored).
 export const PLAYER_ID = 1;
 
-// Combat.
-export const HIT_CHANCE = 0.75;
+// Combat: two visible rolls, identical rules for every combatant.
+// 1) To-hit — roll a d20: a natural 1 always misses; otherwise the attack
+//    lands if roll + skill >= HIT_THRESHOLD (6 → 75% base, +5% per skill
+//    point, capped at 95% by the natural-1 rule).
+// 2) Damage — roll the attacker's damage die + strength − target armor
+//    (minimum 1; see mitigatedDamage).
+export const HIT_DIE = 20;
+export const HIT_THRESHOLD = 6;
 
-// Player.
+// Player. Rolls a d8 for damage; skill/strength/armor start at 0 and grow
+// only through treasure chests.
 export const PLAYER_MAX_HP = 20;
-export const PLAYER_DAMAGE = 4;
-
-// Enemy damage is a die rolled fresh on every landed hit (through the seeded
-// RNG, after the hit roll succeeds) — the player's damage stays flat.
-export const ENEMY_DAMAGE_DIE = 4;
+export const PLAYER_ATTACK_DIE = 8;
 
 // Enemy types. Goblin is the baseline; skeletons are "about half a goblin" —
 // fragile AND slow (`moveEvery: 2` = one tile every 2 turns; attacks are never
-// slowed) — but hit with the same die. `glyph` is a presentation hint; the
+// slowed) — but roll the same damage die. The die itself comes from the depth
+// ladder below and is stamped at spawn. `glyph` is a presentation hint; the
 // renderer's tileStyle owns the final glyph/color.
 export const ENEMY_TYPES = Object.freeze({
-  goblin: { kind: 'goblin', glyph: 'g', maxHp: 5, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 1 },
-  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 3, damageDie: ENEMY_DAMAGE_DIE, moveEvery: 2 },
+  goblin: { kind: 'goblin', glyph: 'g', maxHp: 6, moveEvery: 1 },
+  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 3, moveEvery: 2 },
   // The level boss: one guards the down-stairs on every BOSS_FLOOR_INTERVAL-th
-  // floor (never the random pool). maxHp/damageMult here are the tier-1 (floor
-  // 5) values — deeper lairs escalate via the depth-scaling constants below.
-  // Tuned by simulation: the first boss is ~97% winnable at full chest-fed
-  // strength but deadly to an early diver. Same hit chance and AI as everyone.
-  boss: { kind: 'boss', glyph: 'B', maxHp: 30, damageDie: ENEMY_DAMAGE_DIE, damageMult: 2, moveEvery: 1 },
+  // floor (never the random pool). maxHp is the tier-1 (floor 5) value; its
+  // damage die comes from BOSS_DICE. Simulator-tuned (npm run balance): a hard
+  // peak, but no longer the majority of all deaths. Same rules as everyone.
+  boss: { kind: 'boss', glyph: 'B', maxHp: 24, moveEvery: 1 },
 });
 
 // Every Nth floor spawns a boss in the room with the down-stairs.
 export const BOSS_FLOOR_INTERVAL = 5;
 
-// Depth scaling (simulation-tuned so chest income no longer outruns the
-// dungeon: ~2/3 of thorough players clear floor 10, stair-rushers rarely do).
-// Regular enemies gain +1 damage on every roll per DMG floors and +1 max HP
-// per HP floors. Bosses keep their own curve instead of the HP drip: each lair
-// tier (floor/5) adds BOSS_HP_PER_TIER max HP and raises the damage multiplier
-// by 1 (floor 5: 2xd4, floor 10: 3xd4, ...); the flat damage bonus applies to
-// them too.
-export const SCALE_DMG_EVERY_FLOORS = 3;
+// Depth scaling: deeper monsters roll bigger dice. Regular enemies climb the
+// ladder one rung per DIE_LADDER_EVERY_FLOORS (floors 1-3: d4, 4-6: d6, ...,
+// clamped at the last rung) and gain +1 max HP per SCALE_HP_EVERY_FLOORS.
+// Bosses skip the ladder: each lair tier (floor/5) picks from BOSS_DICE
+// (floor 5: d10, floor 10: d12, floor 15+: d20) and adds BOSS_HP_PER_TIER
+// max HP. The ladder replaces the old flat damage bonus with the same means
+// (d4+n ≡ d(4+2n) in expectation) and more variance.
+export const ENEMY_DIE_LADDER = Object.freeze([4, 6, 8, 10]);
+export const DIE_LADDER_EVERY_FLOORS = 4;
+export const BOSS_DICE = Object.freeze([8, 12, 20]);
 export const SCALE_HP_EVERY_FLOORS = 2;
-export const BOSS_HP_PER_TIER = 15;
+export const BOSS_HP_PER_TIER = 12;
 
 // Items.
 export const POTION_HEAL = 8;
@@ -67,14 +72,27 @@ export const POTION_HEAL = 8;
 // goblin and respects armor (same rule as enemy attacks).
 export const CHEST_EFFECT = Object.freeze({
   STRENGTH: 'strength',
+  SKILL: 'skill',
   ARMOR: 'armor',
   HEALTH: 'health',
   TRAP: 'trap',
 });
 export const CHEST_STRENGTH_BONUS = 1; // +1 damage dealt per stack
+export const CHEST_SKILL_BONUS = 1; // +1 on every to-hit roll per stack (+5% accuracy)
 export const CHEST_ARMOR_BONUS = 1; // -1 damage taken per stack
-export const CHEST_HEALTH_BONUS = 5; // +5 max HP, and refill to full
-export const CHEST_TRAP_DIE = ENEMY_DAMAGE_DIE; // rolled 1..die at spawn — a trap hits like a goblin
+export const CHEST_HEALTH_BONUS = 4; // +4 max HP, and refill to full
+export const CHEST_TRAP_DIE = 4; // rolled 1..die at spawn — a trap hits like a floor-1 goblin
+
+// Chest contents table: cumulative d100 thresholds rolled at spawn. Four stat
+// builds (damage, accuracy, defense, pool) plus the trap share that makes
+// greedy chest-opening a gamble.
+export const CHEST_TABLE = Object.freeze({
+  strength: 25, // 1-25   → +strength (25%)
+  skill: 45, //    26-45  → +skill    (20%)
+  armor: 70, //    46-70  → +armor    (25%)
+  health: 90, //   71-90  → +max HP   (20%)
+  // 91-100 → trap (10%)
+});
 
 // Map + generation.
 export const MAP_WIDTH = 72;
@@ -84,9 +102,17 @@ export const MAX_ROOMS = 12;
 export const MIN_ROOM_SIZE = 4;
 export const MAX_ROOM_SIZE = 10;
 
-// Population per floor (mildly RNG-varied; no depth curve in Phase 1).
+// Population per floor (mildly RNG-varied). Enemy count grows with depth:
+// +1 per ENEMY_COUNT_EVERY_FLOORS floors of descent, capped at
+// ENEMY_COUNT_CAP. The spawn mix also drifts toward goblins (the tougher
+// archetype) as the player descends.
 export const MIN_ENEMIES = 5;
 export const MAX_ENEMIES = 8;
+export const ENEMY_COUNT_EVERY_FLOORS = 3;
+export const ENEMY_COUNT_CAP = 12;
+export const GOBLIN_WEIGHT_BASE = 0.5; // goblin share of the mix on floor 1
+export const GOBLIN_WEIGHT_PER_FLOOR = 0.03; // added per floor below the first
+export const GOBLIN_WEIGHT_MAX = 0.8;
 export const MIN_POTIONS = 1;
 export const MAX_POTIONS = 3;
 export const MIN_CHESTS = 1;

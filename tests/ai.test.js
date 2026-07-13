@@ -15,7 +15,7 @@ function corridorState({ playerX, enemyX, enemyType = ENEMY_TYPES.goblin }) {
   for (let x = 1; x <= 9; x++) tiles[idx(map, x, 1)] = TILE.FLOOR;
   tiles[idx(map, 5, 1)] = TILE.DOOR;
 
-  const player = { id: 1, kind: 'player', x: playerX, y: 1, hp: 20, maxHp: 20, damage: 4, glyph: '@' };
+  const player = { id: 1, kind: 'player', x: playerX, y: 1, hp: 20, maxHp: 20, attackDie: 8, glyph: '@' };
   const enemy = createEnemy(enemyType, enemyX, 1);
   enemy.id = 2;
   const state = {
@@ -80,8 +80,10 @@ describe('skeleton cadence (moveEvery 2)', () => {
     expect(enemy.x).toBe(2);
   });
 
-  it('skeletons hit as hard as goblins but are fragile (half a goblin)', () => {
-    expect(ENEMY_TYPES.skeleton.damageDie).toBe(ENEMY_TYPES.goblin.damageDie);
+  it('skeletons hit as hard as goblins but are fragile (about half a goblin)', () => {
+    const goblin = createEnemy(ENEMY_TYPES.goblin, 0, 0, 1);
+    const skeleton = createEnemy(ENEMY_TYPES.skeleton, 0, 0, 1);
+    expect(skeleton.attackDie).toBe(goblin.attackDie);
     expect(ENEMY_TYPES.skeleton.maxHp).toBe(3);
   });
 
