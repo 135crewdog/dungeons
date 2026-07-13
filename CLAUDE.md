@@ -116,10 +116,11 @@ the seeded RNG, tabletop style):
    so a hit that would deal >0 raw damage always lands for **at least 1** (armor
    never grants invincibility; a 0-damage attack stays 0).
 
-The message log prints the to-hit rolls (`You roll 14: hit the goblin for 5.`); the
-renderer floats a **"Miss!"** or the **damage number** per swing. Skill, strength,
-and armor are player stats that start at 0 and stack via treasure chests. The player
-rolls a **d8** for damage. Two entities never share a tile.
+The message log stays plain language (`You hit the goblin for 5.`) — the to-hit
+roll rides on the attack event/log data but is not narrated; the renderer floats a
+**"Miss!"** or the **damage number** per swing. Skill, strength, and armor are
+player stats that start at 0 and stack via treasure chests. The player rolls a
+**d8** for damage. Two entities never share a tile.
 
 **Goblin is the baseline enemy** (6 HP, d4 damage die, full speed — the floor-1
 reference). Skeletons are "about half a goblin": **3 HP** and **half movement speed**

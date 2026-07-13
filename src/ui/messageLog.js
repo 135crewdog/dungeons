@@ -9,12 +9,12 @@ function format(entry) {
   switch (entry.type) {
     case 'hit':
       return d.attacker === 'player'
-        ? `You roll ${d.roll}: hit the ${d.target} for ${d.damage}.`
-        : `The ${d.attacker} rolls ${d.roll}: hits you for ${d.damage}.`;
+        ? `You hit the ${d.target} for ${d.damage}.`
+        : `The ${d.attacker} hits you for ${d.damage}.`;
     case 'miss':
       return d.attacker === 'player'
-        ? `You roll ${d.roll}: miss the ${d.target}.`
-        : `The ${d.attacker} rolls ${d.roll}: miss.`;
+        ? `You miss the ${d.target}.`
+        : `The ${d.attacker} misses you.`;
     case 'death':
       return d.kind === 'player' ? 'You die...' : `The ${d.kind} dies.`;
     case 'pickup':
