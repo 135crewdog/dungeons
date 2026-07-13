@@ -177,9 +177,10 @@ completed phase, the **patch** for fixes and balance tweaks (retroactively, Phas
 0.1.0 and Phases 3a–3f ≈ 0.3.1–0.3.6; the version display shipped as **0.4.0**).
 `package.json`'s `version` field is the **single source of truth**; Vite injects it at
 build time as the `__APP_VERSION__` constant (`define` in `vite.config.js`), read via
-`src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim `v0.4.0`
-item at the end of the HUD row and in the pause-menu footer, so screenshots identify
-the build. Bump the version in the same commit as the change it describes.
+`src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim `v0.4.1`
+watermark top-right on the row under the Menu text (kept apart from the realtime
+gameplay stats) and in the pause-menu footer, so screenshots identify the build. Bump
+the version in the same commit as the change it describes.
 
 ## PR Watching
 
