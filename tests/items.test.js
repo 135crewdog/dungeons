@@ -6,8 +6,9 @@ import { createRng } from '../src/core/rng.js';
 import { TILE, PLAYER_MAX_HP } from '../src/core/constants.js';
 import { idx } from '../src/core/query.js';
 
-// A small floor with the player at (2,2). `stairsAt` and `potion` are optional.
-function miniState({ playerHp = PLAYER_MAX_HP, stairsAt = null, potion = null } = {}) {
+// A small floor with the player at (2,2). `stairsAt`, `potion`, and `chest`
+// are optional; `chest` is { x, y, effect, amount }.
+function miniState({ playerHp = PLAYER_MAX_HP, playerArmor = 0, stairsAt = null, potion = null, chest = null } = {}) {
   const width = 8;
   const height = 8;
   const tiles = new Uint8Array(width * height).fill(TILE.FLOOR);
@@ -24,7 +25,7 @@ function miniState({ playerHp = PLAYER_MAX_HP, stairsAt = null, potion = null } 
     tiles[idx(map, stairsAt.x, stairsAt.y)] = TILE.STAIRS_DOWN;
     map.stairsDown = { ...stairsAt };
   }
-  const player = { id: 1, kind: 'player', x: 2, y: 2, hp: playerHp, maxHp: PLAYER_MAX_HP, damage: 4, glyph: '@' };
+  const player = { id: 1, kind: 'player', x: 2, y: 2, hp: playerHp, maxHp: PLAYER_MAX_HP, damage: 4, strength: 0, armor: playerArmor, glyph: '@' };
   const state = {
     rng: createRng(1),
     status: 'playing',
@@ -33,7 +34,11 @@ function miniState({ playerHp = PLAYER_MAX_HP, stairsAt = null, potion = null } 
     map,
     vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
     entities: { nextId: 2, playerId: 1, byId: new Map([[1, player]]) },
-    items: potion ? [{ id: 99, type: 'potion', x: potion.x, y: potion.y, heal: potion.heal }] : [],
+    items: potion
+      ? [{ id: 99, type: 'potion', x: potion.x, y: potion.y, heal: potion.heal }]
+      : chest
+        ? [{ id: 98, type: 'chest', x: chest.x, y: chest.y, effect: chest.effect, amount: chest.amount }]
+        : [],
     path: null,
     floors: new Map(),
     log: [],
@@ -58,6 +63,71 @@ describe('potions', () => {
     processCommand(state, { type: 'move', dx: 1, dy: 0 });
     expect(player.hp).toBe(PLAYER_MAX_HP);
     expect(state.items).toHaveLength(0);
+  });
+});
+
+describe('chests', () => {
+  const walkOntoChest = (state) => processCommand(state, { type: 'move', dx: 1, dy: 0 });
+
+  it('a strength chest raises player strength and is consumed', () => {
+    const { state, player } = miniState({ chest: { x: 3, y: 2, effect: 'strength', amount: 1 } });
+    const events = walkOntoChest(state);
+    expect(player.strength).toBe(1);
+    expect(state.items).toHaveLength(0);
+    const pickup = events.find((e) => e.type === 'pickup');
+    expect(pickup).toMatchObject({ item: 'chest', effect: 'strength', amount: 1 });
+  });
+
+  it('an armor chest raises player armor and is consumed', () => {
+    const { state, player } = miniState({ chest: { x: 3, y: 2, effect: 'armor', amount: 1 } });
+    walkOntoChest(state);
+    expect(player.armor).toBe(1);
+    expect(state.items).toHaveLength(0);
+  });
+
+  it('a health chest raises max HP and refills to full', () => {
+    const { state, player } = miniState({ playerHp: 5, chest: { x: 3, y: 2, effect: 'health', amount: 5 } });
+    const events = walkOntoChest(state);
+    expect(player.maxHp).toBe(PLAYER_MAX_HP + 5);
+    expect(player.hp).toBe(player.maxHp);
+    const pickup = events.find((e) => e.type === 'pickup');
+    expect(pickup.heal).toBe(PLAYER_MAX_HP + 5 - 5); // healed from 5 to the new max
+  });
+
+  it('a trap chest deals its damage', () => {
+    const { state, player } = miniState({ chest: { x: 3, y: 2, effect: 'trap', amount: 2 } });
+    const events = walkOntoChest(state);
+    expect(player.hp).toBe(PLAYER_MAX_HP - 2);
+    expect(state.items).toHaveLength(0);
+    const pickup = events.find((e) => e.type === 'pickup');
+    expect(pickup).toMatchObject({ item: 'chest', effect: 'trap', amount: 2 });
+  });
+
+  it('armor mitigates trap damage but a trap always costs at least 1 HP', () => {
+    const one = miniState({ playerArmor: 1, chest: { x: 3, y: 2, effect: 'trap', amount: 2 } });
+    walkOntoChest(one.state);
+    expect(one.player.hp).toBe(PLAYER_MAX_HP - 1);
+
+    const heavy = miniState({ playerArmor: 5, chest: { x: 3, y: 2, effect: 'trap', amount: 2 } });
+    walkOntoChest(heavy.state);
+    expect(heavy.player.hp).toBe(PLAYER_MAX_HP - 1);
+  });
+
+  it('a lethal trap kills the player: status dead, death event, entity kept', () => {
+    const { state, player } = miniState({ playerHp: 2, chest: { x: 3, y: 2, effect: 'trap', amount: 2 } });
+    const events = walkOntoChest(state);
+    expect(player.hp).toBe(0);
+    expect(state.status).toBe('dead');
+    expect(events.some((e) => e.type === 'death')).toBe(true);
+    expect(state.entities.byId.has(1)).toBe(true); // kept for the game-over frame
+    expect(state.items).toHaveLength(0);
+  });
+
+  it('chest contents are seed-deterministic', () => {
+    const summary = (state) => state.items.map((it) => ({ type: it.type, x: it.x, y: it.y, effect: it.effect }));
+    expect(summary(createGame(777))).toEqual(summary(createGame(777)));
+    // And chests actually spawn.
+    expect(createGame(777).items.some((it) => it.type === 'chest')).toBe(true);
   });
 });
 

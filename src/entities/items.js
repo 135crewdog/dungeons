@@ -1,8 +1,39 @@
-import { POTION_HEAL } from '../core/constants.js';
+import {
+  POTION_HEAL,
+  CHEST_EFFECT,
+  CHEST_STRENGTH_BONUS,
+  CHEST_ARMOR_BONUS,
+  CHEST_HEALTH_BONUS,
+  CHEST_TRAP_DAMAGE,
+} from '../core/constants.js';
+import { nextInt } from '../core/rng.js';
 
 // Factory for a health potion at integer tile coordinates. Items live in
 // state.items (they are not turn-taking entities). The id is assigned by the
 // caller from the shared allocator so it is unique across the run.
 export function createPotion(x, y) {
   return { id: 0, type: 'potion', x, y, heal: POTION_HEAL };
+}
+
+// Factory for a treasure chest. Contents are rolled once here, at spawn:
+// 30% strength / 30% armor / 30% health / 10% trap — so what a chest holds is
+// fixed by the run's seed and survives floor snapshots.
+export function createChest(rng, x, y) {
+  const roll = nextInt(rng, 1, 100);
+  let effect;
+  let amount;
+  if (roll <= 30) {
+    effect = CHEST_EFFECT.STRENGTH;
+    amount = CHEST_STRENGTH_BONUS;
+  } else if (roll <= 60) {
+    effect = CHEST_EFFECT.ARMOR;
+    amount = CHEST_ARMOR_BONUS;
+  } else if (roll <= 90) {
+    effect = CHEST_EFFECT.HEALTH;
+    amount = CHEST_HEALTH_BONUS;
+  } else {
+    effect = CHEST_EFFECT.TRAP;
+    amount = CHEST_TRAP_DAMAGE;
+  }
+  return { id: 0, type: 'chest', x, y, effect, amount };
 }

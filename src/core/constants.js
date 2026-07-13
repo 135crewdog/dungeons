@@ -36,6 +36,20 @@ export const ENEMY_TYPES = Object.freeze({
 // Items.
 export const POTION_HEAL = 8;
 
+// Treasure chests. Contents are decided at spawn time (deterministic per seed)
+// and stored on the item. Bonuses stack across a run; the trap hits like a
+// goblin and respects armor (same rule as enemy attacks).
+export const CHEST_EFFECT = Object.freeze({
+  STRENGTH: 'strength',
+  ARMOR: 'armor',
+  HEALTH: 'health',
+  TRAP: 'trap',
+});
+export const CHEST_STRENGTH_BONUS = 1; // +1 damage dealt per stack
+export const CHEST_ARMOR_BONUS = 1; // -1 damage taken per stack
+export const CHEST_HEALTH_BONUS = 5; // +5 max HP, and refill to full
+export const CHEST_TRAP_DAMAGE = ENEMY_TYPES.goblin.damage;
+
 // Map + generation.
 export const MAP_WIDTH = 72;
 export const MAP_HEIGHT = 44;
@@ -49,6 +63,8 @@ export const MIN_ENEMIES = 5;
 export const MAX_ENEMIES = 8;
 export const MIN_POTIONS = 1;
 export const MAX_POTIONS = 3;
+export const MIN_CHESTS = 1;
+export const MAX_CHESTS = 2;
 
 // Field of view: unbounded line of sight within walls (classic). A large radius
 // stands in for "unbounded" while bounding worst-case work on open maps.
