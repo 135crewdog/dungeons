@@ -2,4 +2,4 @@
 // one-time deploy). Empty string = leaderboard disabled: the death screen
 // hides the initials form and the leaderboard view shows "not configured",
 // and the game otherwise runs exactly as before.
-export const LEADERBOARD_URL = '';
+export const LEADERBOARD_URL = 'https://dungeons-leaderboard.c10darren-ward.workers.dev';
