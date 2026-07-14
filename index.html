@@ -273,6 +273,92 @@
         color: #8a93a6;
       }
 
+      /* Leaderboard and help: menu-style panels layered above the menu
+         (z-index 30) so they can be opened from it; the menu stays open
+         underneath and Escape closes only the topmost layer. */
+      #leaderboard,
+      #help {
+        inset: 0;
+        z-index: 30;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(5, 6, 10, 0.82);
+        pointer-events: auto;
+      }
+      #leaderboard.show,
+      #help.show {
+        display: flex;
+      }
+      .lb-panel,
+      .help-panel {
+        width: min(380px, 92vw);
+      }
+      /* Section header inside a panel — same visual language as the menu's
+         seed label, shared by the leaderboard and help overlays. */
+      .panel-label {
+        margin: 0 0 6px;
+        font-size: 12px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: #8a93a6;
+      }
+      .help-panel .panel-label {
+        margin-top: 12px;
+      }
+      .help-panel .panel-label:first-of-type {
+        margin-top: 0;
+      }
+      .lb-status {
+        padding: 18px 0;
+        text-align: center;
+        font-size: 13px;
+        color: #8a93a6;
+      }
+      .lb-table,
+      .help-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .lb-table th {
+        padding: 2px 6px;
+        text-align: left;
+        font-weight: 400;
+        color: #8a93a6;
+        border-bottom: 1px solid #232838;
+      }
+      .lb-table td {
+        padding: 3px 6px;
+        color: #cdd3e0;
+      }
+      .lb-table .lb-num {
+        text-align: right;
+      }
+      .lb-table .lb-initials {
+        color: #fff;
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+      .lb-table .lb-dim {
+        color: #8a93a6;
+      }
+      .help-table td {
+        padding: 3px 6px;
+        vertical-align: top;
+        color: #8a93a6;
+      }
+      .help-table .help-key {
+        width: 110px;
+        color: #cdd3e0;
+        white-space: nowrap;
+      }
+      .help-table .help-glyph {
+        width: 28px;
+        color: #fff;
+        font-weight: 700;
+      }
+
       #gameover {
         inset: 0;
         display: none;
@@ -310,6 +396,57 @@
       }
       .go-panel button:hover {
         background: #fff;
+      }
+      .go-panel button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      /* Arcade initials entry: a stubby 3-character field + submit, dropped a
+         row under the floor line. */
+      .go-initials {
+        display: flex;
+        gap: 6px;
+        align-items: stretch;
+        justify-content: center;
+        margin-top: 14px;
+      }
+      .go-initials input {
+        width: 5ch;
+        padding: 5px 8px;
+        text-align: center;
+        font-family: inherit;
+        font-size: 15px;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        color: #fff;
+        background: #05060a;
+        border: 1px solid #3a4256;
+      }
+      .go-initials input:focus {
+        outline: none;
+        border-color: #7ad07a;
+      }
+      .go-initials input:disabled {
+        opacity: 0.5;
+      }
+      .go-panel .go-initials button {
+        margin-top: 0;
+        padding: 5px 12px;
+        font-size: 13px;
+      }
+      .go-status {
+        min-height: 1.2em;
+        margin: 8px 0 0;
+        font-size: 13px;
+        color: #8a93a6;
+      }
+      .go-buttons {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+      .go-panel .go-buttons button {
+        margin-top: 14px;
       }
     </style>
   </head>

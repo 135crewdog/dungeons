@@ -12,6 +12,11 @@ import { createHud } from './ui/hud.js';
 import { createMessageLog } from './ui/messageLog.js';
 import { createGameOver } from './ui/gameOver.js';
 import { createMenu } from './ui/menu.js';
+import { createLeaderboard } from './ui/leaderboard.js';
+import { createHelp } from './ui/help.js';
+import { APP_VERSION } from './ui/version.js';
+import { createLeaderboardClient, buildScorePayload } from './net/leaderboard.js';
+import { LEADERBOARD_URL } from './net/config.js';
 
 function randomSeed() {
   const buf = new Uint32Array(1);
@@ -53,9 +58,40 @@ const game = createPhaserGame(parent, state);
 
 const hud = createHud(document.body);
 const messageLog = createMessageLog(document.body);
-// The menu (created below) layers over the death screen; while it is open, its
-// seed form/input owns Enter/Space, so the death screen's restart shortcut stands down.
-const gameOver = createGameOver(document.body, { isKeyboardBlocked: () => menu.isOpen() });
+
+// Cross-device leaderboard client (disabled while LEADERBOARD_URL is empty).
+// Failed submissions queue in localStorage; flush on boot and on reconnect.
+const lb = createLeaderboardClient({
+  url: LEADERBOARD_URL,
+  storage: window.localStorage,
+  fetchFn: (...args) => fetch(...args),
+  now: () => Date.now(),
+});
+lb.flushQueue();
+window.addEventListener('online', () => lb.flushQueue());
+
+// The menu / leaderboard / help (created below) layer over the death screen;
+// while any is open it owns the keys, so the death screen's Enter/Space
+// restart shortcut stands down. Score submission reads the live state — safe
+// because the overlay is only visible while the death state is current.
+const gameOver = createGameOver(document.body, {
+  isKeyboardBlocked: () => menu.isOpen() || leaderboard.isOpen() || help.isOpen(),
+  canSubmit: () => lb.isEnabled(),
+  getLastInitials: () => lb.getLastInitials(),
+  onSubmitScore: (initials) => {
+    lb.setLastInitials(initials);
+    return lb.submit(
+      buildScorePayload({
+        initials,
+        floor: state.floor,
+        version: APP_VERSION,
+        seed: state.seed,
+        turns: state.turn,
+      }),
+    );
+  },
+  onShowLeaderboard: () => leaderboard.open(),
+});
 
 function refreshUi() {
   hud.update(state);
@@ -105,13 +141,23 @@ const menu = createMenu(document.body, {
   onNewRun: () => startRun(randomSeed()),
   onRestartSeed: () => startRun(state.seed),
   onLoadSeed: (text) => startRun(coerceSeed(text)),
+  onLeaderboard: () => leaderboard.open(),
+  onHelp: () => help.open(),
+  isChildOpen: () => leaderboard.isOpen() || help.isOpen(),
 });
 
-// While the menu is open the game is paused: swallow movement/tap commands so
-// nothing advances underneath it. The menu overlay already intercepts pointer
-// events over the map, so this mainly stops keyboard moves.
+// Created after the menu on purpose: their window Escape handlers must run
+// after the menu's, so one Escape press closes only the topmost layer (the
+// menu defers via isChildOpen, then the child's own handler closes it).
+const leaderboard = createLeaderboard(document.body, { fetchScores: () => lb.fetchScores() });
+const help = createHelp(document.body);
+
+// While the menu (or an overlay layered above it) is open the game is paused:
+// swallow movement/tap commands so nothing advances underneath. The overlays
+// already intercept pointer events over the map, so this mainly stops
+// keyboard moves.
 function gatedDispatch(command) {
-  if (menu.isOpen()) return;
+  if (menu.isOpen() || leaderboard.isOpen() || help.isOpen()) return;
   controller.dispatch(command);
 }
 

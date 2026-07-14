@@ -18,6 +18,10 @@ import { APP_VERSION } from './version.js';
 //   onNewRun()       → start a fresh run with a new random seed
 //   onRestartSeed()  → replay the current run from floor 1 (same seed)
 //   onLoadSeed(text) → start a run from a user-entered seed
+//   onLeaderboard()  → open the leaderboard overlay (menu stays open below)
+//   onHelp()         → open the help overlay (menu stays open below)
+//   isChildOpen()    → a child overlay (leaderboard/help) is layered on top,
+//                      so Escape belongs to it, not to this menu
 export function createMenu(parent, actions) {
   // The trigger is plain HUD text ("Menu"), anchored top-right — same visual
   // language as the HP/Floor readouts, not a boxed icon.
@@ -39,6 +43,8 @@ export function createMenu(parent, actions) {
     '<button type="button" data-act="resume">Resume</button>' +
     '<button type="button" data-act="newrun">New run</button>' +
     '<button type="button" data-act="restart">Restart this seed</button>' +
+    '<button type="button" data-act="board">Leaderboard</button>' +
+    '<button type="button" data-act="help">Help</button>' +
     '</div>' +
     '<div class="menu-seed">' +
     '<div class="menu-seed-label">Seed</div>' +
@@ -134,6 +140,14 @@ export function createMenu(parent, actions) {
       case 'copy':
         copySeed();
         break;
+      // Leaderboard/help layer over the menu, which stays open underneath so
+      // Escape (or closing the child) drops straight back into it.
+      case 'board':
+        actions.onLeaderboard();
+        break;
+      case 'help':
+        actions.onHelp();
+        break;
       // 'load' is a submit button handled by the form's submit event.
     }
   });
@@ -150,6 +164,10 @@ export function createMenu(parent, actions) {
   // concerned only with turning key presses into moves.
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    // A child overlay (leaderboard/help) is on top: Escape is its to handle.
+    // Children register their handlers after this one, so deferring here is
+    // enough — the same keypress then closes only the topmost layer.
+    if (actions.isChildOpen?.()) return;
     if (!isOpen() && !actions.canOpen()) return;
     e.preventDefault();
     toggle();
