@@ -6,10 +6,26 @@ submission time. The game client talks to it via `src/net/leaderboard.js`.
 
 - `worker.js` — the Worker: `GET /scores`, `POST /scores`, CORS, rate limit.
 - `scores.js` — pure validation/SQL logic (unit-tested in `tests/`).
+- `worker.dashboard.js` — the same Worker inlined into one import-free file for
+  pasting into the Cloudflare dashboard editor (the no-install path below).
 - `schema.sql` — the one-table D1 schema.
 - `wrangler.toml` — Worker + D1 binding config.
 
-## One-time deploy
+## Deploy from the browser — no install (Cloudflare dashboard)
+
+Prefer clicking to typing, or don't want to install anything? Do it all at
+[dash.cloudflare.com](https://dash.cloudflare.com):
+
+1. **D1 → Create database** named `dungeons-leaderboard`. Open its **Console**
+   tab, paste the contents of `schema.sql`, and run it.
+2. **Workers → Create Worker** (start from Hello World), name it, Deploy, then
+   **Edit code**: replace the sample with all of `worker.dashboard.js` and Deploy.
+3. In the Worker's **Settings → Bindings**, add a **D1 database** binding named
+   exactly `DB`, pointing at `dungeons-leaderboard`, and Deploy once more.
+4. Copy the Worker's `*.workers.dev` URL into `LEADERBOARD_URL` in
+   `src/net/config.js` and commit.
+
+## One-time deploy (wrangler CLI)
 
 Requires a free Cloudflare account. From this `server/` directory:
 
