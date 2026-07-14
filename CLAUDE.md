@@ -62,7 +62,46 @@ too) so a dead player can copy the seed or retry the same dungeon. The menu is a
 overlay in `ui/` (like the HUD and game-over screen): it only reads the seed and invokes
 composition-root callbacks, never mutating simulation state or importing the renderer. Its
 look is deliberately plain and NetHack-ish so a future ASCII↔sprite art-style toggle can
-slot into the options list.
+slot into the options list. **Leaderboard** and **Help** actions open child overlays that
+layer *above* the menu (z-index 30 vs the menu's 20) with the menu staying open
+underneath; the menu's Escape handler defers while a child is open (`isChildOpen`
+callback from the composition root), so one Escape press closes only the topmost layer.
+Movement/tap input is gated while any of the three overlays is open.
+
+## Leaderboard (cross-device, 30-day rolling)
+
+The one networked feature. A tiny **Cloudflare Worker + D1** backend lives in
+**`server/`** (worker.js + pure logic in scores.js + schema.sql + wrangler.toml),
+deployed **manually once** via `npx wrangler deploy` (steps in `server/README.md`); the
+game itself stays a static GitHub Pages deploy. API: `POST /scores` validates
+`{ initials, floor, turns, seed, version }` (initials exactly 3 chars A–Z0-9, uppercased
+server-side) and stamps a **server** timestamp; `GET /scores` returns the top 50 of the
+last 30 days ordered **floor DESC, turns ASC, created_at ASC**, plus the server clock so
+row ages ("3d ago") never trust the device clock. CORS is `*` (no credentials);
+body-size cap and a best-effort per-IP rate limit blunt abuse. Anti-cheat is
+honor-level, but every score carries its seed so a run could later be replay-verified
+with the headless engine.
+
+The client lives in **`src/net/`** — the only code allowed to fetch or touch
+localStorage (the architecture test enforces that the sim never does either).
+`src/net/config.js` holds `LEADERBOARD_URL`; **empty string = feature disabled** (the
+death screen hides the initials form, the leaderboard view says "not configured", and
+the game is otherwise unchanged). `createLeaderboardClient` takes injected
+fetch/storage/clock so it tests in plain Node. Offline-first: a failed submit queues in
+localStorage (`lb.queue`, cap 10, oldest dropped) and is flushed on boot and on the
+`online` event; the last-used initials are remembered (`lb.initials`) and prefilled.
+
+UI: on death the "You died" panel offers arcade-style 3-character initials entry
+(sanitized while typing, **one submission per death** — the form locks after submit)
+plus a Leaderboard button; the pause menu has Leaderboard too. The view renders
+rank/initials/floor/version/age with loading/empty/offline/not-configured states, and
+builds every cell with `textContent` since rows are other players' input.
+
+## Help
+
+A static menu-reachable overlay (`src/ui/help.js`): a glyph table (all eleven symbols,
+playful one-liners), a stats table (HP/Floor/STR/ARM/SKILL), and a controls list, in the
+same NetHack-ish panel style. It reads nothing and calls nothing back.
 
 ## Turn Order (strict, every turn)
 
@@ -177,10 +216,11 @@ completed phase, the **patch** for fixes and balance tweaks (retroactively, Phas
 0.1.0 and Phases 3a–3f ≈ 0.3.1–0.3.6; the version display shipped as **0.4.0**).
 `package.json`'s `version` field is the **single source of truth**; Vite injects it at
 build time as the `__APP_VERSION__` constant (`define` in `vite.config.js`), read via
-`src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim `v0.4.1`
+`src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim `v0.5.0`
 watermark top-right on the row under the Menu text (kept apart from the realtime
-gameplay stats) and in the pause-menu footer, so screenshots identify the build. Bump
-the version in the same commit as the change it describes.
+gameplay stats) and in the pause-menu footer, so screenshots identify the build — and
+it rides along on every leaderboard submission. Bump the version in the same commit as
+the change it describes (Phase 4, the leaderboard + help release, is **0.5.0**).
 
 ## PR Watching
 
@@ -198,9 +238,12 @@ src/
   entities/   // player, enemies, items, spawning
   systems/    // combat, pathfinding, fov, visibility, ai
   renderer/   // ALL Phaser code only
-  ui/         // HUD, message log, game-over (DOM overlays)
+  ui/         // HUD, message log, game-over, menu, leaderboard, help (DOM overlays)
   input/      // keyboard, mouse, touch
+  net/        // leaderboard client — the only fetch/localStorage code; never
+              // imported by the sim (architecture-test enforced)
 assets/       // empty for now
+server/       // Cloudflare Worker + D1 leaderboard backend (deployed separately)
 ```
 
 The simulation layer is `core/`, `world/`, `entities/`, `systems/`. The renderer layer
@@ -263,6 +306,12 @@ the careful bot's floor-10 clear rate stays ~14% (cross-validated), floor-1 deat
 floor makes big dice pierce armor harder than their mean suggests, so die
 assignments, not modifiers, carry the curve.
 
+Phase 4 (complete): **cross-device leaderboard** (30-day rolling window, arcade
+initials, Cloudflare Worker + D1 backend in `server/`, offline submission queue —
+see the Leaderboard section) · **in-game Help page** (glyph/stat/control tables from
+the menu). This is a deliberate exception to "offline and local": the sim remains
+fully offline; only `src/net/` and the composition root know the network exists.
+
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
 
@@ -271,7 +320,11 @@ mechanic not listed here.
 Each major module has browser-free unit tests (Vitest). The simulation is kept
 independent enough that dungeon generation, combat, pathfinding, and FOV are tested
 without instantiating Phaser. Determinism is guarded: no `Math.random()` and no Phaser
-import under the simulation directories.
+import under the simulation directories — and no `fetch`, `localStorage`, or `src/net`
+import there either (networking stays in `net/` + composition root). The leaderboard
+worker is plain `fetch(request, env)` JS, tested in Node with a fake D1
+(`tests/leaderboard-server.test.js`); the client tests inject fake fetch/storage
+(`tests/leaderboard.test.js`).
 
 Balance is guarded empirically: `npm run balance` runs the headless simulator
 (`scripts/balance-sim.js`) — seeded bot-driven runs through the real engine that
@@ -282,7 +335,9 @@ loot, or spawning constant; the before/after tables belong in the commit message
 
 `vite-plugin-pwa` (Workbox) generates the manifest + service worker: fullscreen
 display, no orientation lock, precache of all built assets for full offline play, and
-add-to-home-screen installability.
+add-to-home-screen installability. The service worker is precache-only — cross-origin
+leaderboard calls pass through it untouched (no `runtimeCaching`), so the API needs no
+PWA configuration and offline play is unaffected.
 
 ## Milestones
 
