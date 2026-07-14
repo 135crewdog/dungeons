@@ -26,7 +26,7 @@ function code(relPath) {
 }
 
 const SIM_DIRS = ['src/core', 'src/world', 'src/entities', 'src/systems'];
-const NON_RENDERER_DIRS = [...SIM_DIRS, 'src/ui', 'src/input'];
+const NON_RENDERER_DIRS = [...SIM_DIRS, 'src/ui', 'src/input', 'src/net'];
 
 describe('architecture guards', () => {
   it('gameplay code never calls Math.random() (single seeded RNG only)', () => {
@@ -41,6 +41,19 @@ describe('architecture guards', () => {
     for (const dir of NON_RENDERER_DIRS) {
       for (const f of jsFiles(dir)) {
         expect(/from\s+['"]phaser['"]/.test(code(f)), `${f} imports phaser`).toBe(false);
+      }
+    }
+  });
+
+  it('the simulation never talks to the network or browser storage', () => {
+    // Networking lives in src/net (leaderboard) and is wired by the
+    // composition root and UI only; the sim stays pure and deterministic.
+    for (const dir of SIM_DIRS) {
+      for (const f of jsFiles(dir)) {
+        const src = code(f);
+        expect(/from\s+['"][^'"]*\/net\//.test(src), `${f} imports src/net`).toBe(false);
+        expect(/\bfetch\s*\(/.test(src), `${f} calls fetch`).toBe(false);
+        expect(/localStorage/.test(src), `${f} touches localStorage`).toBe(false);
       }
     }
   });

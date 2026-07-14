@@ -1,0 +1,13 @@
+name = "dungeons-leaderboard"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+[vars]
+# Lock to "https://<user>.github.io" later if desired; "*" is fine because the
+# API uses no cookies or credentials.
+ALLOWED_ORIGIN = "*"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dungeons-leaderboard"
+database_id = "PASTE_DATABASE_ID_HERE"
