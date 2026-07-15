@@ -1,5 +1,6 @@
-// Pause/options menu overlay. Opened by the on-screen menu button (☰) or the
-// Escape key; closed by Escape, the Resume button, or clicking the backdrop.
+// Pause/options menu overlay. Opened by the on-screen "Menu" text button or
+// the Escape key; closed by Escape, the Resume button, or clicking the
+// backdrop.
 // A DOM overlay like the HUD and game-over screen — it only reads the seed and
 // invokes lifecycle callbacks (new run / restart / load seed) supplied by the
 // composition root. It never touches the simulation state or the renderer.

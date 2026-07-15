@@ -107,12 +107,19 @@ same NetHack-ish panel style. It reads nothing and calls nothing back.
 
 1. Receive and validate player input (keyboard, click, or tap).
 2. Execute player movement or attack.
-3. For each enemy in ascending entity-id order: move toward the player, then attack if
-   adjacent.
-4. Resolve item pickups (walking over items).
-5. Update field of view and visibility.
+3. Update field of view and visibility. (FOV depends only on walls + player
+   position, so it is computed right after the player acts and is stable
+   through the enemy phase — this is what gives enemies correct line of sight
+   for same-turn aggro.)
+4. For each enemy in ascending entity-id order: attack if adjacent, else move
+   one step toward the player. (An enemy that closes to melee range this turn
+   does **not** also attack this turn.)
+5. Resolve item pickups (walking over items).
 6. Update HUD and message log.
 7. Wait for the next player input.
+
+Stepping onto a staircase ends the turn immediately after the player's move:
+the floor swaps and the enemy/pickup phases are skipped.
 
 ## Movement and Pathfinding
 
@@ -216,11 +223,12 @@ completed phase, the **patch** for fixes and balance tweaks (retroactively, Phas
 0.1.0 and Phases 3a–3f ≈ 0.3.1–0.3.6; the version display shipped as **0.4.0**).
 `package.json`'s `version` field is the **single source of truth**; Vite injects it at
 build time as the `__APP_VERSION__` constant (`define` in `vite.config.js`), read via
-`src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim `v0.5.0`
-watermark top-right on the row under the Menu text (kept apart from the realtime
-gameplay stats) and in the pause-menu footer, so screenshots identify the build — and
-it rides along on every leaderboard submission. Bump the version in the same commit as
-the change it describes (Phase 4, the leaderboard + help release, is **0.5.0**).
+`src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim version
+watermark (`v0.5.2` style) top-right on the row under the Menu text (kept apart from
+the realtime gameplay stats) and in the pause-menu footer, so screenshots identify the
+build — and it rides along on every leaderboard submission. Bump the version in the
+same commit as the change it describes (Phase 4, the leaderboard + help release, was
+**0.5.0**; `package.json` is always the current number).
 
 ## PR Watching
 
@@ -286,8 +294,10 @@ the real engine with two bot policies (thorough / stair-rusher) over hundreds of
 seeded runs. Changes: goblin 7 HP · skeleton 4 HP · **enemy count depth scaling**
 (+1 per 3 floors, cap 12) · **depth-weighted spawn mix** (goblin share 50% +3%/floor,
 cap 80%) · chest table 30/25/30/15 with `CHEST_TABLE` thresholds · health chest +4 ·
-boss 26 HP base, +12/tier, exempt from the flat damage drip. The current numbers in
-the Combat section above are authoritative.
+boss 26 HP base, +12/tier, exempt from the flat damage drip. *(The HP/chest numbers in
+this changelog are the 3d-era values and were re-tuned again in 3f; the Combat section
+above — goblin 6 HP, skeleton 3 HP, boss 24 HP base, chest table 25/20/25/20/10 — is
+authoritative.)*
 
 Phase 3e (complete, superseded by 3f): **player damage die** — the player rolled
 d4+2 (+strength) per landed hit instead of a flat 4, making combat dice on both

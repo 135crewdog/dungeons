@@ -3,6 +3,7 @@ import { createGame, descend, ascend } from '../src/core/gameState.js';
 import { getPlayer, idx } from '../src/core/query.js';
 import { createRng } from '../src/core/rng.js';
 import { resolveAttack } from '../src/systems/combat.js';
+import { createBossChest } from '../src/entities/items.js';
 import { SPAWNABLE_ENEMIES, createEnemy } from '../src/entities/enemies.js';
 import {
   ENEMY_TYPES,
@@ -145,6 +146,26 @@ describe('boss chest drop', () => {
       seen.add(chest.effect);
     }
     expect([...seen].sort()).toEqual(['armor', 'health', 'strength']);
+  });
+});
+
+describe('boss chest odds', () => {
+  it('splits evenly — each bonus lands about a third of the time, never trap or skill', () => {
+    // The spec promises 1/3 strength / 1/3 armor / 1/3 health. Seeded, so the
+    // observed split is deterministic; the band is generous to survive any
+    // future reseeding of this test.
+    const rng = createRng(4242);
+    const counts = { strength: 0, armor: 0, health: 0 };
+    const N = 6000;
+    for (let i = 0; i < N; i++) {
+      const chest = createBossChest(rng, 0, 0);
+      expect(['strength', 'armor', 'health']).toContain(chest.effect); // no trap, no skill
+      counts[chest.effect] += 1;
+    }
+    for (const share of Object.values(counts)) {
+      expect(share / N).toBeGreaterThan(0.28);
+      expect(share / N).toBeLessThan(0.39);
+    }
   });
 });
 
