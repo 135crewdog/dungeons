@@ -110,6 +110,8 @@ export class DungeonScene extends Phaser.Scene {
           spawnFloatingText(this, ev.x, ev.y, `+${ev.heal}`, '#5ad07a');
         } else if (ev.effect === 'strength') {
           spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} STR`, '#e0b74a');
+        } else if (ev.effect === 'skill') {
+          spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} SKL`, '#b48ff0');
         } else if (ev.effect === 'armor') {
           spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} ARM`, '#6db3f2');
         } else if (ev.effect === 'trap') {
