@@ -1,0 +1,133 @@
+# Quality-Control Audit — Dungeons
+
+- **Audited commit:** `c0aba8a` (v0.5.1, tip of `main` at audit time)
+- **Date:** 2026-07-15
+- **Branch:** `claude/app-quality-control-3rme1d` — carries this report plus 7 audit commits (4 fixes, 3 hardening), shipped as **v0.5.2**
+- **What ran:** the full unit suite with coverage; ~10 headless engine probes (30k-draw distribution checks, 20k-floor generation sweep, turn-order and cancellation instrumentation); two independent 200-run balance-simulator batches; micro-benchmarks of the pathfinding hot path; a production build with artifact inspection; and a **16-scenario real-browser E2E campaign** (Playwright + the preview build) with the production leaderboard fully stubbed — **zero requests escaped to the real backend** (tripwire-verified).
+
+---
+
+## 1. Executive summary
+
+**Verdict: this is genuinely good tech, not a novelty that happens to run.** The two claims the whole design rests on — a pure, deterministic simulation and a renderer that only observes it — are not just stated, they are *provable*: a 188-command game session replayed through the real browser (keyboard events → input layer → engine → Phaser rendering) produced a final state **deep-equal to the headless engine's prediction**, entity for entity, HP for HP, explored-tile for explored-tile. Very few hobby codebases pass that test. The defects found were real but peripheral: documentation drifting from code, one missing feedback effect, test-coverage holes around the edges, and loopholes in the guardrail test meant to protect the architecture.
+
+**Q1 — Does the app do what we think it does?** Yes, with one nuance: *the code is right and the docs had drifted.* Every gameplay number in the authoritative Combat section of CLAUDE.md matches the code exactly (verified live: goblin 6 HP, skeleton 3 HP/half-speed, boss 24+12/tier with d8/d12/d20, d20 to-hit with nat-1 miss and 95% cap, min-1 damage floor, chest table 25/20/25/20/10 within ±0.15% over 30k draws, boss chest exactly thirds and never a trap). What disagreed was prose: CLAUDE.md's Turn Order section contradicted its own Combat section (and the code) on enemy attack order and FOV timing, the Phase-3d changelog carried superseded numbers, and the README still described Phase 1. All fixed on this branch.
+
+**Q2 — Does it do what we want it to do?** Behaviorally yes, verified end-to-end in a real browser: movement (incl. numpad diagonals and corner-cut refusal), bump combat with plain-language log, click auto-walk with the exact 90 ms cadence and all four cancellation triggers, floor persistence across a full descend/return round trip, door-occluded FOV, menu pause/seed tools/URL sync, overlay layering with correct Escape ordering, the death → initials → one-submission lock → restart flow, and offline PWA boot. One gap found and fixed: skill chests granted their bonus silently — the renderer floated text for every chest effect *except* skill.
+
+**Q3 — Are we sufficiently clear on what we want?** Clearer than almost any project of this size — CLAUDE.md is a real spec and most of it is enforced by tests. The audit found the spots where clarity had decayed: the internal Turn Order contradiction, changelog-vs-authority ambiguity, a version number pinned in prose, and two stale constants comments that said the opposite of the constants beside them (now all corrected). Two decisions remain genuinely undocumented: **key auto-repeat is live** (holding a key walks at OS repeat rate — E2E-confirmed; decide if that's intended and write it down), and the player's 20 max HP appears nowhere in the spec.
+
+**Q4 — Is it efficient? Are we doing things repeatedly that could be done once?** Structurally, the expensive things are already done right: FOV is computed **exactly once per turn** (call-graph verified), enemy line-of-sight is an O(1) lookup into the player's symmetric FOV instead of per-enemy shadowcasts, rendering is event-driven (no per-frame scene update; glyphs/entities are pooled images), and A* uses a real binary heap with deterministic tie-breaking. The one hot-ish path — every aggroed enemy re-runs a full A* each turn with a linear `entityAt` scan inside the inner loop — was benchmarked, not guessed at: **worst case 2.8 ms/turn** with 12 enemies crowding the player, i.e. **3.15% of the 90 ms input budget**. Not a player-facing problem; a flow-field prototype showed 4–52× headroom if enemy counts ever grow. The genuinely redundant work found is small and listed as wave-4 polish (full 3,168-tile re-sync per turn, unconditional `setTexture`, unpooled floating-text objects, a re-scan of the current room's explored flags every turn).
+
+**Q5 — Are we following best practices (coding and gaming)?** Coding: the layering is exemplary and now *strictly* test-enforced (the old guard test had eight demonstrated evasions — dynamic imports, `fetch` outside the sim dirs, renderer importing mutators — all closed); the gaps are the untested presentation layer (0% coverage on `ui/`, `main.js`, most of `renderer/` — structural: the Vitest env is `node`), no linter, and until this branch no PR CI. Gaming: seeded determinism with URL replay, tabletop-transparent combat rolls, honest offline-first networking, integer-scaled ASCII rendering, and empirically **accurate** balance documentation (both 200-run batches reproduced the documented floor-10 clear ~14-16%, floor-1 deaths ~18%, boss share ~32-34%). Weakest practice: modal accessibility (no focus trap, focus not restored, pinch-zoom disabled globally).
+
+## 2. Scorecard
+
+| Dimension | Grade | One line |
+|---|---|---|
+| Architecture | **A** | Sim/renderer split proven by browser-vs-engine parity; boundaries now strictly test-enforced |
+| Correctness | **A−** | All specced mechanics verified; one missing feedback effect (fixed); two theoretical edge cases noted |
+| Docs / spec | **B → A−** | CLAUDE.md excellent but had internal contradictions; README was two phases stale (both fixed) |
+| Efficiency | **A−** | Right algorithms in the right places; worst-case turn = 3% of input budget; minor redundant work catalogued |
+| Testing | **B → B+** | Sim superbly tested (≈100%), presentation layer at 0% (structural); top gaps + guard loopholes closed on this branch |
+| Server | **B+** | Parameterized SQL, validation, caps all solid; untested hand-copied dashboard worker is the real risk |
+| Process | **B−  → B+** | Disciplined commits and versioning; no lint; PR CI added on this branch |
+
+## 3. Findings
+
+Severity: **S1** user-facing/correctness · **S2** significant quality or risk · **S3** minor · **S4** nit. Every inventory item from recon appears here, including the ones the evidence *dismissed*.
+
+### 3.1 Fixed on this branch
+
+| # | Finding (severity) | Evidence | Verified by | Fix |
+|---|---|---|---|---|
+| F1 | Skill chests float no pickup text — the only chest effect with no visual feedback (S2) | `src/renderer/GameScene.js` pickup branches: heal/strength/armor/trap, no `skill` | Code read; post-fix E2E screenshot shows violet `+1 SKL` float | `b7127af` (+ version → 0.5.2) |
+| F2 | CLAUDE.md contradicts itself and the code: Turn Order said enemies "move, then attack" and put FOV after pickups; code (and CLAUDE.md's own Combat section) does attack-**else**-move with FOV **before** the enemy phase | `src/systems/ai.js:32-40`, `src/core/turnEngine.js:68-76` | Engine probe: an enemy that closes distance does not attack that turn; doorway-step aggros enemies the same turn (FOV already updated); event order `move → attack → pickup` | `cda692f` |
+| F3 | Phase-3d changelog numbers superseded but unannotated (goblin 7→6, skeleton 4→3, boss 26→24, chest 30/25/30/15→25/20/25/20/10) (S3) | CLAUDE.md Phase-3d block vs Combat section vs `constants.js` | Live-constant probe table | `cda692f` |
+| F4 | README described Phase 1: flat "75% hit chance", seed-chip UX that moved to the menu, no chests/boss/scaling/leaderboard/help/balance sim (S2) | `README.md` (old) | Diff vs shipped features | `554ba84` |
+| F5 | Stale comments inside `constants.js` said per-3-floor die ladder and floor-5 boss d10; the constants beside them say per-4 and d8 (S3) | `constants.js:55-58` (old) | Live values: ladder [4,6,8,10] per-4; BOSS_DICE [8,12,20] | `756eb27` |
+| F6 | Dead code: `FOV_RADIUS = 40` (never imported; real FOV depth is `max(w,h)`=72 — its comment described a bound that didn't exist) and `DIRS4` (never imported) (S3) | `constants.js`, `visibility.js:27` | Repo-wide grep: zero references | `756eb27` |
+| F7 | Test gaps: no integrated turn-order test with enemies present; auto-walk cancellation tested only for "new command"; boss-chest ⅓ split asserted only as "all three occur" (S2) | `tests/` inventory | Coverage + test-name audit | `884b181` — 9 new tests (156 total, was 146) |
+| F8 | Architecture guard test had 8 demonstrated evasions: `main.js` exempt from every rule; fetch/localStorage banned only in sim dirs (CLAUDE.md says `net/` is the *only* place); `Math.random` unchecked outside sim; dynamic `import()`/`require()` invisible; renderer rule banned only the literal token `turnEngine` — importing `gameState` or `combat` from the renderer passed (S2) | `tests/architecture.test.js` (old) | Probe fed the actual regexes synthetic violations; new guards verified to fire on a planted violation file | `7ad52ec` |
+| F9 | No CI on pull requests — tests ran only on push to `main`, inside the deploy job (S2) | `.github/workflows/` | Only `deploy.yml` existed | `84ea0f9` (`test.yml`: `on: pull_request`) |
+| F10 | `menu.js` header comment referenced a "☰" icon; the button ships as the "Menu" text (S4) | `menu.js:1` | Read | `756eb27` |
+
+### 3.2 Confirmed — recommended, not fixed (each needs an owner decision)
+
+| # | Finding (severity) | Evidence / numbers | Recommendation | Effort |
+|---|---|---|---|---|
+| R1 | **Presentation layer is untested and currently untestable**: 0% coverage on all of `src/ui/`, `src/main.js`, `keyboard.js`, `pointer.js`, and all renderer files except `tileStyle`; `vite.config.js` sets `test.environment: 'node'`, so DOM tests cannot even be written today (S2) | Coverage report (Appendix A) | Add a jsdom (or happy-dom) Vitest project for `ui/`+`input/`; adopt this audit's Playwright harness (scratchpad `e2e/`) as an optional smoke script — its 16 scenarios and fixture-discovery pattern are reusable as-is | M |
+| R2 | **`server/worker.dashboard.js` is a hand-maintained duplicate** of worker.js+scores.js with zero test coverage. Probe: byte-for-byte identical behavior today (14/14 cases) — so it's drift *risk*, not drift; nothing will catch the first divergence (S2) | Dual-worker battery (Appendix E) | Either generate it (`cat scores.js worker.js` build step with the import lines stripped) or run the same test battery over both modules in `leaderboard-server.test.js` | S |
+| R3 | `GET /scores` has **no cache header and no read-side rate limit** — every open of the leaderboard hits D1; a scraper loop hits it at full rate (S3) | Probe: 10 rapid GETs → 10× 200, `cache-control: (absent)`; POST limiter confirmed working (7th rapid POST → 429) | `Cache-Control: public, max-age=30` on GET (Cloudflare edge caches it; one line) | S |
+| R4 | POST accepts any Content-Type (`text/plain` with valid JSON → 201) (S4) | Probe (both workers) | Optionally require `application/json`; validation already bounds every field, so this is strictness, not a hole | S |
+| R5 | **Overlay scaffolding is copy-pasted 4×**: the panel/head/× shell HTML in menu, leaderboard, help (+ gameOver variant); `isOpen`/class-toggling ×4; backdrop-click-close ×3; a global Escape `keydown` listener ×4; `isEditable()` duplicated verbatim in `keyboard.js` and `gameOver.js` (S3) | File reads (menu.js:39, leaderboard.js:16, help.js:63, gameOver.js:26…) | One `createOverlay({title, body, onClose})` factory in `ui/`; export one `isEditable` | M |
+| R6 | **Palette lives in three unsynchronized places**: CSS custom props (index.html), Phaser hex (`tileStyle.js`), and inline string hexes in `hud.js` + `GameScene.js` — index.html's own comment admits the hand-sync (S3) | Reads; the comment at index.html:21 | One palette module (string hexes; renderer converts to 0x once); or at minimum move the float colors into `tileStyle.js`, the declared style seam | S–M |
+| R7 | Corner-cut rule implemented twice (`movement.js:16-19` and inside A* at `pathfinding.js:94-96`) (S3) | Consistency probe: 3,756 random diagonal cases, **0 disagreements** — consistent today, unguarded tomorrow | Extract one shared diagonal-legality helper into `core/query.js` | S |
+| R8 | Enemies lack the `strength/skill/armor` fields the player has — combat's `?? 0` defaults are load-bearing; `glyph` (a presentation hint) lives on sim entities (S4) | `createEnemy` instance keys probe | Zero-init the three stats in `createEnemy`; leave `glyph` (documented as a hint; tileStyle owns the final say) | S |
+| R9 | **Pathfinding does per-enemy work a shared structure could do once**: every aggroed enemy runs a full A* each turn and keeps only `path[1]`, with an O(entities) `entityAt` scan called per expanded neighbor (S3 — *efficiency headroom, not a problem*) | Benchmarks (Appendix C): A* 29–53 µs/call; **worst case 2.8 ms/turn** at 12 enemies crowded around the player = 3.15% of the 90 ms budget; uncrowded turns 0.025 ms; flow-field prototype serves all enemies in 44–119 µs/turn (4–52×) | Do nothing for gameplay today. If enemy counts grow, balance-sim throughput matters, or you want the elegance: one BFS flow field from the player per turn + a per-turn occupancy `Set` replaces all enemy A* calls. Gate on these benchmarks | M |
+| R10 | Renderer redundant work per turn: all 3,168 grid tiles re-tinted, `setTexture` called even when unchanged, floating text allocates a fresh Phaser `Text` (own canvas texture) per swing, `revealRoom` re-marks the current room every turn, `entitiesSorted` allocates+sorts per call (S4 — bounded, per-turn not per-frame) | Reads + the event-driven design keeping all of it off the frame loop | Cheap wins if ever needed: skip-if-unchanged `setTexture`, pool float texts, early-out `revealRoom` on same room id. None is urgent | S each |
+| R11 | **Key auto-repeat is live**: holding a key walks at OS repeat rate (no `e.repeat` guard) (S4 — *design decision, not bug*) | E2E: synthetic `repeat: true` keydowns each consumed a turn | Decide intent. Roguelike-classic is repeat-on; if so, one sentence in CLAUDE.md. If not, one-line guard in `keyboard.js` | S |
+| R12 | `ensureArrivalClear` can co-locate two entities if the arrival stair's 8 neighbors are all blocked — violating "two entities never share a tile". Constructed probe: confirmed. Real-game reachability: walls alone can't do it (stairs sit in ≥4×4 rooms), but 8 de-aggroed enemies ringing the stair could, in principle (S3 robustness) | `arrival-clear.mjs` probe | Widen the scan to radius 2, or swap the squatter onto the player's previous tile | S |
+| R13 | `placeRooms` comment claims "guarantees at least 2 rooms"; the loop is rejection sampling with no hard floor (S4) | 20,000 generated floors: minimum **7** rooms, stairs present 100% — statistically bulletproof, formally overclaimed | Soften the comment ("statistically guaranteed; min observed 7/20k") or add a retry loop | S |
+| R14 | No linter/formatter at all (S3) | No eslint/prettier/editorconfig anywhere | ESLint flat config + Prettier, wired into `test.yml`. The codebase is stylistically consistent — this is about keeping it that way | S |
+| R15 | `index.html` carries ~523 lines of inline CSS (S4) | Line count | Fine for a no-framework PWA; extract to `src/ui/style.css` only if it keeps growing | S |
+| R16 | Bundle is 1.52 MB (355 KB gzip), ~all Phaser (S4) | Build output | Precached by the SW, so it costs once. Not worth action now | — |
+
+### 3.3 Checked and dismissed (the claims held)
+
+- **Balance documentation is accurate** — two independent 200-run batches: floor-10 clear 15% / 16% (doc: ~14%), floor-1 deaths 18.5% (doc: ~18%), boss death share 32% / 34% (doc: ~33%). The headless simulator drives the *real* engine (imports, not a copy).
+- **Chest odds match spec exactly**: 24.99 / 24.91 / 19.91 / 20.15 / 10.03 % over 30k draws; trap damage uniform 1–4; boss chest 33.6 / 33.5 / 32.9 % thirds, 0 traps, 0 skill in 6,000 draws.
+- **Combat math is exactly as written**: nat-1 always misses, 75% + 5%/skill capped at 95%, damage-die + strength − armor floored at 1, miss = one RNG draw / hit = two (RNG-order locked by an existing test).
+- **FOV recomputes exactly once per turn**; door opacity, room-reveal, monotonic explored memory all verified (unit tests + E2E).
+- **Determinism holds in the real browser**: same `?seed=` → byte-identical map; text seeds FNV-fold with exact URL round-trip; the 188-command parity replay matches the engine before *and after* the fixes; the balance simulator's output was **byte-identical** before/after this branch's commits (the fixes provably changed no gameplay).
+- **No shadow state**: all AI memory lives on entities in the single state object; the only external holder is the controller's transient auto-walk closure.
+- **No leaks found**: overlays are constructed once, listeners attached once, `gameOver.show()` is idempotent; renderer images are pooled by entity id and destroyed with their entities.
+- **XSS discipline holds**: a stubbed leaderboard row with initials `<b>` rendered as literal text (all cells `textContent`); CSS clips hostile lengths.
+- **Server input handling is solid**: fully parameterized SQL, typed bounds on every field (floor 1–1000 as integer, turns ≤1e6, initials `/^[A-Z0-9]{3}$/` normalized server-side, seed/version length-capped), 512-byte body cap → 413, bad JSON → 400, 30-day window + floor DESC/turns ASC/created ASC ordering as specced, server clock in responses so ages never trust the device.
+- **PWA is precache-only as claimed** (no runtimeCaching in the generated SW — leaderboard calls pass through), manifest correct, offline reload boots (E2E-verified with the SW active).
+- **`__APP_VERSION__` injection** works (exactly one replacement, zero unreplaced tokens; watermark + menu + leaderboard payload all agree).
+- **Corner-cutting**: refused identically by the step rule and A* in 3,756 randomized diagonal cases.
+
+## 4. What is genuinely good (preserve these)
+
+1. **The separation is real.** The browser-vs-engine parity test is the audit's centerpiece: input → sim → renderer round-trips with zero drift over 188 commands including combat, a descend, and a return ascent. The renderer cannot even *import* a mutator anymore (guard-enforced).
+2. **Determinism as a feature**: one mulberry32 stream on the state, crypto-seeded at boot, logged, URL-synced, replayable — and exploited everywhere: tests, the balance simulator, this audit's fixtures.
+3. **The balance simulator is a serious tool** — it plays the real engine with two honest bot personas and its documented numbers reproduce. Very rare discipline. (40 s for the default pass; ~0.15 ms/simulated turn.)
+4. **Right-sized algorithms**: symmetric shadowcasting with exact rational slopes; binary-heap A* with total deterministic ordering; Kruskal MST + loop links for guaranteed-connected dungeons; O(1) enemy sight via FOV symmetry.
+5. **The leaderboard design is honest about trust**: injected dependencies (tests in plain Node), offline queue with cap, server timestamps and clock, honor-level anti-cheat *with the seed recorded* so replay-verification stays possible.
+6. **Process discipline**: 73 small, well-written commits; versions bumped with their changes; CLAUDE.md maintained as a living spec (its few drifts are what this audit existed to catch).
+
+## 5. Remediation roadmap (prioritized)
+
+- **Wave 1 — cheap, high-value (≤ a day):** R2 (dashboard-worker drift guard), R3 (GET cache header), R7 (one corner-cut helper), R8 (enemy stat fields), R11 (decide + document key-repeat), R13 (rooms comment).
+- **Wave 2 — DRY the UI (1–2 days):** R5 (overlay factory + shared `isEditable`), R6 (single palette source).
+- **Wave 3 — test infrastructure (2–3 days):** R1 (jsdom project for `ui/`/`input/`; adopt the E2E harness as a smoke script), R14 (lint in CI).
+- **Wave 4 — efficiency, only behind benchmarks:** R9 (flow field + occupancy set) and R10 (renderer micro-passes) — currently 3% of budget worst-case, so this is headroom, not debt.
+- **Wave 5 — polish:** R4 (Content-Type), R12 (arrival-clear radius), accessibility pass (focus trap + restore, initials autofocus, reconsider `user-scalable=no`), R15/R16 as taste dictates.
+
+## Appendix A — Test suite & coverage
+
+- Baseline at `c0aba8a`: **146/146 passing** (17 files, 4.3 s). Final on this branch: **156/156 passing** (18 files).
+- Coverage (v8, baseline): `src/systems` **100%**, `src/world` **100%**, `src/entities` 99%, `src/core` 94.9% — vs `src/ui` **0%**, `src/main.js` **0%**, `keyboard.js`/`pointer.js` **0%**, `src/renderer` 12.2% (only `tileStyle`), `server/worker.dashboard.js` **0%**. The split is the finding (R1).
+
+## Appendix B — Balance simulator (200 runs/policy/batch, real engine)
+
+Batch 1 (seeds 1000+, the documented configuration) — thorough policy: reached floor 2/5/10 = 82% / 52% / 17%; cleared all 12 floors 14%; median death floor 4; deaths: goblin 99, skeleton 41, boss 28, trap 4; avg 1,191 turns. Rusher policy: 0% clears, median death floor 2 (dies as designed). Batch 2 (seeds 4242+): floor-10 clear 16%, boss share 34% — consistent. **Doc claims validated.** Post-fix re-run: **byte-identical** to batch 1.
+
+## Appendix C — Benchmarks (Node 22, this container)
+
+- `aStar` with the AI's real predicate (includes `entityAt` linear scan), worst-case cross-map route: 29.2 µs (16 entities) → 52.8 µs (43 entities); scaling ×1.8 over that range.
+- Whole `processCommand` turn, 12 force-aggroed unkillable goblins crowding the player (pathological): **2.835 ms/turn = 3.15% of the 90 ms step budget**. Typical uncrowded turn: **0.025 ms**.
+- Flow-field prototype (one BFS + per-enemy lookup, corner-cut-aware, occupancy-aware): 119 µs → 44 µs per turn for 16→43 enemies — **3.9× to 51.7×** vs N independent A* calls (it gets *faster* with crowding as occupied tiles prune the frontier).
+
+## Appendix D — E2E matrix (Playwright + chromium-1194, preview build)
+
+16/16 scenarios passed (one — the leaderboard error state — passed on re-run after a test-side race fix; the app behavior was correct throughout). Coverage: pixel→tile calibration at 3 viewport/dpr configs · boot state parity + seed log/URL/HUD/version · keyboard movement, wall bump (no turn), diagonal, key-repeat probe · bump combat with plain-language log parity · auto-walk arrival at ~90 ms cadence · cancellation by new command · door-occlusion visibility flip (screenshots) · full descend/return floor persistence · 188-command **sim/browser parity** · menu pause/gating/clipboard/restart-same-seed/load-text-seed/new-run URL sync · help & leaderboard layering with per-layer Escape · hostile-initials XSS check · death flow: sanitized initials, exactly one POST `{initials:'ABC', floor:1, seed:'1', version, turns}`, form lock, menu-above-death, restart with fresh seed · PWA manifest/SW/offline reload. Post-fix re-verification: boot v0.5.2, parity replay, and the new `+1 SKL` float (screenshot) all pass. **Zero page errors across the campaign.**
+
+## Appendix E — Network isolation & server probes
+
+Every game context ran three guards (allowlist-with-tripwire on all routes, leaderboard-origin stub, service workers blocked except the PWA scenario, which never touches the leaderboard). **Escaped requests: 0 in every scenario.** All POST verification used captured stubs; the production worker received no audit traffic. Server behavior was probed **in-process** with a fake D1 against *both* worker copies: 14/14 cases identical (see R2); `text/plain` POST → 201 (R4); GET carries no cache header and no read limit (R3); the POST limiter 429s the 7th rapid submission as documented.
+
+## Appendix F — Methodology & limitations
+
+Audited at `c0aba8a`; all baseline evidence gathered before any fix commit; suite re-run green after every commit; balance re-run byte-identical post-fixes. E2E staging note: the death scenario sets the player to 1 HP (and the target enemy unkillable) via the exposed `window.__game` debug handle — everything else in every scenario flows through real input events. Headless Chromium ran the WebGL renderer (SwiftShader). Fixture seeds were discovered by simulating the real engine (seeds 1–500; skill-chest scan to 2000); all replay coordinates/turn counts come from those simulations, never hand-hardcoded. Not audited: the deployed worker instance itself (only its code), real-device touch input, screen-reader behavior.
