@@ -52,12 +52,12 @@ export const ENEMY_TYPES = Object.freeze({
 export const BOSS_FLOOR_INTERVAL = 5;
 
 // Depth scaling: deeper monsters roll bigger dice. Regular enemies climb the
-// ladder one rung per DIE_LADDER_EVERY_FLOORS (floors 1-3: d4, 4-6: d6, ...,
-// clamped at the last rung) and gain +1 max HP per SCALE_HP_EVERY_FLOORS.
-// Bosses skip the ladder: each lair tier (floor/5) picks from BOSS_DICE
-// (floor 5: d10, floor 10: d12, floor 15+: d20) and adds BOSS_HP_PER_TIER
-// max HP. The ladder replaces the old flat damage bonus with the same means
-// (d4+n ≡ d(4+2n) in expectation) and more variance.
+// ladder one rung per DIE_LADDER_EVERY_FLOORS (floors 1-4: d4, 5-8: d6,
+// 9-12: d8, 13+: d10, clamped at the last rung) and gain +1 max HP per
+// SCALE_HP_EVERY_FLOORS. Bosses skip the ladder: each lair tier (floor/5)
+// picks from BOSS_DICE (floor 5: d8, floor 10: d12, floor 15+: d20) and adds
+// BOSS_HP_PER_TIER max HP. The ladder replaces the old flat damage bonus with
+// the same means (d4+n ≡ d(4+2n) in expectation) and more variance.
 export const ENEMY_DIE_LADDER = Object.freeze([4, 6, 8, 10]);
 export const DIE_LADDER_EVERY_FLOORS = 4;
 export const BOSS_DICE = Object.freeze([8, 12, 20]);
@@ -118,10 +118,6 @@ export const MAX_POTIONS = 3;
 export const MIN_CHESTS = 1;
 export const MAX_CHESTS = 2;
 
-// Field of view: unbounded line of sight within walls (classic). A large radius
-// stands in for "unbounded" while bounding worst-case work on open maps.
-export const FOV_RADIUS = 40;
-
 // How many turns an aggroed enemy keeps hunting after it loses line of sight
 // before giving up (it heads to the last place it saw the player first).
 export const DEAGGRO_TURNS = 6;
@@ -140,12 +136,4 @@ export const DIRS8 = Object.freeze([
   { dx: -1, dy: 1 },
   { dx: -1, dy: 0 },
   { dx: -1, dy: -1 },
-]);
-
-// Cardinal-only vectors (used where diagonals are not wanted).
-export const DIRS4 = Object.freeze([
-  { dx: 0, dy: -1 },
-  { dx: 1, dy: 0 },
-  { dx: 0, dy: 1 },
-  { dx: -1, dy: 0 },
 ]);
