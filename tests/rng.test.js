@@ -19,6 +19,19 @@ describe('rng', () => {
     expect(seqA).toEqual(seqB);
   });
 
+  it('matches the locked mulberry32 sequence (saved seeds stay reproducible)', () => {
+    // Pin the exact output so an accidental change to the generator — which would
+    // silently invalidate every shared/logged seed — fails loudly here.
+    const r = createRng(12345);
+    expect(Array.from({ length: 5 }, () => nextFloat(r))).toEqual([
+      0.9797282677609473,
+      0.3067522644996643,
+      0.484205421525985,
+      0.817934412509203,
+      0.5094283693470061,
+    ]);
+  });
+
   it('different seeds diverge', () => {
     const a = createRng(1);
     const b = createRng(2);

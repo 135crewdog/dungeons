@@ -7,8 +7,20 @@ import { moveEvent } from './events.js';
 import { resolveAttack, areHostile } from '../systems/combat.js';
 
 // Is a single (dx, dy) step legal terrain-wise? Destination must be walkable,
-// and a diagonal may not squeeze between two wall corners.
+// and a diagonal may not squeeze between two wall corners. Only true one-tile
+// steps are legal: a non-integer or multi-tile delta (or standing still) is
+// rejected up front so the pure engine can never teleport across intervening
+// tiles.
 export function canStep(state, entity, dx, dy) {
+  if (
+    !Number.isInteger(dx) ||
+    !Number.isInteger(dy) ||
+    Math.abs(dx) > 1 ||
+    Math.abs(dy) > 1 ||
+    (dx === 0 && dy === 0)
+  ) {
+    return false;
+  }
   const map = state.map;
   const nx = entity.x + dx;
   const ny = entity.y + dy;

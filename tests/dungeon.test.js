@@ -38,14 +38,18 @@ describe('dungeon generation', () => {
     expect(Array.from(a.tiles)).toEqual(Array.from(b.tiles));
   });
 
-  it('produces at least two rooms and keeps them in bounds', () => {
-    const map = gen(1);
-    expect(map.rooms.length).toBeGreaterThanOrEqual(2);
-    for (const r of map.rooms) {
-      expect(r.x).toBeGreaterThanOrEqual(1);
-      expect(r.y).toBeGreaterThanOrEqual(1);
-      expect(r.x + r.w).toBeLessThanOrEqual(map.width - 1);
-      expect(r.y + r.h).toBeLessThanOrEqual(map.height - 1);
+  it('produces at least two rooms and keeps them in bounds (across many seeds)', () => {
+    // One seed cannot catch a rejection-sampling shortfall; sweep a wide range so
+    // the two-room minimum the stairs depend on is actually exercised.
+    for (let seed = 0; seed < 500; seed++) {
+      const map = gen(seed);
+      expect(map.rooms.length).toBeGreaterThanOrEqual(2);
+      for (const r of map.rooms) {
+        expect(r.x).toBeGreaterThanOrEqual(1);
+        expect(r.y).toBeGreaterThanOrEqual(1);
+        expect(r.x + r.w).toBeLessThanOrEqual(map.width - 1);
+        expect(r.y + r.h).toBeLessThanOrEqual(map.height - 1);
+      }
     }
   });
 

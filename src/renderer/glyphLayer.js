@@ -4,7 +4,7 @@
 // serve any color (lit, dimmed, entity), and pixelArt keeps it crisp under
 // integer zoom.
 
-import { TILE_SIZE } from '../core/constants.js';
+import { TILE_SIZE } from './tileSize.js';
 import { idx } from '../core/query.js';
 import { ALL_GLYPHS, tileGlyph, tileColor, VIS } from './tileStyle.js';
 

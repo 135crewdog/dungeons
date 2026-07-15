@@ -2,7 +2,7 @@
 // turns tile coordinates into world pixels. Keeping this isolated means the
 // simulation never sees a pixel and input can convert screen→tile via one path.
 
-import { TILE_SIZE } from '../core/constants.js';
+import { TILE_SIZE } from './tileSize.js';
 
 // Target on-screen size of a tile, in CSS pixels. Zoom is chosen to hold tiles
 // at (about) this size REGARDLESS of screen size — so a bigger screen shows MORE

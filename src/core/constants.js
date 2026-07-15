@@ -1,8 +1,6 @@
-// Shared gameplay constants and enums. Leaf module: imports nothing.
-// The simulation deals only in integer tile coordinates; TILE_SIZE is the sole
-// pixel-related value here and is consumed exclusively by the renderer.
-
-export const TILE_SIZE = 16;
+// Shared gameplay constants and enums. Leaf module: imports nothing. The
+// simulation deals only in integer tile coordinates and is unaware of pixels;
+// the tile→pixel size lives with the renderer (src/renderer/tileSize.js).
 
 // Tile type ids. Stored as bytes in the map's Uint8Array.
 export const TILE = Object.freeze({
@@ -52,11 +50,11 @@ export const ENEMY_TYPES = Object.freeze({
 export const BOSS_FLOOR_INTERVAL = 5;
 
 // Depth scaling: deeper monsters roll bigger dice. Regular enemies climb the
-// ladder one rung per DIE_LADDER_EVERY_FLOORS (floors 1-3: d4, 4-6: d6, ...,
-// clamped at the last rung) and gain +1 max HP per SCALE_HP_EVERY_FLOORS.
-// Bosses skip the ladder: each lair tier (floor/5) picks from BOSS_DICE
-// (floor 5: d10, floor 10: d12, floor 15+: d20) and adds BOSS_HP_PER_TIER
-// max HP. The ladder replaces the old flat damage bonus with the same means
+// ladder one rung per DIE_LADDER_EVERY_FLOORS (floors 1-4: d4, 5-8: d6,
+// 9-12: d8, 13+: d10, clamped at the last rung) and gain +1 max HP per
+// SCALE_HP_EVERY_FLOORS. Bosses skip the ladder: each lair tier (floor/5) picks
+// from BOSS_DICE (floor 5: d8, floor 10: d12, floor 15+: d20) and adds
+// BOSS_HP_PER_TIER max HP. The ladder replaces the old flat damage bonus with the same means
 // (d4+n ≡ d(4+2n) in expectation) and more variance.
 export const ENEMY_DIE_LADDER = Object.freeze([4, 6, 8, 10]);
 export const DIE_LADDER_EVERY_FLOORS = 4;

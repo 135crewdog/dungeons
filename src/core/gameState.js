@@ -152,6 +152,9 @@ function generateAndEnter(state, floorNumber, player) {
 
 // If a stray (de-aggroed) enemy is standing on the tile the player is about to
 // arrive on, nudge it to a free neighboring tile so the two never share a tile.
+// Neighbors are tried first (the enemy barely moves); if all eight are blocked,
+// fall back to a deterministic scan for any free walkable tile so the no-shared-
+// tile invariant always holds.
 function ensureArrivalClear(state, x, y) {
   const occ = entityAt(state, x, y);
   if (!occ) return;
@@ -164,4 +167,13 @@ function ensureArrivalClear(state, x, y) {
     occ.y = ny;
     return;
   }
+  for (let ny = 0; ny < state.map.height; ny++) {
+    for (let nx = 0; nx < state.map.width; nx++) {
+      if (!isWalkable(state.map, nx, ny) || entityAt(state, nx, ny)) continue;
+      occ.x = nx;
+      occ.y = ny;
+      return;
+    }
+  }
+  throw new Error('No free tile available for staircase arrival');
 }

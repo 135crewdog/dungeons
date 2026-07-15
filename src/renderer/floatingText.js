@@ -1,4 +1,4 @@
-import { TILE_SIZE } from '../core/constants.js';
+import { TILE_SIZE } from './tileSize.js';
 
 // Spawn a short-lived number/word that floats up and fades over a tile. Used for
 // combat feedback ("Miss!" and damage). Pure renderer concern — driven by the

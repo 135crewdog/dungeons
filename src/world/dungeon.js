@@ -14,6 +14,12 @@ export function generateFloor(rng, floorNumber, width = MAP_WIDTH, height = MAP_
   const map = { width, height, tiles, rooms: [], roomAt, stairsDown: null, stairsUp: null };
 
   const rooms = placeRooms(rng, width, height);
+  // Stairs need a start room and a distinct far room; placeStairs also assumes
+  // rooms[0] exists. Rejection sampling makes this practically certain, but fail
+  // loudly rather than generate a broken floor if it ever falls short.
+  if (rooms.length < 2) {
+    throw new Error(`Dungeon generation produced only ${rooms.length} room(s)`);
+  }
   map.rooms = rooms;
   carveRooms(map, rooms);
   connectRooms(map, rng, rooms);

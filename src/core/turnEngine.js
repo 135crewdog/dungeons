@@ -21,16 +21,22 @@ export function processCommand(state, command) {
 
   const events = [];
   const player = getPlayer(state);
+  if (!player || !command || typeof command !== 'object') return events;
   const fromX = player.x;
   const fromY = player.y;
   const acted = executePlayerAction(state, command, events);
   if (!acted) return events;
+  // The player acted, so the turn is consumed — count it now, before the
+  // staircase branch, so every turn-consuming action (including descending or
+  // ascending) advances the counter exactly once.
+  state.turn++;
 
   // Stepping onto a staircase ends this floor immediately: swap floors and skip
-  // the enemy phase (the player has left this floor behind). Only a real step
-  // onto the stair counts — not a bump-attack made while already standing on it,
-  // nor the tile the player was placed on when they arrived — so the player
-  // doesn't ricochet straight back the way they came.
+  // the enemy and pickup phases (the player has left this floor behind — a
+  // documented exception to running every step of the turn sequence). Only a
+  // real step onto the stair counts — not a bump-attack made while already
+  // standing on it, nor the tile the player was placed on when they arrived — so
+  // the player doesn't ricochet straight back the way they came.
   const movedOntoTile = player.x !== fromX || player.y !== fromY;
   if (movedOntoTile) {
     const tile = tileAt(state.map, player.x, player.y);
@@ -61,12 +67,14 @@ function executePlayerAction(state, command, events) {
   return false;
 }
 
-// Everything after the player acts, in the briefing's order. FOV is recomputed
-// right after the player moves — it depends only on walls + player position, so
-// it is stable through the enemy phase, and it gives enemies correct
-// line-of-sight for aggro this same turn.
+// Everything after the player acts (the turn is already counted). FOV is
+// recomputed right after the player moves — it depends only on walls + player
+// position, so it is stable through the enemy phase, and it gives enemies
+// correct symmetric line-of-sight for aggro this same turn. (Deferring FOV to
+// after the enemy phase, to match the briefing's step 5 literally, would need
+// enemy sight computed independently of the player's visibility layer — a
+// systems-layer change, so the early recompute stands for now.)
 function advanceWorld(state, events) {
-  state.turn++;
   // Step 5 (computed early, see above): update field of view and visibility.
   updateVisibility(state);
   // Step 3: each enemy acts in ascending id order.
