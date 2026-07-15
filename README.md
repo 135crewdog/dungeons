@@ -5,9 +5,8 @@ JavaScript, playable as an installable **offline PWA**. Rendered entirely in ASC
 There is no scripted story — everything emerges from the systems and procedural
 generation.
 
-This is **Phase 1**: the complete core loop. Descend through procedurally generated
-floors, fight two kinds of monsters, grab potions, and see how deep you can get
-before you die.
+Descend through procedurally generated floors, fight monsters and bosses, collect
+potions and treasure, and compete on the optional cross-device leaderboard.
 
 ## Features
 
@@ -15,13 +14,15 @@ before you die.
 - Symmetric-shadowcasting field of view with remembered (dimmed) terrain
 - Two enemy types that wake on sight and hunt you with A\* pathfinding — and give up
   the chase when you break their line of sight (closed doors block sight, too)
-- Bump-to-attack combat: 75% hit chance, floating damage / "Miss!" numbers
-- Health potions (walk over to drink) and persistent floors joined by up/down stairs —
+- Bump-to-attack combat: d20 to-hit rolls, per-combatant damage dice, stackable
+  stats, and floating damage or "Miss!" indicators
+- Health potions and treasure chests with permanent bonuses or traps, plus persistent
+  floors joined by up/down stairs —
   climb back up and the floor is exactly as you left it
 - HUD with HP + floor number and a scrolling message log
-- Permadeath: die and restart a fresh run
-- Deterministic: every run is driven by a single seed — logged to the console and shown
-  in a top-right chip you can click to copy; reopen with `?seed=<value>` to replay it
+- Permadeath: die, start a fresh run, or replay the same seed
+- Deterministic: every run is driven by a single seed, logged to the console and
+  available to copy or replace in the pause menu; reopen with `?seed=<value>` to replay it
 
 ## Controls
 
@@ -31,10 +32,12 @@ before you die.
   explored ground. The walk stops if a new enemy appears, you take damage, or you
   press a key.
 - Attack by moving into an enemy. Walk onto `>` to descend, `<` to ascend, onto
-  `!` to drink.
+  `!` to drink, and onto `$` to open a chest.
+- **Menu:** press **Escape** or select **Menu** in the upper-right corner to pause,
+  copy or change the seed, and open the leaderboard or help.
 
 Glyphs: `@` you · `#` wall · `.` floor · `+` door · `>` stairs down · `<` stairs up ·
-`!` potion · `g` goblin · `s` skeleton.
+`!` potion · `$` chest · `g` goblin · `s` skeleton · `B` boss.
 
 ## Getting started
 
@@ -44,6 +47,7 @@ npm run dev        # local dev server
 npm run build      # production build to dist/
 npm run preview    # serve the build (test the offline PWA here)
 npm test           # run the unit tests (no browser needed)
+npm run balance    # run the seeded headless balance simulator
 ```
 
 ## Reproducible runs
@@ -63,8 +67,8 @@ separate:
 - The simulation owns all game state in a single object and exposes pure actions
   (`processCommand`, `resolveAttack`, `descend`, …). It uses integer tile
   coordinates only and never imports Phaser.
-- The renderer observes state + the event list each turn returns and draws it. It
-  never mutates simulation state. Phaser lives only in `src/renderer/`.
+- The renderer observes state and the event list returned by each turn, then draws them.
+  It never mutates simulation state. Phaser lives only in `src/renderer/`.
 
 ```
 src/
@@ -73,8 +77,9 @@ src/
   entities/   player, enemies, items, spawning
   systems/    combat, pathfinding, fov, visibility, ai
   renderer/   all Phaser code (glyph grid, camera, floating text)
-  ui/         HUD, message log, game-over (DOM overlays)
+  ui/         HUD, message log, game-over, menu, leaderboard, help
   input/      keyboard + pointer
+  net/        leaderboard client and browser-storage integration
 ```
 
 `src/main.js` is the only module that wires the renderer to everything else.

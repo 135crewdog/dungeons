@@ -56,8 +56,8 @@ composition root gates player input and cancels any in-progress auto-walk — an
 advances. Options: **Resume**, **New run** (fresh random seed), **Restart this seed**
 (replay the current run from floor 1), and a **Seed** section that shows/copies the current
 seed and lets the player paste a seed to regenerate its exact dungeon (routed through the
-same `coerceSeed` + `restart` lifecycle as a `?seed=` URL). The menu is **also reachable
-from the "You died" screen** (the Menu text stays above the death overlay; Escape works
+same `coerceSeed` + `restart` lifecycle as a `?seed=` URL). The menu **remains reachable
+while the "You died" overlay is displayed** (the Menu text stays above the death overlay; Escape works
 too) so a dead player can copy the seed or retry the same dungeon. The menu is a DOM
 overlay in `ui/` (like the HUD and game-over screen): it only reads the seed and invokes
 composition-root callbacks, never mutating simulation state or importing the renderer. Its
@@ -71,7 +71,9 @@ Movement/tap input is gated while any of the three overlays is open.
 ## Leaderboard (cross-device, 30-day rolling)
 
 The one networked feature. A tiny **Cloudflare Worker + D1** backend lives in
-**`server/`** (worker.js + pure logic in scores.js + schema.sql + wrangler.toml),
+**`server/`** (`worker.js` + pure logic in `scores.js` + `schema.sql` +
+`wrangler.toml`). `worker.dashboard.js` is an optional, manually maintained
+single-file copy for dashboard-only deployment; the modular files remain authoritative,
 deployed **manually once** via `npx wrangler deploy` (steps in `server/README.md`); the
 game itself stays a static GitHub Pages deploy. API: `POST /scores` validates
 `{ initials, floor, turns, seed, version }` (initials exactly 3 chars A–Z0-9, uppercased
@@ -182,8 +184,9 @@ keep their numbers.
 
 ## Death
 
-Permadeath. At 0 HP a minimal "You died" overlay appears; restarting begins a fresh run
-on floor 1 with a **new random seed** (logged).
+Permadeath. At 0 HP a minimal "You died" overlay appears. Starting a new run returns
+to floor 1 with a **new random seed** (logged); "Restart this seed" instead replays the
+current seed.
 
 ## Visual Style
 
@@ -204,8 +207,8 @@ edges and adapt to any aspect ratio.
 ## Language and Tooling
 
 Plain JavaScript, ES modules throughout. No TypeScript. No barrel/`index.js` files
-unless they solve a clear current problem. Only runtime deps are **Phaser** and
-**Vite**; **Vitest** and **vite-plugin-pwa** are dev/build tooling. Prefer simple,
+unless they solve a clear current problem. The only runtime dependency is **Phaser**;
+**Vite**, **Vitest**, and **vite-plugin-pwa** are development/build tooling. Prefer simple,
 readable code; favor composition; keep systems loosely coupled; avoid circular
 dependencies.
 
@@ -216,7 +219,7 @@ completed phase, the **patch** for fixes and balance tweaks (retroactively, Phas
 0.1.0 and Phases 3a–3f ≈ 0.3.1–0.3.6; the version display shipped as **0.4.0**).
 `package.json`'s `version` field is the **single source of truth**; Vite injects it at
 build time as the `__APP_VERSION__` constant (`define` in `vite.config.js`), read via
-`src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim `v0.5.0`
+`src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim `v<current version>`
 watermark top-right on the row under the Menu text (kept apart from the realtime
 gameplay stats) and in the pause-menu footer, so screenshots identify the build — and
 it rides along on every leaderboard submission. Bump the version in the same commit as
