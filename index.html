@@ -17,6 +17,40 @@
     <style>
       :root {
         color-scheme: dark;
+
+        /* Canonical DOM-UI palette. The Phaser renderer (src/renderer/
+           tileStyle.js) uses 0x equivalents and cannot read these — keep the
+           two in sync by hand:
+             --c-bg #05060a  --c-panel #0b0d12  --c-text #cdd3e0
+             --c-text-hi #ffffff  --c-good #7ad07a  --c-warn #e8c15a
+             --c-bad #ff6b6b */
+        --c-bg: #05060a; /* void bg, input bg, text on light buttons */
+        --c-panel: #0b0d12; /* raised panel surface */
+        --c-border: #3a4256; /* panel & input borders, idle focus */
+        --c-rule: #232838; /* hairline separators */
+        --c-text: #cdd3e0; /* primary text, light-button surface */
+        --c-text-hi: #ffffff; /* emphasis */
+        --c-text-dim: #8a93a6; /* labels, muted, dim cells */
+        --c-good: #7ad07a; /* hp-high, focus ring */
+        --c-warn: #e8c15a; /* hp-mid */
+        --c-bad: #ff6b6b; /* hp-low, "You died" */
+        --c-scrim: rgba(5, 6, 10, 0.82); /* overlay backdrops */
+
+        /* Spacing scale — the literals already in use (4/6/8/12/16). */
+        --sp-1: 4px;
+        --sp-2: 6px;
+        --sp-3: 8px;
+        --sp-4: 12px;
+        --sp-5: 16px;
+
+        /* Font-size scale — existing literals. */
+        --fs-xs: 12px;
+        --fs-sm: 13px;
+        --fs-md: 14px;
+        --fs-lg: 15px;
+        --fs-xl: 17px;
+
+        --font-mono: 'DejaVu Sans Mono', 'Courier New', monospace;
       }
       html,
       body {
@@ -49,20 +83,31 @@
       .overlay {
         position: fixed;
         z-index: 10;
-        font-family: 'DejaVu Sans Mono', 'Courier New', monospace;
-        color: #cdd3e0;
+        font-family: var(--font-mono);
+        color: var(--c-text);
         pointer-events: none;
       }
       #hud {
         top: max(8px, env(safe-area-inset-top));
         left: max(10px, env(safe-area-inset-left));
+        /* Reserve room on the right for the Menu button so banked buffs
+           (STR/SKL/ARM) wrap to a new line instead of sliding under it. */
+        max-width: calc(
+          100vw - max(10px, env(safe-area-inset-left)) -
+            max(10px, env(safe-area-inset-right)) - 52px
+        );
         display: flex;
-        gap: 16px;
-        font-size: 15px;
+        flex-wrap: wrap;
+        gap: 4px 16px; /* tight row-gap when wrapped; column gap unchanged */
+        font-size: var(--fs-lg);
         text-shadow: 0 1px 2px #000, 0 0 2px #000;
       }
+      /* Keep each readout intact when the row wraps. */
+      #hud .hud-item {
+        white-space: nowrap;
+      }
       #hud b {
-        color: #fff;
+        color: var(--c-text-hi);
         font-weight: 700;
       }
       #hud .hud-dim {
@@ -101,9 +146,9 @@
         right: max(10px, env(safe-area-inset-right));
         margin: 0;
         padding: 0;
-        font-family: 'DejaVu Sans Mono', 'Courier New', monospace;
-        font-size: 15px;
-        color: #cdd3e0;
+        font-family: var(--font-mono);
+        font-size: var(--fs-lg);
+        color: var(--c-text);
         background: none;
         border: 0;
         cursor: pointer;
@@ -319,7 +364,34 @@
       .help-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 13px;
+        /* Deterministic columns: widths come from the first row / explicit
+           rules, not the browser's content-driven default, so the help and
+           leaderboard columns line up instead of drifting with their data. */
+        table-layout: fixed;
+        font-size: var(--fs-sm);
+      }
+      /* Leaderboard column widths (# / Who / Floor / Ver / When). With fixed
+         layout these are taken from the header row and shared by every body
+         row, giving stable, even spacing. */
+      .lb-table th:nth-child(1),
+      .lb-table td:nth-child(1) {
+        width: 12%;
+      }
+      .lb-table th:nth-child(2),
+      .lb-table td:nth-child(2) {
+        width: 16%;
+      }
+      .lb-table th:nth-child(3),
+      .lb-table td:nth-child(3) {
+        width: 18%;
+      }
+      .lb-table th:nth-child(4),
+      .lb-table td:nth-child(4) {
+        width: 22%;
+      }
+      .lb-table th:nth-child(5),
+      .lb-table td:nth-child(5) {
+        width: 32%;
       }
       .lb-table th {
         padding: 2px 6px;
@@ -330,7 +402,12 @@
       }
       .lb-table td {
         padding: 3px 6px;
-        color: #cdd3e0;
+        color: var(--c-text);
+        /* Clip an unexpectedly long value (e.g. a hostile version string) to
+           its column instead of blowing out the whole table. */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .lb-table .lb-num {
         text-align: right;
@@ -348,14 +425,17 @@
         vertical-align: top;
         color: #8a93a6;
       }
+      /* One shared key-column width across all three help tables (Symbols /
+         Stats / Controls) so every description column lines up on the same
+         left edge. 116px fits the widest key ("Arrows / WASD") without
+         overflow. */
       .help-table .help-key {
-        width: 110px;
-        color: #cdd3e0;
+        width: 116px;
+        color: var(--c-text);
         white-space: nowrap;
       }
       .help-table .help-glyph {
-        width: 28px;
-        color: #fff;
+        color: var(--c-text-hi);
         font-weight: 700;
       }
 
@@ -370,32 +450,40 @@
       #gameover.show {
         display: flex;
       }
+      /* A centered flex column with one uniform gap replaces the old grab-bag
+         of child margins, so the death screen reads with an even rhythm
+         instead of bunched up. gap also collapses cleanly when the initials
+         form is hidden (submission unconfigured). */
       .go-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--sp-5);
         text-align: center;
       }
       .go-panel h1 {
-        color: #ff6b6b;
+        color: var(--c-bad);
         font-size: clamp(24px, 6vw, 34px);
         letter-spacing: 2px;
-        margin: 0 0 6px;
+        margin: 0;
       }
       .go-panel p {
-        margin: 4px 0 0;
-        font-size: 14px;
+        margin: 0;
+        font-size: var(--fs-md);
       }
       .go-panel button {
-        margin-top: 16px;
+        margin-top: 0;
         padding: 8px 18px;
         font-family: inherit;
-        font-size: 15px;
-        color: #05060a;
-        background: #cdd3e0;
+        font-size: var(--fs-lg);
+        color: var(--c-bg);
+        background: var(--c-text);
         border: 0;
         cursor: pointer;
         pointer-events: auto;
       }
       .go-panel button:hover {
-        background: #fff;
+        background: var(--c-text-hi);
       }
       .go-panel button:disabled {
         opacity: 0.5;
@@ -408,23 +496,23 @@
         gap: 6px;
         align-items: stretch;
         justify-content: center;
-        margin-top: 14px;
+        margin-top: 0;
       }
       .go-initials input {
         width: 5ch;
         padding: 5px 8px;
         text-align: center;
         font-family: inherit;
-        font-size: 15px;
+        font-size: var(--fs-lg);
         letter-spacing: 4px;
         text-transform: uppercase;
-        color: #fff;
-        background: #05060a;
-        border: 1px solid #3a4256;
+        color: var(--c-text-hi);
+        background: var(--c-bg);
+        border: 1px solid var(--c-border);
       }
       .go-initials input:focus {
         outline: none;
-        border-color: #7ad07a;
+        border-color: var(--c-good);
       }
       .go-initials input:disabled {
         opacity: 0.5;
@@ -432,21 +520,21 @@
       .go-panel .go-initials button {
         margin-top: 0;
         padding: 5px 12px;
-        font-size: 13px;
+        font-size: var(--fs-sm);
       }
       .go-status {
+        /* Reserve a line so the layout doesn't jump when the status text
+           (Sending…/Submitted!) appears; vertical spacing is owned by the
+           panel's gap, so no margin here. */
         min-height: 1.2em;
-        margin: 8px 0 0;
-        font-size: 13px;
-        color: #8a93a6;
+        margin: 0;
+        font-size: var(--fs-sm);
+        color: var(--c-text-dim);
       }
       .go-buttons {
         display: flex;
         gap: 8px;
         justify-content: center;
-      }
-      .go-panel .go-buttons button {
-        margin-top: 14px;
       }
     </style>
   </head>
