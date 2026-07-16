@@ -18,12 +18,13 @@
       :root {
         color-scheme: dark;
 
-        /* Canonical DOM-UI palette. The Phaser renderer (src/renderer/
-           tileStyle.js) uses 0x equivalents and cannot read these — keep the
-           two in sync by hand:
-             --c-bg #05060a  --c-panel #0b0d12  --c-text #cdd3e0
-             --c-text-hi #ffffff  --c-good #7ad07a  --c-warn #e8c15a
-             --c-bad #ff6b6b */
+        /* Canonical DOM-UI palette. Every DOM overlay color comes from these
+           custom properties (the HUD's HP colors use var() in inline styles
+           too). The Phaser canvas has its own palette in
+           src/renderer/tileStyle.js — the layers deliberately don't share a
+           module (architecture guards). The ONE color both must agree on by
+           hand is the void background: --c-bg / body background here ==
+           BG_COLOR in tileStyle.js (#05060a), so letterbox and page blend. */
         --c-bg: #05060a; /* void bg, input bg, text on light buttons */
         --c-panel: #0b0d12; /* raised panel surface */
         --c-border: #3a4256; /* panel & input borders, idle focus */

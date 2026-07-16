@@ -33,12 +33,12 @@ describe('HUD', () => {
     expect(el.textContent).not.toContain('SKL');
   });
 
-  it('colors the HP number by ratio (green > 50%, red <= 25%)', () => {
+  it('colors the HP number by ratio via the CSS palette (good > 50%, bad <= 25%)', () => {
     const { update, el } = createHud(document.body);
     update(stateWith({ hp: 20, maxHp: 20, strength: 0, skill: 0, armor: 0 }));
-    expect(el.querySelector('b').getAttribute('style')).toContain('#7ad07a');
+    expect(el.querySelector('b').getAttribute('style')).toContain('var(--c-good)');
     update(stateWith({ hp: 4, maxHp: 20, strength: 0, skill: 0, armor: 0 }));
-    expect(el.querySelector('b').getAttribute('style')).toContain('#ff6b6b');
+    expect(el.querySelector('b').getAttribute('style')).toContain('var(--c-bad)');
   });
 
   it('exposes a static version watermark', () => {

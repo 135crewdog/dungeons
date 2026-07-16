@@ -25,7 +25,9 @@ export function createHud(parent) {
     const p = getPlayer(state);
     if (!p) return;
     const ratio = p.hp / p.maxHp;
-    const color = ratio > 0.5 ? '#7ad07a' : ratio > 0.25 ? '#e8c15a' : '#ff6b6b';
+    // CSS custom properties from index.html's :root — the single source for
+    // every DOM-UI color (var() resolves inside inline styles too).
+    const color = ratio > 0.5 ? 'var(--c-good)' : ratio > 0.25 ? 'var(--c-warn)' : 'var(--c-bad)';
     el.innerHTML =
       `<span class="hud-item">HP <b style="color:${color}">${p.hp}</b>` +
       `<span class="hud-dim">/${p.maxHp}</span></span>` +

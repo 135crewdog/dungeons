@@ -7,6 +7,12 @@ import { TILE } from '../core/constants.js';
 // Visibility levels a tile can be drawn at.
 export const VIS = Object.freeze({ UNSEEN: 0, EXPLORED: 1, VISIBLE: 2 });
 
+// The void behind the map — the letterbox and camera background. This is the
+// ONE color shared with the DOM UI (index.html's --c-bg and the <body>
+// background must match it by hand) so canvas letterbox and page blend into
+// a single surface.
+export const BG_COLOR = '#05060a';
+
 const TILE_GLYPH = {
   [TILE.WALL]: '#',
   [TILE.FLOOR]: '.',
