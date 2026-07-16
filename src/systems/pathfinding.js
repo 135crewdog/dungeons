@@ -5,6 +5,7 @@
 // same inputs always yield the same path (determinism).
 
 import { DIRS8 } from '../core/constants.js';
+import { diagonalAllowed } from '../core/query.js';
 
 function octile(dx, dy) {
   const ax = Math.abs(dx);
@@ -91,9 +92,7 @@ export function aStar(passable, start, goal, width) {
       const nid = ny * width + nx;
       if (closed.has(nid)) continue;
       if (!passable(nx, ny)) continue;
-      if (dx !== 0 && dy !== 0) {
-        if (!passable(cur.x + dx, cur.y) || !passable(cur.x, cur.y + dy)) continue;
-      }
+      if (!diagonalAllowed(passable, cur.x, cur.y, dx, dy)) continue;
       const ng = cur.g + (dx !== 0 && dy !== 0 ? 14 : 10);
       if (gScore.has(nid) && ng >= gScore.get(nid)) continue;
       gScore.set(nid, ng);

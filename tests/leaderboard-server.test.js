@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import worker from '../server/worker.js';
+import dashboardWorker from '../server/worker.dashboard.js';
 import {
   validateScore,
   windowCutoff,
@@ -174,5 +175,65 @@ describe('worker fetch handler', () => {
       env,
     );
     expect(del.status).toBe(405);
+  });
+
+  it('caches GET /scores briefly at the edge (blunts a read/scraper flood on D1)', async () => {
+    const res = await worker.fetch(new Request('https://lb.example/scores'), { DB: fakeDb() });
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=30');
+  });
+});
+
+// worker.dashboard.js is a hand-inlined single-file copy for pasting into the
+// Cloudflare dashboard. It has no imports, so the tests above can't cover it —
+// this battery fails the moment its behavior drifts from the modular worker.
+describe('dashboard worker parity', () => {
+  const VALID = { initials: 'AAA', floor: 3, turns: 120, seed: '42', version: '0.5.2' };
+  // Each case supplies a fresh IP so the module-level rate-limit map (separate
+  // per worker module) never bleeds between cases.
+  const cases = [
+    { name: 'valid POST', method: 'POST', body: VALID, ct: 'application/json' },
+    { name: 'text/plain POST', method: 'POST', body: VALID, ct: 'text/plain' },
+    { name: 'oversized body', method: 'POST', raw: 'x'.repeat(600) },
+    { name: 'bad initials', method: 'POST', body: { ...VALID, initials: 'TOOLONG' } },
+    { name: 'bad JSON', method: 'POST', raw: '{nope' },
+    { name: 'GET', method: 'GET' },
+    { name: 'OPTIONS', method: 'OPTIONS' },
+    { name: 'PUT', method: 'PUT', body: {} },
+    { name: 'unknown path', method: 'GET', path: '/nope' },
+  ];
+
+  async function run(w, c, ip) {
+    const url = `https://lb.example${c.path || '/scores'}`;
+    const headers = { 'CF-Connecting-IP': ip };
+    if (c.ct) headers['content-type'] = c.ct;
+    const body = c.raw ?? (c.body ? JSON.stringify(c.body) : undefined);
+    const res = await w.fetch(new Request(url, { method: c.method, headers, body }), {
+      DB: fakeDb([
+        { initials: 'AAA', floor: 9, turns: 1, seed: '1', version: '0.5.2', created_at: 1 },
+      ]),
+    });
+    const text = await res.text();
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+      // `now` is a live server clock (Date.now()), captured microseconds apart
+      // in each worker — normalize it so only logic is compared.
+      if (parsed && typeof parsed.now === 'number') parsed.now = 0;
+    } catch {
+      parsed = text;
+    }
+    return {
+      status: res.status,
+      cors: res.headers.get('Access-Control-Allow-Origin'),
+      cache: res.headers.get('Cache-Control'),
+      body: parsed,
+    };
+  }
+
+  it.each(cases)('responds identically to the modular worker: $name', async (c) => {
+    const ip = `parity-${c.name.replace(/\s+/g, '-')}`;
+    const a = await run(worker, c, `${ip}-a`);
+    const b = await run(dashboardWorker, c, `${ip}-b`);
+    expect(b).toEqual(a);
   });
 });

@@ -2,7 +2,7 @@
 // engine so the AI can reuse it without an import cycle. A step either moves the
 // entity, bump-attacks a hostile occupant (same turn), or is refused.
 
-import { isWalkable, entityAt } from './query.js';
+import { isWalkable, entityAt, diagonalAllowed } from './query.js';
 import { moveEvent } from './events.js';
 import { resolveAttack, areHostile } from '../systems/combat.js';
 
@@ -13,10 +13,7 @@ export function canStep(state, entity, dx, dy) {
   const nx = entity.x + dx;
   const ny = entity.y + dy;
   if (!isWalkable(map, nx, ny)) return false;
-  if (dx !== 0 && dy !== 0) {
-    if (!isWalkable(map, entity.x + dx, entity.y)) return false;
-    if (!isWalkable(map, entity.x, entity.y + dy)) return false;
-  }
+  if (!diagonalAllowed((x, y) => isWalkable(map, x, y), entity.x, entity.y, dx, dy)) return false;
   return true;
 }
 

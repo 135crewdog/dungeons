@@ -28,10 +28,10 @@ function corsHeaders(env) {
   };
 }
 
-function json(status, body, env) {
+function json(status, body, env, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json', ...corsHeaders(env) },
+    headers: { 'content-type': 'application/json', ...corsHeaders(env), ...extraHeaders },
   });
 }
 
@@ -56,7 +56,9 @@ export default {
       const { results } = await env.DB.prepare(SELECT_TOP_SQL)
         .bind(windowCutoff(now), TOP_LIMIT)
         .all();
-      return json(200, { scores: results, now }, env);
+      // Cache reads briefly at the edge so a refresh storm or scraper doesn't hit
+      // D1 on every request; a 30-day leaderboard tolerates 30s of staleness.
+      return json(200, { scores: results, now }, env, { 'Cache-Control': 'public, max-age=30' });
     }
 
     if (request.method !== 'POST') return json(405, { error: 'method not allowed' }, env);

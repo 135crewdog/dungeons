@@ -80,3 +80,13 @@ export function chebyshev(ax, ay, bx, by) {
 export function isAdjacent(ax, ay, bx, by) {
   return chebyshev(ax, ay, bx, by) === 1;
 }
+
+// No corner-cutting: a diagonal step from (x, y) by (dx, dy) is legal only when
+// both orthogonal tiles between it and the mover are passable. Cardinal steps
+// (dx or dy zero) are always allowed. `passable(x, y)` is the caller's tile
+// predicate — isWalkable for a live entity move, the A* frontier test for
+// pathfinding — so player and AI share one definition of the rule.
+export function diagonalAllowed(passable, x, y, dx, dy) {
+  if (dx === 0 || dy === 0) return true;
+  return passable(x + dx, y) && passable(x, y + dy);
+}

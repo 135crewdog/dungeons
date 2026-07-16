@@ -132,7 +132,9 @@ the floor swaps and the enemy/pickup phases are skipped.
   _newly_-visible enemy enters line of sight, the player takes damage, the path becomes
   invalid, or the player issues a new movement command. A click and a tap are identical.
 - **Secondary — keyboard.** Arrow keys and WASD move one cardinal tile per keypress;
-  the **numpad (1–9)** provides all 8 directions including diagonals.
+  the **numpad (1–9)** provides all 8 directions including diagonals. Holding a
+  movement key **repeats** at the OS key-repeat rate (each repeat is one discrete,
+  synchronous turn) — intended hold-to-walk, classic-roguelike behavior, not a bug.
 - **Diagonals forbid corner-cutting:** a diagonal step is illegal unless both
   orthogonal tiles between it and the mover are passable. Same rule for player and AI.
 

@@ -12,8 +12,10 @@ function tooClose(a, b) {
 }
 
 // Rejection-sample non-overlapping rooms. Returns an array of
-// { id, x, y, w, h }. Guarantees at least 2 rooms so a far room exists for the
-// stairs; typically MIN_ROOMS..MAX_ROOMS depending on how they pack.
+// { id, x, y, w, h }. Aims for at least 2 rooms so a far room exists for the
+// stairs; this is statistical, not a hard floor — but on the 72x44 map the
+// minimum observed over 20k seeds is 7 (typically MIN_ROOMS..MAX_ROOMS
+// depending on how they pack).
 export function placeRooms(rng, width, height) {
   const rooms = [];
   const maxAttempts = MAX_ROOMS * 30;
