@@ -3,7 +3,14 @@ import { getPlayer, entitiesSorted, isVisible, isExplored } from '../core/query.
 import { EV } from '../core/events.js';
 import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
 import { computeZoom, tileToWorld, tileCenterWorld, worldToTile } from './camera.js';
-import { entityGlyph, entityColor, itemGlyph, itemColor, scaleColor } from './tileStyle.js';
+import {
+  entityGlyph,
+  entityColor,
+  itemGlyph,
+  itemColor,
+  scaleColor,
+  FLOAT_COLOR,
+} from './tileStyle.js';
 import { spawnFloatingText } from './floatingText.js';
 
 // The one Phaser scene. It OBSERVES the game state and draws it — glyph grid,
@@ -103,19 +110,19 @@ export class DungeonScene extends Phaser.Scene {
   playEvents(events) {
     for (const ev of events) {
       if (ev.type === EV.ATTACK) {
-        if (ev.hit) spawnFloatingText(this, ev.x, ev.y, `-${ev.damage}`, '#ff5566');
-        else spawnFloatingText(this, ev.x, ev.y, 'Miss!', '#aab2c4');
+        if (ev.hit) spawnFloatingText(this, ev.x, ev.y, `-${ev.damage}`, FLOAT_COLOR.damage);
+        else spawnFloatingText(this, ev.x, ev.y, 'Miss!', FLOAT_COLOR.miss);
       } else if (ev.type === EV.PICKUP) {
         if (ev.heal > 0) {
-          spawnFloatingText(this, ev.x, ev.y, `+${ev.heal}`, '#5ad07a');
+          spawnFloatingText(this, ev.x, ev.y, `+${ev.heal}`, FLOAT_COLOR.heal);
         } else if (ev.effect === 'strength') {
-          spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} STR`, '#e0b74a');
+          spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} STR`, FLOAT_COLOR.strength);
         } else if (ev.effect === 'skill') {
-          spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} SKL`, '#b48ff0');
+          spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} SKL`, FLOAT_COLOR.skill);
         } else if (ev.effect === 'armor') {
-          spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} ARM`, '#6db3f2');
+          spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} ARM`, FLOAT_COLOR.armor);
         } else if (ev.effect === 'trap') {
-          spawnFloatingText(this, ev.x, ev.y, `-${ev.amount}`, '#ff5566');
+          spawnFloatingText(this, ev.x, ev.y, `-${ev.amount}`, FLOAT_COLOR.damage);
         }
       }
     }

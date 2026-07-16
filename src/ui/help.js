@@ -3,6 +3,8 @@
 // above the menu (z-index 30) like the leaderboard; Escape closes this layer
 // only (the menu defers via isChildOpen).
 
+import { createOverlay } from './overlay.js';
+
 const GLYPHS = [
   ['@', 'You, the dungeon crawler'],
   ['g', 'Goblin, a cackling green fiend with a taste for flesh'],
@@ -56,15 +58,13 @@ function label(text) {
 }
 
 export function createHelp(parent) {
-  const el = document.createElement('div');
-  el.id = 'help';
-  el.className = 'overlay';
-  el.innerHTML =
-    '<div class="menu-panel help-panel" role="dialog" aria-modal="true" aria-label="Help" tabindex="-1">' +
-    '<div class="menu-head"><h2>Help</h2>' +
-    '<button class="menu-x" type="button" data-act="close" aria-label="Close">×</button></div>' +
-    '</div>';
-  const panel = el.querySelector('.menu-panel');
+  const { el, panel, isOpen, show, hide } = createOverlay({
+    id: 'help',
+    title: 'Help',
+    ariaLabel: 'Help',
+    panelClass: 'help-panel',
+    onClose: () => hide(),
+  });
   panel.append(
     label('Symbols'),
     table(GLYPHS, 'help-key help-glyph'),
@@ -75,28 +75,11 @@ export function createHelp(parent) {
   );
   parent.appendChild(el);
 
-  function isOpen() {
-    return el.classList.contains('show');
-  }
-
-  function open() {
-    el.classList.add('show');
-    panel.focus();
-  }
-
-  function close() {
-    el.classList.remove('show');
-  }
-
-  el.addEventListener('click', (e) => {
-    if (e.target === el || e.target.closest('[data-act="close"]')) close();
-  });
-
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !isOpen()) return;
     e.preventDefault();
-    close();
+    hide();
   });
 
-  return { open, close, isOpen, el };
+  return { open: show, close: hide, isOpen, el };
 }

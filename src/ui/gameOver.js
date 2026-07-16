@@ -4,6 +4,7 @@
 // the UI stays click-through. Read only; the callbacks own the actual work.
 
 import { sanitizeInitials, isValidInitials } from '../net/leaderboard.js';
+import { isEditable } from './dom.js';
 
 // Options wire the overlay to the composition root:
 //   isKeyboardBlocked()      → suppress the Enter/Space restart shortcut while
@@ -110,10 +111,4 @@ export function createGameOver(parent, opts = {}) {
   }
 
   return { show, hide, el };
-}
-
-function isEditable(target) {
-  if (!target) return false;
-  const tag = target.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
 }

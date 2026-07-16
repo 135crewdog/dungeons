@@ -3,6 +3,8 @@
 // directions including diagonals. Keys are matched by KeyboardEvent.code so the
 // mapping is layout- and NumLock-independent.
 
+import { isEditable } from '../ui/dom.js';
+
 const MOVE_BY_CODE = {
   // Cardinals: arrows
   ArrowUp: { dx: 0, dy: -1 },
@@ -39,10 +41,4 @@ export function attachKeyboard(target, dispatch) {
   }
   target.addEventListener('keydown', onKeyDown);
   return () => target.removeEventListener('keydown', onKeyDown);
-}
-
-function isEditable(el) {
-  if (!el) return false;
-  const tag = el.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
 }

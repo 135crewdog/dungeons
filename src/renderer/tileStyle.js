@@ -34,6 +34,19 @@ const ENTITY_COLOR = {
 const POTION_COLOR = 0xe0556b;
 const CHEST_COLOR = 0xe0b74a;
 
+// Floating combat/pickup text colors, as CSS hex strings (Phaser Text takes a
+// string fill). Kept here in the style seam rather than inline in the scene so
+// every renderer color has one home. Per pickup effect plus the two combat
+// outcomes; `damage` doubles as the trap color (both are "you lost HP").
+export const FLOAT_COLOR = Object.freeze({
+  damage: '#ff5566',
+  miss: '#aab2c4',
+  heal: '#5ad07a',
+  strength: '#e0b74a',
+  skill: '#b48ff0',
+  armor: '#6db3f2',
+});
+
 // Every glyph the renderer can draw — used to pre-bake glyph textures.
 export const ALL_GLYPHS = ['#', '.', '+', '>', '<', '@', 'g', 's', 'B', '!', '$'];
 

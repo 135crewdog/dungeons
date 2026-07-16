@@ -11,6 +11,7 @@
 
 import { writeClipboard } from './clipboard.js';
 import { APP_VERSION } from './version.js';
+import { createOverlay } from './overlay.js';
 
 // `actions` wires the menu to the composition root:
 //   getSeed()        → the current run's seed (for display / copy)
@@ -33,45 +34,41 @@ export function createMenu(parent, actions) {
   button.textContent = 'Menu';
   parent.appendChild(button);
 
-  const el = document.createElement('div');
-  el.id = 'menu';
-  el.className = 'overlay';
-  el.innerHTML =
-    '<div class="menu-panel" role="dialog" aria-modal="true" aria-label="Menu" tabindex="-1">' +
-    '<div class="menu-head"><h2>Menu</h2>' +
-    '<button class="menu-x" type="button" data-act="resume" aria-label="Resume">×</button></div>' +
+  const { el, panel, isOpen, show, hide } = createOverlay({
+    id: 'menu',
+    title: 'Menu',
+    ariaLabel: 'Menu',
+    onClose: () => close(),
+  });
+  panel.insertAdjacentHTML(
+    'beforeend',
     '<div class="menu-actions">' +
-    '<button type="button" data-act="resume">Resume</button>' +
-    '<button type="button" data-act="newrun">New run</button>' +
-    '<button type="button" data-act="restart">Restart this seed</button>' +
-    '<button type="button" data-act="board">Leaderboard</button>' +
-    '<button type="button" data-act="help">Help</button>' +
-    '</div>' +
-    '<div class="menu-seed">' +
-    '<div class="menu-seed-label">Seed</div>' +
-    '<div class="menu-seed-row"><code class="menu-seed-val"></code>' +
-    '<button type="button" data-act="copy">Copy</button></div>' +
-    '<form class="menu-seed-row" data-act="loadform">' +
-    '<input class="menu-seed-input" type="text" inputmode="text" autocomplete="off" ' +
-    'spellcheck="false" placeholder="Enter seed" aria-label="Enter seed" />' +
-    '<button type="submit" data-act="load">Play</button></form>' +
-    '</div>' +
-    '<div class="menu-version">Dungeons v' +
-    APP_VERSION +
-    '</div>' +
-    '</div>';
+      '<button type="button" data-act="resume">Resume</button>' +
+      '<button type="button" data-act="newrun">New run</button>' +
+      '<button type="button" data-act="restart">Restart this seed</button>' +
+      '<button type="button" data-act="board">Leaderboard</button>' +
+      '<button type="button" data-act="help">Help</button>' +
+      '</div>' +
+      '<div class="menu-seed">' +
+      '<div class="menu-seed-label">Seed</div>' +
+      '<div class="menu-seed-row"><code class="menu-seed-val"></code>' +
+      '<button type="button" data-act="copy">Copy</button></div>' +
+      '<form class="menu-seed-row" data-act="loadform">' +
+      '<input class="menu-seed-input" type="text" inputmode="text" autocomplete="off" ' +
+      'spellcheck="false" placeholder="Enter seed" aria-label="Enter seed" />' +
+      '<button type="submit" data-act="load">Play</button></form>' +
+      '</div>' +
+      '<div class="menu-version">Dungeons v' +
+      APP_VERSION +
+      '</div>',
+  );
   parent.appendChild(el);
 
-  const panel = el.querySelector('.menu-panel');
   const seedVal = el.querySelector('.menu-seed-val');
   const seedInput = el.querySelector('.menu-seed-input');
   const copyBtn = el.querySelector('[data-act="copy"]');
   const loadForm = el.querySelector('[data-act="loadform"]');
   let copyFlash = null;
-
-  function isOpen() {
-    return el.classList.contains('show');
-  }
 
   function open() {
     if (isOpen() || !actions.canOpen()) return;
@@ -79,14 +76,13 @@ export function createMenu(parent, actions) {
     seedVal.textContent = String(actions.getSeed());
     seedInput.value = '';
     resetCopy();
-    el.classList.add('show');
+    show(); // adds .show and focuses the panel
     button.setAttribute('aria-expanded', 'true');
-    panel.focus();
   }
 
   function close() {
     if (!isOpen()) return;
-    el.classList.remove('show');
+    hide();
     button.setAttribute('aria-expanded', 'false');
     button.focus();
   }
@@ -120,14 +116,11 @@ export function createMenu(parent, actions) {
     actions.onLoadSeed(text);
   }
 
-  // One click handler for the menu's buttons, dispatched by data-act.
+  // One click handler for the menu's action buttons, dispatched by data-act.
+  // The × and backdrop-click close are owned by the overlay factory (onClose).
   el.addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;
-    if (!act) {
-      // A click on the dimmed backdrop (outside the panel) resumes.
-      if (e.target === el) close();
-      return;
-    }
+    if (!act) return;
     switch (act) {
       case 'resume':
         close();
