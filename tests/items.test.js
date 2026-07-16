@@ -180,7 +180,6 @@ describe('stairs / descend', () => {
     const player = getPlayer(state);
     player.hp = 7;
     const beforeTiles = Array.from(state.map.tiles);
-    const beforeExplored = state.vis.explored.reduce((a, b) => a + b, 0);
 
     descend(state);
 

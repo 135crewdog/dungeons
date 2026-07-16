@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, descend, ascend } from '../src/core/gameState.js';
-import { getPlayer, idx } from '../src/core/query.js';
+import { idx } from '../src/core/query.js';
 import { createRng } from '../src/core/rng.js';
 import { resolveAttack } from '../src/systems/combat.js';
 import { createBossChest } from '../src/entities/items.js';

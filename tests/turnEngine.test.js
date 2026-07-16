@@ -76,7 +76,7 @@ describe('turn engine — player movement', () => {
     const { state, player } = miniState(6, 6, [[3, 2], [2, 1]]);
     const blocked = canStep(state, player, 1, -1);
     expect(blocked).toBe(false);
-    const events = processCommand(state, { type: 'move', dx: 1, dy: -1 });
+    processCommand(state, { type: 'move', dx: 1, dy: -1 });
     expect(player.x).toBe(2);
     expect(player.y).toBe(2);
     expect(state.turn).toBe(0);

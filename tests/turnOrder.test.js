@@ -54,7 +54,7 @@ describe('turn order with enemies present', () => {
     // e7 (adjacent) attacks and e3 (two away) moves — e3's move event must
     // precede e7's attack event.
     const { state } = corridorState({ playerX: 5 });
-    const e7 = addEnemy(state, 7, 1, 7);
+    addEnemy(state, 7, 1, 7);
     const e3 = addEnemy(state, 3, 1, 3);
     updateVisibility(state);
     const events = processCommand(state, { type: 'move', dx: 1, dy: 0 });

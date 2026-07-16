@@ -53,7 +53,7 @@ describe('path planning (known-walkable A*)', () => {
   });
 
   it('refuses to route through unexplored tiles even to an explored goal', () => {
-    const { state, player } = corridorState(8);
+    const { state } = corridorState(8);
     // Un-explore a middle segment: the goal is explored but unreachable through fog.
     state.vis.explored[idx(state.map, 4, 1)] = 0;
     state.vis.explored[idx(state.map, 5, 1)] = 0;

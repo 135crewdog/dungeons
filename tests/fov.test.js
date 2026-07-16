@@ -106,7 +106,7 @@ describe('visibility', () => {
   });
 
   it('keeps explored memory monotonic as the player moves', () => {
-    const { state, map, player } = roomState();
+    const { state, player } = roomState();
     updateVisibility(state);
     const before = Uint8Array.from(state.vis.explored);
     player.x = 5;
