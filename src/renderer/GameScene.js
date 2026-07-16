@@ -165,7 +165,9 @@ export class DungeonScene extends Phaser.Scene {
         this.entityLayer.add(img);
         this.entityImages.set(e.id, img);
       }
-      img.setTexture(glyphKey(entityGlyph(e)));
+      // An entity's glyph never changes, so only rebind the texture if it does.
+      const key = glyphKey(entityGlyph(e));
+      if (img.texture.key !== key) img.setTexture(key);
       img.setTint(entityColor(e));
       const w = tileToWorld(e.x, e.y);
       img.setPosition(w.x, w.y);
