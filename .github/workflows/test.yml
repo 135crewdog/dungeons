@@ -1,7 +1,9 @@
 name: Tests
 
-# Runs the unit suite on every pull request so a broken PR is caught before
-# merge — deploy.yml only tests on push to main, i.e. after the fact.
+# Runs lint, formatting, and the unit suite on every pull request so a broken PR
+# is caught before merge — deploy.yml only tests on push to main, i.e. after the
+# fact. The browser E2E campaign (npm run test:e2e) is intentionally not run here;
+# it needs a built app and a Chromium binary and is meant for local/on-demand use.
 
 on:
   pull_request:
@@ -17,4 +19,6 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm test
