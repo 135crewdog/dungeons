@@ -215,9 +215,13 @@ edges and adapt to any aspect ratio.
 
 Plain JavaScript, ES modules throughout. No TypeScript. No barrel/`index.js` files
 unless they solve a clear current problem. Only runtime deps are **Phaser** and
-**Vite**; **Vitest** and **vite-plugin-pwa** are dev/build tooling. Prefer simple,
-readable code; favor composition; keep systems loosely coupled; avoid circular
-dependencies.
+**Vite**; **Vitest** and **vite-plugin-pwa** are dev/build tooling, with
+**ESLint** + **Prettier** as a correctness/format ratchet (`npm run lint`,
+`npm run format`) and **jsdom** + **playwright-core** for the UI and end-to-end
+tests. Prefer simple, readable code; favor composition; keep systems loosely
+coupled; avoid circular dependencies. Formatting is Prettier's (printWidth 100,
+single quotes) — run `npm run format` before committing; the PR CI runs
+`lint` + `format:check` + `test`.
 
 ## Versioning
 
@@ -249,7 +253,8 @@ src/
   entities/   // player, enemies, items, spawning
   systems/    // combat, pathfinding, fov, visibility, ai
   renderer/   // ALL Phaser code only
-  ui/         // HUD, message log, game-over, menu, leaderboard, help (DOM overlays)
+  ui/         // HUD, message log, game-over, menu, leaderboard, help (DOM overlays);
+              // overlay.js is the shared modal factory, dom.js small DOM helpers
   input/      // keyboard, mouse, touch
   net/        // leaderboard client — the only fetch/localStorage code; never
               // imported by the sim (architecture-test enforced)
@@ -330,14 +335,29 @@ mechanic not listed here.
 
 ## Testing
 
-Each major module has browser-free unit tests (Vitest). The simulation is kept
-independent enough that dungeon generation, combat, pathfinding, and FOV are tested
-without instantiating Phaser. Determinism is guarded: no `Math.random()` and no Phaser
-import under the simulation directories — and no `fetch`, `localStorage`, or `src/net`
-import there either (networking stays in `net/` + composition root). The leaderboard
-worker is plain `fetch(request, env)` JS, tested in Node with a fake D1
-(`tests/leaderboard-server.test.js`); the client tests inject fake fetch/storage
-(`tests/leaderboard.test.js`).
+Each major module has browser-free unit tests (Vitest, default `node` env). The
+simulation is kept independent enough that dungeon generation, combat, pathfinding,
+and FOV are tested without instantiating Phaser. Determinism is guarded by
+`tests/architecture.test.js`: no `Math.random()` anywhere under `src/`, no Phaser
+outside `renderer/`, `fetch`/`localStorage` only in `net/` + the composition root,
+and the renderer may import only read-only core (`constants`/`query`/`events`) and
+its own modules — the guards match static, dynamic, and `require` import forms. The
+**UI and input layers** are tested with the DOM factories under **jsdom** (opt-in
+per file via a `// @vitest-environment jsdom` docblock — `tests/ui-*.test.js`,
+`tests/input.test.js`), exercising them through their injected-dependency seams. The
+leaderboard worker is plain `fetch(request, env)` JS, tested in Node with a fake D1
+(`tests/leaderboard-server.test.js`, which also guards the hand-inlined
+`worker.dashboard.js` copy against drift); the client tests inject fake
+fetch/storage (`tests/leaderboard.test.js`).
+
+An opt-in **browser end-to-end** campaign lives in `e2e/` (Playwright via
+`playwright-core`): `npm run build && npm run test:e2e` drives the real PWA through
+16 scenarios — rendering, input→sim→renderer round-trips, floor persistence, overlay
+layering, the death/leaderboard flow, PWA offline boot, and a 188-command
+**sim/browser parity** replay that deep-equals the headless engine. It spawns its
+own preview server, stubs the production leaderboard (asserting zero requests
+escape), and is **not** part of `npm test` (needs a browser + build). See
+`e2e/README.md`.
 
 Balance is guarded empirically: `npm run balance` runs the headless simulator
 (`scripts/balance-sim.js`) — seeded bot-driven runs through the real engine that

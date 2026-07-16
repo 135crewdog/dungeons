@@ -7,6 +7,19 @@
 
 ---
 
+## 0. Remediation update (follow-up branch)
+
+The sections below are the original audit at `c0aba8a`. A follow-up on this branch worked the roadmap in §5 across four waves; the audit numbers are unchanged (they describe the audited commit), but the recommendations are now largely resolved. Every gameplay-affecting change was held to two oracles — the **balance simulator stayed byte-identical** and the **188-command browser parity replay still deep-equals the engine** — so player-visible behavior is provably unchanged. Test count rose **156 → 201**, plus the 27 jsdom UI/input tests and the committed 16-scenario E2E harness.
+
+- **Test infrastructure (R1, wave 3):** jsdom UI/input suite (the presentation layer was 0% — now covered via `tests/ui-*.test.js` / `tests/input.test.js`); the E2E campaign committed to `e2e/` with an opt-in `npm run test:e2e`; ESLint + Prettier adopted and wired into PR CI (`lint` + `format:check` + `test`).
+- **Quick wins (wave 1):** dashboard-worker drift guard test (R2); `Cache-Control` on `GET /scores` (R3); one shared `diagonalAllowed` corner-cut helper (R7); enemies zero-init their stat fields (R8); key-repeat documented (R11); rooms comment softened (R13).
+- **DRY the UI (wave 2):** `createOverlay` factory collapses the menu/leaderboard/help shells (R5); shared `isEditable`; renderer float colors consolidated into `tileStyle.js` (R6).
+- **Efficiency (wave 4, behavior-preserving):** per-turn occupancy Set replaces the linear `entityAt` scan in enemy A* (R9) — the 12-enemy worst-case turn dropped **2.84 → 2.05 ms** (~28%); renderer float pooling, `setTexture`-skip, and a `revealRoom` early-out (R10). The flow-field rewrite was **deliberately not** taken (it changes enemy behavior and would break the parity/balance oracles for a path already at ~2–3% of budget).
+
+Still open (deferred by choice): full accessibility pass (focus trap/restore, initials autofocus, pinch-zoom), CSS-variable ↔ JS-palette unification (needs build tooling), and `ensureArrivalClear` radius-2 hardening (R12, theoretical).
+
+---
+
 ## 1. Executive summary
 
 **Verdict: this is genuinely good tech, not a novelty that happens to run.** The two claims the whole design rests on — a pure, deterministic simulation and a renderer that only observes it — are not just stated, they are _provable_: a 188-command game session replayed through the real browser (keyboard events → input layer → engine → Phaser rendering) produced a final state **deep-equal to the headless engine's prediction**, entity for entity, HP for HP, explored-tile for explored-tile. Very few hobby codebases pass that test. The defects found were real but peripheral: documentation drifting from code, one missing feedback effect, test-coverage holes around the edges, and loopholes in the guardrail test meant to protect the architecture.
