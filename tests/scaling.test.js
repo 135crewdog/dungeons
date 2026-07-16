@@ -34,7 +34,7 @@ describe('depth scaling — regular enemies', () => {
 });
 
 describe('depth scaling — boss tiers', () => {
-  it('tier 1 (floor 5) is the base boss rolling the player\'s own d8', () => {
+  it("tier 1 (floor 5) is the base boss rolling the player's own d8", () => {
     const b = createEnemy(ENEMY_TYPES.boss, 0, 0, 5);
     expect(b).toMatchObject({ maxHp: 24, attackDie: 8 });
   });
@@ -53,14 +53,32 @@ describe('depth scaling — combat integration', () => {
   it('a deep goblin actually swings its bigger die', () => {
     const attacker = { x: 0, y: 0, ...createEnemy(ENEMY_TYPES.goblin, 0, 0, 9) };
     attacker.id = 1;
-    const target = { id: 2, kind: 'player', x: 1, y: 0, hp: 1e9, maxHp: 1e9, attackDie: 8, strength: 0, armor: 0, glyph: '@' };
+    const target = {
+      id: 2,
+      kind: 'player',
+      x: 1,
+      y: 0,
+      hp: 1e9,
+      maxHp: 1e9,
+      attackDie: 8,
+      strength: 0,
+      armor: 0,
+      glyph: '@',
+    };
     const state = {
       rng: createRng(99),
       status: 'playing',
       turn: 0,
       log: [],
       items: [],
-      entities: { nextId: 3, playerId: 2, byId: new Map([[1, attacker], [2, target]]) },
+      entities: {
+        nextId: 3,
+        playerId: 2,
+        byId: new Map([
+          [1, attacker],
+          [2, target],
+        ]),
+      },
     };
     const damages = [];
     for (let i = 0; i < 300; i++) {

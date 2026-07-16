@@ -4,27 +4,18 @@
 
 import { nextInt } from '../core/rng.js';
 import { idx } from '../core/query.js';
-import {
-  TILE,
-  MIN_ROOMS,
-  MAX_ROOMS,
-  MIN_ROOM_SIZE,
-  MAX_ROOM_SIZE,
-} from '../core/constants.js';
+import { TILE, MIN_ROOMS, MAX_ROOMS, MIN_ROOM_SIZE, MAX_ROOM_SIZE } from '../core/constants.js';
 
 // Two rooms conflict if their rectangles come within one tile of each other.
 function tooClose(a, b) {
-  return (
-    a.x - 1 < b.x + b.w &&
-    a.x + a.w + 1 > b.x &&
-    a.y - 1 < b.y + b.h &&
-    a.y + a.h + 1 > b.y
-  );
+  return a.x - 1 < b.x + b.w && a.x + a.w + 1 > b.x && a.y - 1 < b.y + b.h && a.y + a.h + 1 > b.y;
 }
 
 // Rejection-sample non-overlapping rooms. Returns an array of
-// { id, x, y, w, h }. Guarantees at least 2 rooms so a far room exists for the
-// stairs; typically MIN_ROOMS..MAX_ROOMS depending on how they pack.
+// { id, x, y, w, h }. Aims for at least 2 rooms so a far room exists for the
+// stairs; this is statistical, not a hard floor — but on the 72x44 map the
+// minimum observed over 20k seeds is 7 (typically MIN_ROOMS..MAX_ROOMS
+// depending on how they pack).
 export function placeRooms(rng, width, height) {
   const rooms = [];
   const maxAttempts = MAX_ROOMS * 30;

@@ -13,7 +13,14 @@ function corridorState(exploredTo = 8) {
   const width = 10;
   const height = 3;
   const tiles = new Uint8Array(width * height); // WALL
-  const map = { width, height, tiles, rooms: [], roomAt: new Int16Array(width * height).fill(-1), stairs: null };
+  const map = {
+    width,
+    height,
+    tiles,
+    rooms: [],
+    roomAt: new Int16Array(width * height).fill(-1),
+    stairs: null,
+  };
   const explored = new Uint8Array(width * height);
   for (let x = 1; x <= 8; x++) {
     tiles[idx(map, x, 1)] = TILE.FLOOR;
@@ -53,7 +60,7 @@ describe('path planning (known-walkable A*)', () => {
   });
 
   it('refuses to route through unexplored tiles even to an explored goal', () => {
-    const { state, player } = corridorState(8);
+    const { state } = corridorState(8);
     // Un-explore a middle segment: the goal is explored but unreachable through fog.
     state.vis.explored[idx(state.map, 4, 1)] = 0;
     state.vis.explored[idx(state.map, 5, 1)] = 0;
@@ -116,11 +123,31 @@ describe('auto-walk cancellation triggers', () => {
     const width = 14;
     const height = 3;
     const tiles = new Uint8Array(width * height); // WALL
-    const map = { width, height, tiles, rooms: [], roomAt: new Int16Array(width * height).fill(-1), stairsDown: null, stairsUp: null };
+    const map = {
+      width,
+      height,
+      tiles,
+      rooms: [],
+      roomAt: new Int16Array(width * height).fill(-1),
+      stairsDown: null,
+      stairsUp: null,
+    };
     for (let x = 1; x <= 12; x++) tiles[idx(map, x, 1)] = TILE.FLOOR;
     if (doorX !== null) tiles[idx(map, doorX, 1)] = TILE.DOOR;
     if (pocketX !== null) tiles[idx(map, pocketX, 0)] = TILE.FLOOR;
-    const player = { id: 1, kind: 'player', x: playerX, y: 1, hp: 20, maxHp: 20, attackDie: 8, glyph: '@', strength: 0, skill: 0, armor: 0 };
+    const player = {
+      id: 1,
+      kind: 'player',
+      x: playerX,
+      y: 1,
+      hp: 20,
+      maxHp: 20,
+      attackDie: 8,
+      glyph: '@',
+      strength: 0,
+      skill: 0,
+      armor: 0,
+    };
     const state = {
       rng: createRng(1),
       status: 'playing',

@@ -7,10 +7,14 @@
 // Local (depth, col) → map (x, y) for each of the four quadrants.
 function transform(cardinal, ox, oy, depth, col) {
   switch (cardinal) {
-    case 0: return { x: ox + col, y: oy - depth }; // North
-    case 1: return { x: ox + depth, y: oy + col }; // East
-    case 2: return { x: ox + col, y: oy + depth }; // South
-    default: return { x: ox - depth, y: oy + col }; // West
+    case 0:
+      return { x: ox + col, y: oy - depth }; // North
+    case 1:
+      return { x: ox + depth, y: oy + col }; // East
+    case 2:
+      return { x: ox + col, y: oy + depth }; // South
+    default:
+      return { x: ox - depth, y: oy + col }; // West
   }
 }
 

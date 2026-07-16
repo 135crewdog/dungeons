@@ -17,7 +17,12 @@ function reachable(map, sx, sy) {
   seen.add(key(sx, sy));
   while (stack.length) {
     const [x, y] = stack.pop();
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
       const nx = x + dx;
       const ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
@@ -69,10 +74,7 @@ describe('dungeon generation', () => {
         const a = rooms[i];
         const b = rooms[j];
         const overlap =
-          a.x - 1 < b.x + b.w &&
-          a.x + a.w + 1 > b.x &&
-          a.y - 1 < b.y + b.h &&
-          a.y + a.h + 1 > b.y;
+          a.x - 1 < b.x + b.w && a.x + a.w + 1 > b.x && a.y - 1 < b.y + b.h && a.y + a.h + 1 > b.y;
         expect(overlap).toBe(false);
       }
     }
@@ -114,7 +116,12 @@ describe('dungeon generation', () => {
           if (map.tiles[idx(map, x, y)] !== TILE.DOOR) continue;
           totalDoors++;
           // A door never sits orthogonally next to another door (no door rows).
-          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          for (const [dx, dy] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ]) {
             const nx = x + dx;
             const ny = y + dy;
             if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;

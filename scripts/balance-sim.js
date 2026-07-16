@@ -34,27 +34,39 @@ function pct(x) {
 
 function printReport(batch) {
   const { policy, runs, baseSeed, maxFloor, summary } = batch;
-  console.log(`\n=== ${policy} — ${runs} runs, seeds ${baseSeed}..${baseSeed + runs - 1}, floors 1..${maxFloor} ===`);
+  console.log(
+    `\n=== ${policy} — ${runs} runs, seeds ${baseSeed}..${baseSeed + runs - 1}, floors 1..${maxFloor} ===`,
+  );
 
   const floors = Array.from({ length: maxFloor }, (_, i) => i + 1);
   const rows = [
     ['floor', ...floors.map(String)],
     ['reached', ...floors.map((f) => pct(summary.reachedByFloor[f]))],
     ['died here', ...floors.map((f) => String(summary.deathsByFloor[f] ?? 0))],
-    ['hp on descent', ...floors.map((f) => {
-      const d = summary.avgAtDescent[f];
-      return d ? `${d.hp.toFixed(1)}/${d.maxHp.toFixed(1)}` : '-';
-    })],
-    ['str/arm on descent', ...floors.map((f) => {
-      const d = summary.avgAtDescent[f];
-      return d ? `${d.strength.toFixed(1)}/${d.armor.toFixed(1)}` : '-';
-    })],
+    [
+      'hp on descent',
+      ...floors.map((f) => {
+        const d = summary.avgAtDescent[f];
+        return d ? `${d.hp.toFixed(1)}/${d.maxHp.toFixed(1)}` : '-';
+      }),
+    ],
+    [
+      'str/arm on descent',
+      ...floors.map((f) => {
+        const d = summary.avgAtDescent[f];
+        return d ? `${d.strength.toFixed(1)}/${d.armor.toFixed(1)}` : '-';
+      }),
+    ],
   ];
   printTable(rows);
 
   const clear10 = summary.reachedByFloor[Math.min(11, maxFloor + 1)];
-  console.log(`cleared floor 10 (reached 11): ${pct(clear10)}   cleared all ${maxFloor}: ${pct(summary.cleared)}`);
-  console.log(`median death floor: ${summary.medianDeathFloor ?? '-'}   boss-floor death share: ${pct(summary.bossFloorDeathShare)}`);
+  console.log(
+    `cleared floor 10 (reached 11): ${pct(clear10)}   cleared all ${maxFloor}: ${pct(summary.cleared)}`,
+  );
+  console.log(
+    `median death floor: ${summary.medianDeathFloor ?? '-'}   boss-floor death share: ${pct(summary.bossFloorDeathShare)}`,
+  );
   const causes = Object.entries(summary.deathCauses)
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => `${k} ${v}`)

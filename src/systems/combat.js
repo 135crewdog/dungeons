@@ -70,7 +70,8 @@ function dropBossChest(state, x, y) {
   if (t === TILE.STAIRS_DOWN || t === TILE.STAIRS_UP) {
     for (const { dx, dy } of DIRS8) {
       const nt = tileAt(state.map, x + dx, y + dy);
-      const free = (nt === TILE.FLOOR || nt === TILE.DOOR) &&
+      const free =
+        (nt === TILE.FLOOR || nt === TILE.DOOR) &&
         !entityAt(state, x + dx, y + dy) &&
         !state.items.some((it) => it.x === x + dx && it.y === y + dy);
       if (free) {

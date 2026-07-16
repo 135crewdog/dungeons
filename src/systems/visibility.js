@@ -31,11 +31,15 @@ export function updateVisibility(state) {
 
 // On entering a room, mark the whole room (and its enclosing wall ring)
 // explored, so its layout is remembered immediately. This only affects memory;
-// what is currently lit stays shadowcast-driven.
+// what is currently lit stays shadowcast-driven. Explored memory is monotonic,
+// so once a room is bulk-revealed there is nothing to redo while the player
+// stays in it — `_revealedRoom` skips the double loop until the room changes.
 function revealRoom(state, px, py) {
   const map = state.map;
   const rid = map.roomAt[idx(map, px, py)];
   if (rid === -1) return;
+  if (state.vis._revealedRoom === rid) return;
+  state.vis._revealedRoom = rid;
   const room = map.rooms[rid];
   for (let y = room.y - 1; y <= room.y + room.h; y++) {
     for (let x = room.x - 1; x <= room.x + room.w; x++) {

@@ -48,6 +48,12 @@ export function createEnemy(type, x, y, floorNumber = 1) {
     hp: maxHp,
     maxHp,
     attackDie,
+    // Combat stats every combatant carries; enemies start at zero and, unlike
+    // the player, never gain them from chests. Explicit here so combat never
+    // has to lean on `?? 0` defaults for a missing field.
+    strength: 0,
+    skill: 0,
+    armor: 0,
     moveEvery: type.moveEvery ?? 1,
     moveCooldown: 0,
     aggro: false,

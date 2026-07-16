@@ -9,7 +9,7 @@ import { descend, ascend } from './gameState.js';
 import { pushLog } from './entity.js';
 import { pickupEvent, descendEvent, ascendEvent, deathEvent } from './events.js';
 import { updateVisibility } from '../systems/visibility.js';
-import { enemyTurn } from '../systems/ai.js';
+import { enemyTurn, buildOccupancy } from '../systems/ai.js';
 import { mitigatedDamage } from '../systems/combat.js';
 import { aStar } from '../systems/pathfinding.js';
 
@@ -134,10 +134,13 @@ function openChest(state, player, item, events) {
 }
 
 function enemyPhase(state, events) {
+  // Build the tile-occupancy set once and share it across the whole phase; each
+  // enemy keeps it live as it steps (see ai.buildOccupancy).
+  const occupied = buildOccupancy(state);
   for (const enemy of enemiesSorted(state)) {
     if (state.status !== 'playing') break; // player died mid-phase
     if (!state.entities.byId.has(enemy.id)) continue; // safety
-    for (const e of enemyTurn(state, enemy.id)) events.push(e);
+    for (const e of enemyTurn(state, enemy.id, occupied)) events.push(e);
   }
 }
 

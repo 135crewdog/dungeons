@@ -15,7 +15,16 @@ function corridorState({ playerX, enemyX, enemyType = ENEMY_TYPES.goblin }) {
   for (let x = 1; x <= 9; x++) tiles[idx(map, x, 1)] = TILE.FLOOR;
   tiles[idx(map, 5, 1)] = TILE.DOOR;
 
-  const player = { id: 1, kind: 'player', x: playerX, y: 1, hp: 20, maxHp: 20, attackDie: 8, glyph: '@' };
+  const player = {
+    id: 1,
+    kind: 'player',
+    x: playerX,
+    y: 1,
+    hp: 20,
+    maxHp: 20,
+    attackDie: 8,
+    glyph: '@',
+  };
   const enemy = createEnemy(enemyType, enemyX, 1);
   enemy.id = 2;
   const state = {
@@ -25,7 +34,14 @@ function corridorState({ playerX, enemyX, enemyType = ENEMY_TYPES.goblin }) {
     log: [],
     map,
     vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
-    entities: { nextId: 3, playerId: 1, byId: new Map([[1, player], [2, enemy]]) },
+    entities: {
+      nextId: 3,
+      playerId: 1,
+      byId: new Map([
+        [1, player],
+        [2, enemy],
+      ]),
+    },
   };
   return { state, player, enemy };
 }
@@ -51,7 +67,11 @@ describe('enemy aggro through doors', () => {
 
 describe('skeleton cadence (moveEvery 2)', () => {
   it('moves immediately on aggro, then only every other turn', () => {
-    const { state, enemy } = corridorState({ playerX: 1, enemyX: 4, enemyType: ENEMY_TYPES.skeleton });
+    const { state, enemy } = corridorState({
+      playerX: 1,
+      enemyX: 4,
+      enemyType: ENEMY_TYPES.skeleton,
+    });
     updateVisibility(state);
     enemyTurn(state, 2);
     expect(enemy.x).toBe(3); // first step is immediate
@@ -62,7 +82,11 @@ describe('skeleton cadence (moveEvery 2)', () => {
   });
 
   it('attacks every turn once adjacent — only movement is slowed', () => {
-    const { state, enemy } = corridorState({ playerX: 1, enemyX: 2, enemyType: ENEMY_TYPES.skeleton });
+    const { state, enemy } = corridorState({
+      playerX: 1,
+      enemyX: 2,
+      enemyType: ENEMY_TYPES.skeleton,
+    });
     updateVisibility(state);
     for (let i = 0; i < 4; i++) {
       const events = enemyTurn(state, 2);
@@ -72,7 +96,11 @@ describe('skeleton cadence (moveEvery 2)', () => {
   });
 
   it('a goblin (moveEvery 1) still moves every turn', () => {
-    const { state, enemy } = corridorState({ playerX: 1, enemyX: 4, enemyType: ENEMY_TYPES.goblin });
+    const { state, enemy } = corridorState({
+      playerX: 1,
+      enemyX: 4,
+      enemyType: ENEMY_TYPES.goblin,
+    });
     updateVisibility(state);
     enemyTurn(state, 2);
     expect(enemy.x).toBe(3);
@@ -88,7 +116,11 @@ describe('skeleton cadence (moveEvery 2)', () => {
   });
 
   it('giving up the chase resets the cooldown so re-aggro steps immediately', () => {
-    const { state, player, enemy } = corridorState({ playerX: 3, enemyX: 4, enemyType: ENEMY_TYPES.skeleton });
+    const { state, player, enemy } = corridorState({
+      playerX: 3,
+      enemyX: 4,
+      enemyType: ENEMY_TYPES.skeleton,
+    });
     updateVisibility(state);
     enemyTurn(state, 2); // adjacent: attacks, aggroed, lastSeen = (3,1)
     player.x = 9; // flee past the door, out of sight

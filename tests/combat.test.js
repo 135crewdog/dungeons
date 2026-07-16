@@ -20,17 +20,42 @@ function combatState(
 ) {
   const rng = createRng(seed);
   const attacker = {
-    id: 1, kind: 'player', x: 0, y: 0, hp: 20, maxHp: 20,
-    attackDie: attackerDie, skill: attackerSkill, strength: attackerStrength, glyph: '@',
+    id: 1,
+    kind: 'player',
+    x: 0,
+    y: 0,
+    hp: 20,
+    maxHp: 20,
+    attackDie: attackerDie,
+    skill: attackerSkill,
+    strength: attackerStrength,
+    glyph: '@',
   };
-  const target = { id: 2, kind: targetKind, x: 1, y: 0, hp: targetHp, maxHp: targetHp, attackDie: 4, armor: targetArmor, glyph: 'g' };
+  const target = {
+    id: 2,
+    kind: targetKind,
+    x: 1,
+    y: 0,
+    hp: targetHp,
+    maxHp: targetHp,
+    attackDie: 4,
+    armor: targetArmor,
+    glyph: 'g',
+  };
   const state = {
     rng,
     status: 'playing',
     turn: 0,
     log: [],
     items: [],
-    entities: { nextId: 3, playerId: 1, byId: new Map([[1, attacker], [2, target]]) },
+    entities: {
+      nextId: 3,
+      playerId: 1,
+      byId: new Map([
+        [1, attacker],
+        [2, target],
+      ]),
+    },
   };
   return { state, attacker, target };
 }
@@ -103,14 +128,31 @@ describe('damage roll', () => {
 
   it('the player rolls a d8 that shifts with strength', () => {
     const player = { ...createPlayer(0, 0), id: 1 };
-    const target = { id: 2, kind: 'goblin', x: 1, y: 0, hp: 1e9, maxHp: 1e9, attackDie: 4, armor: 0, glyph: 'g' };
+    const target = {
+      id: 2,
+      kind: 'goblin',
+      x: 1,
+      y: 0,
+      hp: 1e9,
+      maxHp: 1e9,
+      attackDie: 4,
+      armor: 0,
+      glyph: 'g',
+    };
     const state = {
       rng: createRng(42),
       status: 'playing',
       turn: 0,
       log: [],
       items: [],
-      entities: { nextId: 3, playerId: 1, byId: new Map([[1, player], [2, target]]) },
+      entities: {
+        nextId: 3,
+        playerId: 1,
+        byId: new Map([
+          [1, player],
+          [2, target],
+        ]),
+      },
     };
     const seen = new Set();
     for (let i = 0; i < 300; i++) {
@@ -123,7 +165,7 @@ describe('damage roll', () => {
     expect(seen.size).toBe(8);
 
     player.strength = 2; // chest bonuses shift the whole range
-    for (let landed = 0; landed < 20; ) {
+    for (let landed = 0; landed < 20;) {
       const [ev] = resolveAttack(state, 1, 2);
       if (!ev.hit) continue;
       landed++;
@@ -134,7 +176,7 @@ describe('damage roll', () => {
 
   it('armor reduces damage but a landed hit always costs at least 1', () => {
     const { state } = combatState(7, { attackerDie: 4, targetHp: 1e9, targetArmor: 100 });
-    for (let landed = 0; landed < 20; ) {
+    for (let landed = 0; landed < 20;) {
       const [ev] = resolveAttack(state, 1, 2);
       if (!ev.hit) continue;
       landed++;
@@ -176,7 +218,17 @@ describe('death and factions', () => {
 
   it('player death sets status dead and keeps the player entity', () => {
     const rng = createRng(11);
-    const enemy = { id: 1, kind: 'skeleton', x: 0, y: 0, hp: 10, maxHp: 10, attackDie: 4, strength: 100, glyph: 's' };
+    const enemy = {
+      id: 1,
+      kind: 'skeleton',
+      x: 0,
+      y: 0,
+      hp: 10,
+      maxHp: 10,
+      attackDie: 4,
+      strength: 100,
+      glyph: 's',
+    };
     const player = { id: 2, kind: 'player', x: 1, y: 0, hp: 5, maxHp: 5, attackDie: 8, glyph: '@' };
     const state = {
       rng,
@@ -184,7 +236,14 @@ describe('death and factions', () => {
       turn: 0,
       log: [],
       items: [],
-      entities: { nextId: 3, playerId: 2, byId: new Map([[1, enemy], [2, player]]) },
+      entities: {
+        nextId: 3,
+        playerId: 2,
+        byId: new Map([
+          [1, enemy],
+          [2, player],
+        ]),
+      },
     };
     for (let i = 0; i < 30 && state.status === 'playing'; i++) resolveAttack(state, 1, 2);
     expect(state.status).toBe('dead');

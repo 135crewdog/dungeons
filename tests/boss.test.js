@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, descend, ascend } from '../src/core/gameState.js';
-import { getPlayer, idx } from '../src/core/query.js';
+import { idx } from '../src/core/query.js';
 import { createRng } from '../src/core/rng.js';
 import { resolveAttack } from '../src/systems/combat.js';
 import { createBossChest } from '../src/entities/items.js';
@@ -14,8 +14,7 @@ import {
   TILE,
 } from '../src/core/constants.js';
 
-const bosses = (state) =>
-  [...state.entities.byId.values()].filter((e) => e.kind === 'boss');
+const bosses = (state) => [...state.entities.byId.values()].filter((e) => e.kind === 'boss');
 
 describe('boss spawning', () => {
   it('never enters the random spawn pool', () => {
@@ -80,7 +79,19 @@ describe('boss chest drop', () => {
     const height = 3;
     const map = { width, height, tiles: new Uint8Array(width * height).fill(TILE.FLOOR) };
     // The player's +100 strength makes any landed hit lethal to the boss.
-    const player = { id: 1, kind: 'player', x: playerAt.x, y: playerAt.y, hp: 20, maxHp: 20, attackDie: 8, skill: 0, strength: 100, armor: 0, glyph: '@' };
+    const player = {
+      id: 1,
+      kind: 'player',
+      x: playerAt.x,
+      y: playerAt.y,
+      hp: 20,
+      maxHp: 20,
+      attackDie: 8,
+      skill: 0,
+      strength: 100,
+      armor: 0,
+      glyph: '@',
+    };
     const boss = { id: 2, kind: 'boss', x: 1, y: 1, hp: 30, maxHp: 30, attackDie: 10, glyph: 'B' };
     if (bossTile !== null) map.tiles[boss.y * width + boss.x] = bossTile;
     const state = {
@@ -90,7 +101,14 @@ describe('boss chest drop', () => {
       log: [],
       items: [],
       map,
-      entities: { nextId: 3, playerId: 1, byId: new Map([[1, player], [2, boss]]) },
+      entities: {
+        nextId: 3,
+        playerId: 1,
+        byId: new Map([
+          [1, player],
+          [2, boss],
+        ]),
+      },
     };
     return { state, boss };
   }
@@ -135,7 +153,11 @@ describe('boss chest drop', () => {
   });
 
   it('never drops a trap; all three bonuses occur across seeds', () => {
-    const bonusFor = { strength: CHEST_STRENGTH_BONUS, armor: CHEST_ARMOR_BONUS, health: CHEST_HEALTH_BONUS };
+    const bonusFor = {
+      strength: CHEST_STRENGTH_BONUS,
+      armor: CHEST_ARMOR_BONUS,
+      health: CHEST_HEALTH_BONUS,
+    };
     const seen = new Set();
     for (let seed = 1; seed <= 200; seed++) {
       const { state } = bossFight(seed);

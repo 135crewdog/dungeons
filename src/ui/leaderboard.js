@@ -7,28 +7,26 @@
 // rendered with textContent, never markup interpolation.
 
 import { formatAge } from '../net/leaderboard.js';
+import { createOverlay } from './overlay.js';
 
 export function createLeaderboard(parent, { fetchScores }) {
-  const el = document.createElement('div');
-  el.id = 'leaderboard';
-  el.className = 'overlay';
-  el.innerHTML =
-    '<div class="menu-panel lb-panel" role="dialog" aria-modal="true" aria-label="Leaderboard" tabindex="-1">' +
-    '<div class="menu-head"><h2>Leaderboard</h2>' +
-    '<button class="menu-x" type="button" data-act="close" aria-label="Close">×</button></div>' +
-    '<div class="panel-label">Top runs — last 30 days</div>' +
-    '<div class="lb-body"></div>' +
-    '</div>';
+  const { el, panel, isOpen, show, hide } = createOverlay({
+    id: 'leaderboard',
+    title: 'Leaderboard',
+    ariaLabel: 'Leaderboard',
+    panelClass: 'lb-panel',
+    onClose: () => close(),
+  });
+  const label = document.createElement('div');
+  label.className = 'panel-label';
+  label.textContent = 'Top runs — last 30 days';
+  const body = document.createElement('div');
+  body.className = 'lb-body';
+  panel.append(label, body);
   parent.appendChild(el);
 
-  const panel = el.querySelector('.menu-panel');
-  const body = el.querySelector('.lb-body');
   // Guards a stale fetch resolving after the overlay was closed and reopened.
   let requestToken = 0;
-
-  function isOpen() {
-    return el.classList.contains('show');
-  }
 
   function renderStatus(text) {
     body.textContent = '';
@@ -77,8 +75,7 @@ export function createLeaderboard(parent, { fetchScores }) {
   }
 
   async function open() {
-    el.classList.add('show');
-    panel.focus();
+    show();
     const token = ++requestToken;
     renderStatus('Loading…');
     const res = await fetchScores();
@@ -91,14 +88,9 @@ export function createLeaderboard(parent, { fetchScores }) {
 
   function close() {
     if (!isOpen()) return;
-    requestToken += 1;
-    el.classList.remove('show');
+    requestToken += 1; // invalidate any in-flight fetch
+    hide();
   }
-
-  el.addEventListener('click', (e) => {
-    // The × button or a click on the dimmed backdrop closes.
-    if (e.target === el || e.target.closest('[data-act="close"]')) close();
-  });
 
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !isOpen()) return;
