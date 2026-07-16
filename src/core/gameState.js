@@ -151,17 +151,36 @@ function generateAndEnter(state, floorNumber, player) {
 }
 
 // If a stray (de-aggroed) enemy is standing on the tile the player is about to
-// arrive on, nudge it to a free neighboring tile so the two never share a tile.
+// arrive on, nudge it to the nearest free walkable tile so the two never share
+// a tile. A deterministic breadth-first search (DIRS8 order, no RNG — replays
+// stay exact) rather than a single-ring scan: a stair fully ringed by idle
+// enemies still resolves by pushing the squatter one room-tile further out.
+// The search is bounded; if the whole reachable neighborhood is packed solid
+// (impossible from the generator: rooms are at least 4x4 and entities are
+// capped well below that) the squatter stays put as a last resort.
 function ensureArrivalClear(state, x, y) {
   const occ = entityAt(state, x, y);
   if (!occ) return;
-  for (const { dx, dy } of DIRS8) {
-    const nx = x + dx;
-    const ny = y + dy;
-    if (!isWalkable(state.map, nx, ny)) continue;
-    if (entityAt(state, nx, ny)) continue;
-    occ.x = nx;
-    occ.y = ny;
-    return;
+  const map = state.map;
+  const startKey = y * map.width + x;
+  const visited = new Set([startKey]);
+  const queue = [{ x, y }];
+  const CAP = 64; // plenty for any room + doorways, still strictly bounded
+  while (queue.length > 0 && visited.size < CAP) {
+    const cur = queue.shift();
+    for (const { dx, dy } of DIRS8) {
+      const nx = cur.x + dx;
+      const ny = cur.y + dy;
+      const key = ny * map.width + nx;
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (!isWalkable(map, nx, ny)) continue;
+      if (!entityAt(state, nx, ny)) {
+        occ.x = nx;
+        occ.y = ny;
+        return;
+      }
+      queue.push({ x: nx, y: ny });
+    }
   }
 }
