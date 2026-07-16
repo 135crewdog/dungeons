@@ -16,7 +16,13 @@ The sections below are the original audit at `c0aba8a`. A follow-up on this bran
 - **DRY the UI (wave 2):** `createOverlay` factory collapses the menu/leaderboard/help shells (R5); shared `isEditable`; renderer float colors consolidated into `tileStyle.js` (R6).
 - **Efficiency (wave 4, behavior-preserving):** per-turn occupancy Set replaces the linear `entityAt` scan in enemy A* (R9) — the 12-enemy worst-case turn dropped **2.84 → 2.05 ms** (~28%); renderer float pooling, `setTexture`-skip, and a `revealRoom` early-out (R10). The flow-field rewrite was **deliberately not** taken (it changes enemy behavior and would break the parity/balance oracles for a path already at ~2–3% of budget).
 
-Still open (deferred by choice): full accessibility pass (focus trap/restore, initials autofocus, pinch-zoom), CSS-variable ↔ JS-palette unification (needs build tooling), and `ensureArrivalClear` radius-2 hardening (R12, theoretical).
+The three items deferred at first were picked up in a final pass (v0.5.3), closing the roadmap entirely:
+
+- **Accessibility:** the modal overlays trap Tab and restore focus to their opener; the death screen autofocuses the initials field; submit/leaderboard statuses are `aria-live` regions; and the viewport meta no longer disables pinch-zoom (WCAG 1.4.4) — `touch-action` still keeps play gestures clean.
+- **Palette:** every DOM-UI color now resolves from index.html's `:root` custom properties (the HUD's HP colors use `var()` inline); the canvas palette stays in `tileStyle.js` by design, and the documented hand-synced surface between the two layers is now exactly one color (`--c-bg` ↔ `BG_COLOR`).
+- **`ensureArrivalClear` (R12):** the single-ring nudge became a bounded deterministic BFS — a fully ringed arrival stair resolves instead of overlapping, while the classic one-squatter case lands on the identical tile (balance-sim byte-identical, replays unaffected).
+
+Nothing from the audit's findings remains open.
 
 ---
 
