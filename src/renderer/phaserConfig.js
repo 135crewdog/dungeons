@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DungeonScene } from './GameScene.js';
+import { BG_COLOR } from './tileStyle.js';
 
 // Phaser lives ONLY in the renderer layer. The render buffer is sized in DEVICE
 // pixels (window × dpr) for crispness on hi-dpi screens; the scene's fitToWindow
@@ -11,7 +12,7 @@ export function createPhaserGame(parent, state) {
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
-    backgroundColor: '#05060a',
+    backgroundColor: BG_COLOR,
     pixelArt: true,
     roundPixels: true,
     scale: {

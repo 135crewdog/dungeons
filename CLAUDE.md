@@ -67,7 +67,10 @@ slot into the options list. **Leaderboard** and **Help** actions open child over
 layer _above_ the menu (z-index 30 vs the menu's 20) with the menu staying open
 underneath; the menu's Escape handler defers while a child is open (`isChildOpen`
 callback from the composition root), so one Escape press closes only the topmost layer.
-Movement/tap input is gated while any of the three overlays is open.
+Movement/tap input is gated while any of the three overlays is open. The overlays
+follow the modal a11y contract (via `ui/overlay.js` + `ui/dom.js`): Tab is trapped
+inside the open dialog, focus returns to the opener on close, the death screen
+autofocuses the initials field, and status lines are `aria-live` regions.
 
 ## Leaderboard (cross-device, 30-day rolling)
 
@@ -209,7 +212,9 @@ could swap in later (`tileStyle.js` is the seam) without touching game logic.
 Tile size fixed at 16×16. The viewport scales by showing **more tiles** on larger
 screens, not larger tiles; the camera follows the player. **Integer scaling only**;
 leftover space is neutral letterbox (no stretching). HUD elements anchor to screen
-edges and adapt to any aspect ratio.
+edges and adapt to any aspect ratio. Browser **pinch-zoom stays enabled** (WCAG
+1.4.4 — never set `user-scalable=no`/`maximum-scale=1`); `touch-action: none` on
+the page keeps play gestures from scrolling or double-tap-zooming mid-game.
 
 ## Language and Tooling
 

@@ -10,6 +10,7 @@ import {
   itemColor,
   scaleColor,
   FLOAT_COLOR,
+  BG_COLOR,
 } from './tileStyle.js';
 import { spawnFloatingText } from './floatingText.js';
 
@@ -35,7 +36,7 @@ export class DungeonScene extends Phaser.Scene {
     this.itemImages = new Map();
     this.entityImages = new Map();
 
-    this.cameras.main.setBackgroundColor('#05060a');
+    this.cameras.main.setBackgroundColor(BG_COLOR);
     this.cameras.main.setRoundPixels(true);
     this.renderRatio = 1;
     this.fitToWindow();

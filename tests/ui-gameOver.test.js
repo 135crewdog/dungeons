@@ -91,4 +91,33 @@ describe('game over overlay', () => {
     go.el.querySelector('[data-act="restart"]').click();
     expect(onRestart).toHaveBeenCalledOnce();
   });
+
+  it('autofocuses the initials field on death when submission is enabled', () => {
+    const go = createGameOver(document.body, makeOpts());
+    go.show(deadState, vi.fn());
+    expect(document.activeElement).toBe(go.el.querySelector('.go-initials-input'));
+  });
+
+  it('does not autofocus a hidden form (submission disabled)', () => {
+    const go = createGameOver(document.body, makeOpts({ canSubmit: () => false }));
+    go.show(deadState, vi.fn());
+    expect(document.activeElement).not.toBe(go.el.querySelector('.go-initials-input'));
+  });
+
+  it('announces submit status politely and traps Tab within the panel', () => {
+    const go = createGameOver(document.body, makeOpts());
+    go.show(deadState, vi.fn());
+    expect(go.el.querySelector('.go-status').getAttribute('aria-live')).toBe('polite');
+    // Tab from the last focusable (New run) wraps to the first (initials input).
+    const restart = go.el.querySelector('[data-act="restart"]');
+    restart.focus();
+    const tab = new window.KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    });
+    restart.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(go.el.querySelector('.go-initials-input'));
+  });
 });
