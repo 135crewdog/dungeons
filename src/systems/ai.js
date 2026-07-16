@@ -43,8 +43,7 @@ export function enemyTurn(state, enemyId) {
   // with no player there) or after too many blind turns; otherwise keep heading
   // for where the player was last seen.
   enemy.lostSightTurns++;
-  const atLastSeen =
-    enemy.lastSeen && enemy.x === enemy.lastSeen.x && enemy.y === enemy.lastSeen.y;
+  const atLastSeen = enemy.lastSeen && enemy.x === enemy.lastSeen.x && enemy.y === enemy.lastSeen.y;
   if (!enemy.lastSeen || atLastSeen || enemy.lostSightTurns > DEAGGRO_TURNS) {
     enemy.aggro = false;
     enemy.lastSeen = null;

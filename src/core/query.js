@@ -21,12 +21,7 @@ export function tileAt(map, x, y) {
 // closed door blocks line of sight (so nothing sees through doorways). Both
 // stair tiles are walkable and transparent.
 export function isWalkableTile(t) {
-  return (
-    t === TILE.FLOOR ||
-    t === TILE.DOOR ||
-    t === TILE.STAIRS_DOWN ||
-    t === TILE.STAIRS_UP
-  );
+  return t === TILE.FLOOR || t === TILE.DOOR || t === TILE.STAIRS_DOWN || t === TILE.STAIRS_UP;
 }
 
 export function isTransparentTile(t) {

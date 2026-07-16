@@ -73,7 +73,10 @@ describe('turn engine — player movement', () => {
 
   it('forbids cutting a diagonal between two wall corners', () => {
     // Destination (3,1) is floor, but both orthogonals (3,2) and (2,1) are wall.
-    const { state, player } = miniState(6, 6, [[3, 2], [2, 1]]);
+    const { state, player } = miniState(6, 6, [
+      [3, 2],
+      [2, 1],
+    ]);
     const blocked = canStep(state, player, 1, -1);
     expect(blocked).toBe(false);
     processCommand(state, { type: 'move', dx: 1, dy: -1 });

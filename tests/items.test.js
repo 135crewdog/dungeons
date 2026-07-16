@@ -9,11 +9,24 @@ import { idx } from '../src/core/query.js';
 
 // A small floor with the player at (2,2). `stairsAt`, `potion`, and `chest`
 // are optional; `chest` is { x, y, effect, amount }.
-function miniState({ playerHp = PLAYER_MAX_HP, playerArmor = 0, stairsAt = null, potion = null, chest = null } = {}) {
+function miniState({
+  playerHp = PLAYER_MAX_HP,
+  playerArmor = 0,
+  stairsAt = null,
+  potion = null,
+  chest = null,
+} = {}) {
   const width = 8;
   const height = 8;
   const tiles = new Uint8Array(width * height).fill(TILE.FLOOR);
-  const map = { width, height, tiles, rooms: [], roomAt: new Int16Array(width * height).fill(-1), stairs: null };
+  const map = {
+    width,
+    height,
+    tiles,
+    rooms: [],
+    roomAt: new Int16Array(width * height).fill(-1),
+    stairs: null,
+  };
   for (let x = 0; x < width; x++) {
     tiles[idx(map, x, 0)] = TILE.WALL;
     tiles[idx(map, x, height - 1)] = TILE.WALL;
@@ -26,7 +39,19 @@ function miniState({ playerHp = PLAYER_MAX_HP, playerArmor = 0, stairsAt = null,
     tiles[idx(map, stairsAt.x, stairsAt.y)] = TILE.STAIRS_DOWN;
     map.stairsDown = { ...stairsAt };
   }
-  const player = { id: 1, kind: 'player', x: 2, y: 2, hp: playerHp, maxHp: PLAYER_MAX_HP, attackDie: 8, skill: 0, strength: 0, armor: playerArmor, glyph: '@' };
+  const player = {
+    id: 1,
+    kind: 'player',
+    x: 2,
+    y: 2,
+    hp: playerHp,
+    maxHp: PLAYER_MAX_HP,
+    attackDie: 8,
+    skill: 0,
+    strength: 0,
+    armor: playerArmor,
+    glyph: '@',
+  };
   const state = {
     rng: createRng(1),
     status: 'playing',
@@ -38,7 +63,16 @@ function miniState({ playerHp = PLAYER_MAX_HP, playerArmor = 0, stairsAt = null,
     items: potion
       ? [{ id: 99, type: 'potion', x: potion.x, y: potion.y, heal: potion.heal }]
       : chest
-        ? [{ id: 98, type: 'chest', x: chest.x, y: chest.y, effect: chest.effect, amount: chest.amount }]
+        ? [
+            {
+              id: 98,
+              type: 'chest',
+              x: chest.x,
+              y: chest.y,
+              effect: chest.effect,
+              amount: chest.amount,
+            },
+          ]
         : [],
     path: null,
     floors: new Map(),
@@ -60,7 +94,10 @@ describe('potions', () => {
   });
 
   it('clamps healing to max HP (excess wasted)', () => {
-    const { state, player } = miniState({ playerHp: PLAYER_MAX_HP - 3, potion: { x: 3, y: 2, heal: 8 } });
+    const { state, player } = miniState({
+      playerHp: PLAYER_MAX_HP - 3,
+      potion: { x: 3, y: 2, heal: 8 },
+    });
     processCommand(state, { type: 'move', dx: 1, dy: 0 });
     expect(player.hp).toBe(PLAYER_MAX_HP);
     expect(state.items).toHaveLength(0);
@@ -96,7 +133,10 @@ describe('chests', () => {
   });
 
   it('a health chest raises max HP and refills to full', () => {
-    const { state, player } = miniState({ playerHp: 5, chest: { x: 3, y: 2, effect: 'health', amount: 5 } });
+    const { state, player } = miniState({
+      playerHp: 5,
+      chest: { x: 3, y: 2, effect: 'health', amount: 5 },
+    });
     const events = walkOntoChest(state);
     expect(player.maxHp).toBe(PLAYER_MAX_HP + 5);
     expect(player.hp).toBe(player.maxHp);
@@ -124,7 +164,10 @@ describe('chests', () => {
   });
 
   it('a lethal trap kills the player: status dead, death event, entity kept', () => {
-    const { state, player } = miniState({ playerHp: 2, chest: { x: 3, y: 2, effect: 'trap', amount: 2 } });
+    const { state, player } = miniState({
+      playerHp: 2,
+      chest: { x: 3, y: 2, effect: 'trap', amount: 2 },
+    });
     const events = walkOntoChest(state);
     expect(player.hp).toBe(0);
     expect(state.status).toBe('dead');
@@ -158,7 +201,8 @@ describe('chests', () => {
   });
 
   it('chest contents are seed-deterministic', () => {
-    const summary = (state) => state.items.map((it) => ({ type: it.type, x: it.x, y: it.y, effect: it.effect }));
+    const summary = (state) =>
+      state.items.map((it) => ({ type: it.type, x: it.x, y: it.y, effect: it.effect }));
     expect(summary(createGame(777))).toEqual(summary(createGame(777)));
     // And chests actually spawn.
     expect(createGame(777).items.some((it) => it.type === 'chest')).toBe(true);

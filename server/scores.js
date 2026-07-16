@@ -29,7 +29,9 @@ export function validateScore(body) {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
     return fail('body must be an object');
   }
-  const initials = String(body.initials ?? '').trim().toUpperCase();
+  const initials = String(body.initials ?? '')
+    .trim()
+    .toUpperCase();
   if (!/^[A-Z0-9]{3}$/.test(initials)) {
     return fail('initials must be exactly 3 characters, A-Z or 0-9');
   }

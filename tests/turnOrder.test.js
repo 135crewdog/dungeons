@@ -18,8 +18,17 @@ function corridorState({ playerX, playerHp = 20, rngSeed = 1, doorX = null } = {
   for (let x = 1; x <= width - 2; x++) tiles[idx(map, x, 1)] = TILE.FLOOR;
   if (doorX !== null) tiles[idx(map, doorX, 1)] = TILE.DOOR;
   const player = {
-    id: 1, kind: 'player', x: playerX, y: 1, hp: playerHp, maxHp: 20,
-    attackDie: 8, glyph: '@', strength: 0, skill: 0, armor: 0,
+    id: 1,
+    kind: 'player',
+    x: playerX,
+    y: 1,
+    hp: playerHp,
+    maxHp: 20,
+    attackDie: 8,
+    glyph: '@',
+    strength: 0,
+    skill: 0,
+    armor: 0,
   };
   const state = {
     rng: { seed: rngSeed, s: rngSeed },

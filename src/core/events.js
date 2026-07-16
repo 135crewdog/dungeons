@@ -21,7 +21,12 @@ export function attackEvent(attackerId, targetId, hit, damage, x, y, roll = 0) {
   return { type: EV.ATTACK, attackerId, targetId, hit, damage, x, y, roll };
 }
 
-export function pickupEvent(itemId, x, y, { item = 'potion', heal = 0, effect = null, amount = 0 } = {}) {
+export function pickupEvent(
+  itemId,
+  x,
+  y,
+  { item = 'potion', heal = 0, effect = null, amount = 0 } = {},
+) {
   return { type: EV.PICKUP, itemId, x, y, item, heal, effect, amount };
 }
 

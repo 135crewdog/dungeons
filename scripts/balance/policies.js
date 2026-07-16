@@ -168,9 +168,7 @@ function desperate(player) {
 }
 
 function knownPotions(state) {
-  return tileSet(
-    state.items.filter((it) => it.type === 'potion' && isExplored(state, it.x, it.y)),
-  );
+  return tileSet(state.items.filter((it) => it.type === 'potion' && isExplored(state, it.x, it.y)));
 }
 
 // Thorough: clears each floor completely before descending — kill everything
@@ -241,7 +239,10 @@ export const thorough = {
       } else {
         const visible = threats.filter((e) => isVisible(state, e.x, e.y));
         let hunt = visible;
-        if (visible.some((e) => e.kind === 'boss') && (player.hp < player.maxHp - 4 || frontierStep())) {
+        if (
+          visible.some((e) => e.kind === 'boss') &&
+          (player.hp < player.maxHp - 4 || frontierStep())
+        ) {
           // Leave the boss for last: sweep the rest of the floor (and its
           // chests) first — it chases, but it can never catch a moving player.
           hunt = visible.filter((e) => e.kind !== 'boss');

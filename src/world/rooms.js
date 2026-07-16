@@ -4,22 +4,11 @@
 
 import { nextInt } from '../core/rng.js';
 import { idx } from '../core/query.js';
-import {
-  TILE,
-  MIN_ROOMS,
-  MAX_ROOMS,
-  MIN_ROOM_SIZE,
-  MAX_ROOM_SIZE,
-} from '../core/constants.js';
+import { TILE, MIN_ROOMS, MAX_ROOMS, MIN_ROOM_SIZE, MAX_ROOM_SIZE } from '../core/constants.js';
 
 // Two rooms conflict if their rectangles come within one tile of each other.
 function tooClose(a, b) {
-  return (
-    a.x - 1 < b.x + b.w &&
-    a.x + a.w + 1 > b.x &&
-    a.y - 1 < b.y + b.h &&
-    a.y + a.h + 1 > b.y
-  );
+  return a.x - 1 < b.x + b.w && a.x + a.w + 1 > b.x && a.y - 1 < b.y + b.h && a.y + a.h + 1 > b.y;
 }
 
 // Rejection-sample non-overlapping rooms. Returns an array of

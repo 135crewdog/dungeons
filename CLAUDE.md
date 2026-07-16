@@ -15,7 +15,7 @@ Two completely independent layers:
 - **Simulation** — all game logic and state (player position, enemy HP, dungeon
   layout, item locations, turn order, combat). It **never imports or calls Phaser**.
   It exposes pure actions such as `movePlayer(direction)`, `resolveAttack(attackerId,
-  targetId)`, and `advanceTurn()`, and can be tested with no browser.
+targetId)`, and `advanceTurn()`, and can be tested with no browser.
 - **Renderer** — all Phaser code and visual output. It **observes** simulation state
   and draws it; it **never mutates** simulation state. Rendering never triggers
   gameplay logic.
@@ -40,11 +40,12 @@ simulation is unaware of pixels.
 All procedural generation and combat randomness go through **one seedable RNG
 abstraction** (`mulberry32`), never `Math.random()` in gameplay code. A random seed is
 generated at startup, stored on the game state, and **logged to the console** (decimal
-+ base36) so any run can be reproduced. The current seed lives in the **pause menu**
-(shown there with one-click copy), not in a standalone HUD chip; reopening the page with
-`?seed=<value>` replays that run (a numeric URL seed is coerced back to a number so the
-round-trip is exact). The active seed is kept in sync with the URL (`history.replaceState`,
-no reload) whenever a run starts, so a refresh reproduces the current run.
+
+- base36) so any run can be reproduced. The current seed lives in the **pause menu**
+  (shown there with one-click copy), not in a standalone HUD chip; reopening the page with
+  `?seed=<value>` replays that run (a numeric URL seed is coerced back to a number so the
+  round-trip is exact). The active seed is kept in sync with the URL (`history.replaceState`,
+  no reload) whenever a run starts, so a refresh reproduces the current run.
 
 ## Pause Menu
 
@@ -63,7 +64,7 @@ overlay in `ui/` (like the HUD and game-over screen): it only reads the seed and
 composition-root callbacks, never mutating simulation state or importing the renderer. Its
 look is deliberately plain and NetHack-ish so a future ASCII↔sprite art-style toggle can
 slot into the options list. **Leaderboard** and **Help** actions open child overlays that
-layer *above* the menu (z-index 30 vs the menu's 20) with the menu staying open
+layer _above_ the menu (z-index 30 vs the menu's 20) with the menu staying open
 underneath; the menu's Escape handler defers while a child is open (`isChildOpen`
 callback from the composition root), so one Escape press closes only the topmost layer.
 Movement/tap input is gated while any of the three overlays is open.
@@ -128,7 +129,7 @@ the floor swaps and the enemy/pickup phases are skipped.
 - **Primary — click/tap.** Computes an A\* path to the destination using only tiles
   currently **known to be walkable** (unexplored tiles are treated as blocked). The
   path is stored and executed one tile per turn. It cancels automatically if a
-  *newly*-visible enemy enters line of sight, the player takes damage, the path becomes
+  _newly_-visible enemy enters line of sight, the player takes damage, the path becomes
   invalid, or the player issues a new movement command. A click and a tap are identical.
 - **Secondary — keyboard.** Arrow keys and WASD move one cardinal tile per keypress;
   the **numpad (1–9)** provides all 8 directions including diagonals.
@@ -294,10 +295,10 @@ the real engine with two bot policies (thorough / stair-rusher) over hundreds of
 seeded runs. Changes: goblin 7 HP · skeleton 4 HP · **enemy count depth scaling**
 (+1 per 3 floors, cap 12) · **depth-weighted spawn mix** (goblin share 50% +3%/floor,
 cap 80%) · chest table 30/25/30/15 with `CHEST_TABLE` thresholds · health chest +4 ·
-boss 26 HP base, +12/tier, exempt from the flat damage drip. *(The HP/chest numbers in
+boss 26 HP base, +12/tier, exempt from the flat damage drip. _(The HP/chest numbers in
 this changelog are the 3d-era values and were re-tuned again in 3f; the Combat section
 above — goblin 6 HP, skeleton 3 HP, boss 24 HP base, chest table 25/20/25/20/10 — is
-authoritative.)*
+authoritative.)_
 
 Phase 3e (complete, superseded by 3f): **player damage die** — the player rolled
 d4+2 (+strength) per landed hit instead of a flat 4, making combat dice on both

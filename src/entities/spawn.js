@@ -70,7 +70,10 @@ export function enemyCountFor(rng, floorNumber) {
 // The goblin share of the spawn mix: 50/50 on floor 1, drifting toward the
 // tougher archetype with depth (capped so skeletons never vanish).
 export function goblinShareFor(floorNumber) {
-  return Math.min(GOBLIN_WEIGHT_MAX, GOBLIN_WEIGHT_BASE + GOBLIN_WEIGHT_PER_FLOOR * (floorNumber - 1));
+  return Math.min(
+    GOBLIN_WEIGHT_MAX,
+    GOBLIN_WEIGHT_BASE + GOBLIN_WEIGHT_PER_FLOOR * (floorNumber - 1),
+  );
 }
 
 function spawnEnemies(state, floorNumber) {

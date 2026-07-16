@@ -94,12 +94,22 @@ export function runGame(seed, policyName, { maxFloor = 12, floorTurnCap = 2000 }
   };
 }
 
-export function runBatch(policyName, { runs = 200, baseSeed = 1000, maxFloor = 12, floorTurnCap } = {}) {
+export function runBatch(
+  policyName,
+  { runs = 200, baseSeed = 1000, maxFloor = 12, floorTurnCap } = {},
+) {
   const results = [];
   for (let i = 0; i < runs; i++) {
     results.push(runGame(baseSeed + i, policyName, { maxFloor, floorTurnCap }));
   }
-  return { policy: policyName, runs, baseSeed, maxFloor, summary: summarize(results, maxFloor), results };
+  return {
+    policy: policyName,
+    runs,
+    baseSeed,
+    maxFloor,
+    summary: summarize(results, maxFloor),
+    results,
+  };
 }
 
 export function summarize(results, maxFloor) {

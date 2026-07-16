@@ -53,7 +53,13 @@ describe('initials', () => {
 
 describe('buildScorePayload', () => {
   it('stringifies the seed and keeps every field', () => {
-    const p = buildScorePayload({ initials: 'ABC', floor: 5, version: '0.5.0', seed: 42, turns: 300 });
+    const p = buildScorePayload({
+      initials: 'ABC',
+      floor: 5,
+      version: '0.5.0',
+      seed: 42,
+      turns: 300,
+    });
     expect(p).toEqual(PAYLOAD);
   });
 });
@@ -125,7 +131,13 @@ describe('client', () => {
         return okJson();
       },
     });
-    storage.setItem('lb.queue', JSON.stringify([{ ...PAYLOAD, turns: 1 }, { ...PAYLOAD, turns: 2 }]));
+    storage.setItem(
+      'lb.queue',
+      JSON.stringify([
+        { ...PAYLOAD, turns: 1 },
+        { ...PAYLOAD, turns: 2 },
+      ]),
+    );
     await client.flushQueue();
     expect(sent.map((p) => p.turns)).toEqual([1, 2]);
     expect(JSON.parse(storage.getItem('lb.queue'))).toEqual([]);
