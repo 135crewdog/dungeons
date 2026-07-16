@@ -29,6 +29,37 @@ describe('help overlay', () => {
     window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
     expect(help.isOpen()).toBe(false);
   });
+
+  it('restores focus to the opener when closed', () => {
+    const opener = document.createElement('button');
+    opener.textContent = 'Help';
+    document.body.appendChild(opener);
+    opener.focus();
+    const help = createHelp(document.body);
+    help.open();
+    expect(document.activeElement).not.toBe(opener); // panel took focus
+    help.close();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('traps Tab inside the open dialog', () => {
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    const help = createHelp(document.body);
+    help.open();
+    // The help panel's only focusable is the × close button: Tab from it (the
+    // last focusable) must wrap back to the first, never escape the dialog.
+    const closeBtn = help.el.querySelector('.menu-x');
+    closeBtn.focus();
+    const tab = new window.KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    });
+    closeBtn.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(closeBtn); // wrapped to first (itself)
+  });
 });
 
 describe('leaderboard overlay', () => {

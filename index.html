@@ -2,10 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-    />
+    <!-- Pinch-zoom stays enabled (WCAG 1.4.4): touch-action on the page already
+         keeps play gestures from scrolling/zooming mid-game, and low-vision
+         players need to be able to magnify the overlays. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0d12" />
     <link rel="icon" href="./icons/favicon-64.png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
@@ -93,14 +93,16 @@
         /* Reserve room on the right for the Menu button so banked buffs
            (STR/SKL/ARM) wrap to a new line instead of sliding under it. */
         max-width: calc(
-          100vw - max(10px, env(safe-area-inset-left)) -
-            max(10px, env(safe-area-inset-right)) - 52px
+          100vw - max(10px, env(safe-area-inset-left)) - max(10px, env(safe-area-inset-right)) -
+            52px
         );
         display: flex;
         flex-wrap: wrap;
         gap: 4px 16px; /* tight row-gap when wrapped; column gap unchanged */
         font-size: var(--fs-lg);
-        text-shadow: 0 1px 2px #000, 0 0 2px #000;
+        text-shadow:
+          0 1px 2px #000,
+          0 0 2px #000;
       }
       /* Keep each readout intact when the row wraps. */
       #hud .hud-item {
@@ -120,7 +122,9 @@
         right: max(10px, env(safe-area-inset-right));
         font-size: 15px;
         opacity: 0.5;
-        text-shadow: 0 1px 2px #000, 0 0 2px #000;
+        text-shadow:
+          0 1px 2px #000,
+          0 0 2px #000;
       }
       #msglog {
         left: max(10px, env(safe-area-inset-left));
@@ -133,7 +137,9 @@
         overflow: hidden;
         font-size: 13px;
         line-height: 1.35;
-        text-shadow: 0 1px 2px #000, 0 0 2px #000;
+        text-shadow:
+          0 1px 2px #000,
+          0 0 2px #000;
       }
       /* Menu trigger: plain HUD text ("Menu"), top-right, matching the HP/Floor
          readouts. Appended straight to <body>, so it positions itself. Its
@@ -152,7 +158,9 @@
         background: none;
         border: 0;
         cursor: pointer;
-        text-shadow: 0 1px 2px #000, 0 0 2px #000;
+        text-shadow:
+          0 1px 2px #000,
+          0 0 2px #000;
       }
       #menubtn:hover {
         color: #fff;

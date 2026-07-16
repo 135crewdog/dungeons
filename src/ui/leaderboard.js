@@ -22,6 +22,9 @@ export function createLeaderboard(parent, { fetchScores }) {
   label.textContent = 'Top runs — last 30 days';
   const body = document.createElement('div');
   body.className = 'lb-body';
+  // Live region on the stable container (status divs inside it get replaced),
+  // so screen readers announce Loading… → rows/offline/empty transitions.
+  body.setAttribute('aria-live', 'polite');
   panel.append(label, body);
   parent.appendChild(el);
 

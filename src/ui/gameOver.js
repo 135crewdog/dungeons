@@ -4,7 +4,7 @@
 // the UI stays click-through. Read only; the callbacks own the actual work.
 
 import { sanitizeInitials, isValidInitials } from '../net/leaderboard.js';
-import { isEditable } from './dom.js';
+import { isEditable, trapTabKey } from './dom.js';
 
 // Options wire the overlay to the composition root:
 //   isKeyboardBlocked()      → suppress the Enter/Space restart shortcut while
@@ -33,7 +33,7 @@ export function createGameOver(parent, opts = {}) {
     'aria-label="Your initials for the leaderboard" />' +
     '<button type="submit">Submit</button>' +
     '</form>' +
-    '<p class="go-status"></p>' +
+    '<p class="go-status" aria-live="polite"></p>' +
     '<div class="go-buttons">' +
     '<button type="button" data-act="board">Leaderboard</button>' +
     '<button type="button" data-act="restart">New run</button>' +
@@ -79,6 +79,13 @@ export function createGameOver(parent, opts = {}) {
     else if (act === 'board') opts.onShowLeaderboard?.();
   });
 
+  // Focus trap while the death screen is up (scoped to the overlay, so a menu
+  // or leaderboard layered above — which holds its own focus — is unaffected).
+  const panel = el.querySelector('.go-panel');
+  el.addEventListener('keydown', (e) => {
+    if (el.classList.contains('show')) trapTabKey(panel, e);
+  });
+
   // Enter or Space also restarts while the overlay is up — unless another
   // overlay is layered over it, or the initials input has focus (there Enter
   // belongs to the form).
@@ -104,6 +111,8 @@ export function createGameOver(parent, opts = {}) {
     input.value = getLastInitials();
     status.textContent = '';
     el.classList.add('show');
+    // Arcade UX: land the keyboard straight in the initials field.
+    if (canSubmit()) input.focus();
   }
 
   function hide() {
