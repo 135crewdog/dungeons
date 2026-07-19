@@ -32,6 +32,7 @@ function corridorState({ playerX, enemyX, enemyType = ENEMY_TYPES.goblin }) {
     status: 'playing',
     turn: 0,
     log: [],
+    items: [],
     map,
     vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
     entities: {
@@ -45,6 +46,75 @@ function corridorState({ playerX, enemyX, enemyType = ENEMY_TYPES.goblin }) {
   };
   return { state, player, enemy };
 }
+
+// A 7x5 open room (floor at x=1..5, y=1..3) with a single blocker tile at the
+// center (3,2): either a stair tile or an item on the floor. Player and enemy
+// sit on the middle row on opposite sides, so the only way across is around the
+// blocker — exactly what an enemy must do (it can't use stairs or loot).
+function blockedRoomState({ blocker }) {
+  const width = 7;
+  const height = 5;
+  const tiles = new Uint8Array(width * height); // all WALL
+  const roomAt = new Int16Array(width * height).fill(-1);
+  const map = { width, height, tiles, rooms: [], roomAt, stairsDown: null, stairsUp: null };
+  for (let y = 1; y <= 3; y++) {
+    for (let x = 1; x <= 5; x++) tiles[idx(map, x, y)] = TILE.FLOOR;
+  }
+  const items = [];
+  if (blocker === 'stair') {
+    tiles[idx(map, 3, 2)] = TILE.STAIRS_DOWN;
+    map.stairsDown = { x: 3, y: 2 };
+  } else if (blocker === 'item') {
+    items.push({ id: 9, type: 'potion', x: 3, y: 2, heal: 5 });
+  }
+  const player = { id: 1, kind: 'player', x: 1, y: 2, hp: 20, maxHp: 20, attackDie: 8, glyph: '@' };
+  const enemy = createEnemy(ENEMY_TYPES.goblin, 5, 2, 1);
+  enemy.id = 2;
+  const state = {
+    rng: { seed: 1, s: 1 },
+    status: 'playing',
+    turn: 0,
+    log: [],
+    items,
+    map,
+    vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
+    entities: {
+      nextId: 3,
+      playerId: 1,
+      byId: new Map([
+        [1, player],
+        [2, enemy],
+      ]),
+    },
+  };
+  return { state, player, enemy };
+}
+
+describe('enemies route around stairs and items', () => {
+  it('never steps onto a stair tile while closing on the player', () => {
+    const { state, enemy } = blockedRoomState({ blocker: 'stair' });
+    let attacked = false;
+    for (let i = 0; i < 8 && !attacked; i++) {
+      updateVisibility(state);
+      const events = enemyTurn(state, 2);
+      expect(enemy.x === 3 && enemy.y === 2).toBe(false); // never on the stairs
+      attacked = events.some((e) => e.type === 'attack');
+    }
+    expect(attacked).toBe(true); // it reached the player by going around
+  });
+
+  it('never steps onto an item tile while closing on the player', () => {
+    const { state, enemy } = blockedRoomState({ blocker: 'item' });
+    let attacked = false;
+    for (let i = 0; i < 8 && !attacked; i++) {
+      updateVisibility(state);
+      const events = enemyTurn(state, 2);
+      expect(enemy.x === 3 && enemy.y === 2).toBe(false); // never on the potion
+      attacked = events.some((e) => e.type === 'attack');
+    }
+    expect(attacked).toBe(true); // it reached the player by going around
+  });
+});
 
 describe('enemy aggro through doors', () => {
   it('does not aggro on a player hidden behind a closed door', () => {

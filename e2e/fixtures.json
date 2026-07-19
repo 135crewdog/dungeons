@@ -41,274 +41,262 @@
         {
           "id": 2,
           "kind": "skeleton",
-          "x": 32,
-          "y": 14,
+          "x": 31,
+          "y": 17,
           "hp": 3
         },
         {
           "id": 3,
-          "kind": "goblin",
-          "x": 70,
-          "y": 10,
-          "hp": 6
+          "kind": "skeleton",
+          "x": 65,
+          "y": 17,
+          "hp": 3
         },
         {
           "id": 4,
           "kind": "skeleton",
-          "x": 66,
-          "y": 16,
+          "x": 28,
+          "y": 32,
           "hp": 3
         },
         {
           "id": 5,
           "kind": "skeleton",
           "x": 31,
-          "y": 10,
+          "y": 15,
           "hp": 3
         },
         {
           "id": 6,
-          "kind": "goblin",
+          "kind": "skeleton",
           "x": 28,
-          "y": 15,
-          "hp": 6
+          "y": 10,
+          "hp": 3
         },
         {
           "id": 7,
-          "kind": "goblin",
-          "x": 26,
-          "y": 31,
-          "hp": 6
+          "kind": "skeleton",
+          "x": 20,
+          "y": 9,
+          "hp": 3
         },
         {
           "id": 8,
-          "kind": "goblin",
-          "x": 52,
-          "y": 10,
-          "hp": 6
+          "kind": "skeleton",
+          "x": 49,
+          "y": 11,
+          "hp": 3
         }
       ],
       "items": [
         {
           "id": 9,
           "type": "potion",
-          "x": 65,
-          "y": 10
+          "x": 28,
+          "y": 12
         },
         {
           "id": 10,
-          "type": "potion",
-          "x": 35,
-          "y": 19
-        },
-        {
-          "id": 11,
-          "type": "potion",
-          "x": 44,
-          "y": 30
-        },
-        {
-          "id": 12,
           "type": "chest",
-          "x": 39,
-          "y": 28
+          "x": 18,
+          "y": 9
         }
       ],
-      "explored": 103,
-      "visible": 103,
-      "mapHash": 1711614683
+      "explored": 60,
+      "visible": 60,
+      "mapHash": 1152866694
     }
   },
   "trip": {
-    "seed": 3,
+    "seed": 1,
     "cmds": [
       {
-        "c": "Numpad2",
+        "c": "Numpad9",
         "t": 1,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad9",
         "t": 2,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 3,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad8",
         "t": 4,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad8",
         "t": 5,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad8",
         "t": 6,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad8",
         "t": 7,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad8",
         "t": 8,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 9,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 10,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad4",
         "t": 11,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad4",
         "t": 12,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad7",
         "t": 13,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad4",
         "t": 14,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad4",
         "t": 15,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad4",
         "t": 16,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad4",
         "t": 17,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad4",
         "t": 18,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad4",
         "t": 19,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad7",
         "t": 20,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 21,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 22,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 23,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 24,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 25,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 26,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 27,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 28,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 29,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 30,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 31,
         "f": 1
       },
       {
-        "c": "Numpad7",
+        "c": "Numpad8",
         "t": 32,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 33,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad8",
         "t": 34,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad9",
         "t": 35,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad8",
         "t": 36,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 37,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad4",
         "t": 38,
         "f": 1
       },
@@ -323,92 +311,92 @@
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad7",
         "t": 41,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad7",
         "t": 42,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad7",
         "t": 43,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 44,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad4",
         "t": 45,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad6",
         "t": 46,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad9",
         "t": 47,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad6",
         "t": 48,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad3",
         "t": 49,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad3",
         "t": 50,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad6",
         "t": 51,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 52,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad1",
         "t": 53,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 54,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad7",
         "t": 55,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad7",
         "t": 56,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 57,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 58,
         "f": 1
       },
@@ -423,7 +411,7 @@
         "f": 1
       },
       {
-        "c": "Numpad7",
+        "c": "Numpad4",
         "t": 61,
         "f": 1
       },
@@ -438,237 +426,237 @@
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad4",
         "t": 64,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad4",
         "t": 65,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad7",
         "t": 66,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad7",
         "t": 67,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad4",
         "t": 68,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad4",
         "t": 69,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 70,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 71,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 72,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 73,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 74,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad4",
         "t": 75,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad4",
         "t": 76,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 77,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 78,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad2",
         "t": 79,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad2",
         "t": 80,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad2",
         "t": 81,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad2",
         "t": 82,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad2",
         "t": 83,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad2",
         "t": 84,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad2",
         "t": 85,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad2",
         "t": 86,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 87,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 88,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 89,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 90,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad8",
         "t": 91,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 92,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 93,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 94,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 95,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 96,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 97,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 98,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 99,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 100,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 101,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad6",
         "t": 102,
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad6",
         "t": 103,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 104,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 105,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 106,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 107,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad3",
         "t": 108,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad3",
         "t": 109,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 110,
         "f": 1
       },
@@ -703,127 +691,127 @@
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 117,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 118,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad9",
         "t": 119,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 120,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad3",
         "t": 121,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad3",
         "t": 122,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 123,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 124,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 125,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 126,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 127,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 128,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 129,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 130,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 131,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 132,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 133,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 134,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 135,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 136,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 137,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 138,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 139,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad9",
         "t": 140,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad9",
         "t": 141,
         "f": 1
       },
@@ -838,52 +826,52 @@
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad3",
         "t": 144,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad3",
         "t": 145,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad3",
         "t": 146,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 147,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad6",
         "t": 148,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad6",
         "t": 149,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad6",
         "t": 150,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad6",
         "t": 151,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad6",
         "t": 152,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad6",
         "t": 153,
         "f": 1
       },
@@ -898,264 +886,98 @@
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad9",
         "t": 156,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad3",
         "t": 157,
         "f": 1
       },
       {
-        "c": "Numpad9",
-        "t": 158,
-        "f": 1
-      },
-      {
-        "c": "Numpad6",
-        "t": 159,
-        "f": 1
-      },
-      {
-        "c": "Numpad6",
-        "t": 160,
-        "f": 1
-      },
-      {
-        "c": "Numpad6",
-        "t": 161,
-        "f": 1
-      },
-      {
         "c": "Numpad3",
-        "t": 162,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 163,
-        "f": 1
-      },
-      {
-        "c": "Numpad6",
-        "t": 164,
-        "f": 1
-      },
-      {
-        "c": "Numpad6",
-        "t": 165,
-        "f": 1
-      },
-      {
-        "c": "Numpad6",
-        "t": 166,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 167,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 168,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 169,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 170,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 171,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 172,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 173,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 174,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 175,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 176,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 177,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 178,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 179,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 180,
-        "f": 1
-      },
-      {
-        "c": "Numpad2",
-        "t": 181,
-        "f": 1
-      },
-      {
-        "c": "Numpad6",
-        "t": 182,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 183,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 184,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 185,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 185,
+        "t": 157,
         "f": 2
       },
       {
         "c": "Numpad6",
-        "t": 186,
+        "t": 158,
         "f": 2
       },
       {
         "c": "Numpad4",
-        "t": 186,
+        "t": 158,
         "f": 1
       }
     ],
-    "fightAt": 65,
+    "fightAt": 30,
     "doorFix": {
-      "atCommand": 2,
+      "atCommand": 4,
       "ahead": {
-        "x": 33,
-        "y": 8
+        "x": 41,
+        "y": 37
       }
     },
-    "floor1MapHash": 2802607353,
-    "arrivedFloor2Turn": 185,
+    "floor1MapHash": 1152866694,
+    "arrivedFloor2Turn": 157,
     "final": {
-      "turn": 186,
+      "turn": 158,
       "floor": 1,
       "status": "playing",
       "player": {
-        "x": 55,
-        "y": 35,
-        "hp": 9,
+        "x": 67,
+        "y": 13,
+        "hp": 2,
         "maxHp": 20,
         "strength": 0,
         "skill": 0,
-        "armor": 0
+        "armor": 1
       },
       "entities": [
         {
           "id": 1,
           "kind": "player",
-          "x": 55,
-          "y": 35,
-          "hp": 9
+          "x": 67,
+          "y": 13,
+          "hp": 2
         },
         {
-          "id": 2,
-          "kind": "goblin",
-          "x": 34,
-          "y": 16,
-          "hp": 6
+          "id": 3,
+          "kind": "skeleton",
+          "x": 65,
+          "y": 15,
+          "hp": 3
         },
         {
-          "id": 5,
-          "kind": "goblin",
-          "x": 42,
-          "y": 38,
-          "hp": 6
-        },
-        {
-          "id": 6,
-          "kind": "goblin",
-          "x": 23,
-          "y": 39,
-          "hp": 6
+          "id": 4,
+          "kind": "skeleton",
+          "x": 31,
+          "y": 29,
+          "hp": 3
         }
       ],
-      "items": [
-        {
-          "id": 8,
-          "type": "potion",
-          "x": 32,
-          "y": 4
-        },
-        {
-          "id": 9,
-          "type": "potion",
-          "x": 13,
-          "y": 6
-        },
-        {
-          "id": 10,
-          "type": "chest",
-          "x": 33,
-          "y": 4
-        }
-      ],
-      "explored": 972,
-      "visible": 90,
-      "mapHash": 2802607353
+      "items": [],
+      "explored": 803,
+      "visible": 99,
+      "mapHash": 1152866694
     }
   },
   "fight": {
     "seed": 1,
     "cmds": [
       {
-        "c": "Numpad8",
+        "c": "Numpad7",
         "t": 1,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad7",
         "t": 2,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad4",
         "t": 3,
         "f": 1
       },
@@ -1190,12 +1012,12 @@
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 10,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 11,
         "f": 1
       },
@@ -1223,26 +1045,16 @@
         "c": "Numpad4",
         "t": 16,
         "f": 1
-      },
-      {
-        "c": "Numpad4",
-        "t": 17,
-        "f": 1
-      },
-      {
-        "c": "Numpad4",
-        "t": 18,
-        "f": 1
       }
     ],
     "after": {
-      "turn": 18,
+      "turn": 16,
       "floor": 1,
       "status": "playing",
       "player": {
-        "x": 30,
-        "y": 32,
-        "hp": 14,
+        "x": 31,
+        "y": 31,
+        "hp": 16,
         "maxHp": 20,
         "strength": 0,
         "skill": 0,
@@ -1252,101 +1064,94 @@
         {
           "id": 1,
           "kind": "player",
-          "x": 30,
-          "y": 32,
-          "hp": 14
+          "x": 31,
+          "y": 31,
+          "hp": 16
         },
         {
           "id": 2,
           "kind": "skeleton",
-          "x": 32,
-          "y": 14,
+          "x": 31,
+          "y": 17,
           "hp": 3
         },
         {
           "id": 3,
-          "kind": "goblin",
-          "x": 70,
-          "y": 10,
-          "hp": 6
+          "kind": "skeleton",
+          "x": 65,
+          "y": 17,
+          "hp": 3
         },
         {
           "id": 4,
           "kind": "skeleton",
-          "x": 66,
-          "y": 16,
-          "hp": 3
+          "x": 30,
+          "y": 31,
+          "hp": 2
         },
         {
           "id": 5,
           "kind": "skeleton",
           "x": 31,
-          "y": 10,
+          "y": 15,
           "hp": 3
         },
         {
           "id": 6,
-          "kind": "goblin",
+          "kind": "skeleton",
           "x": 28,
-          "y": 15,
-          "hp": 6
+          "y": 10,
+          "hp": 3
         },
         {
           "id": 7,
-          "kind": "goblin",
-          "x": 29,
-          "y": 32,
-          "hp": 6
+          "kind": "skeleton",
+          "x": 20,
+          "y": 9,
+          "hp": 3
         },
         {
           "id": 8,
-          "kind": "goblin",
-          "x": 52,
-          "y": 10,
-          "hp": 6
+          "kind": "skeleton",
+          "x": 49,
+          "y": 11,
+          "hp": 3
         }
       ],
       "items": [
         {
           "id": 9,
           "type": "potion",
-          "x": 65,
-          "y": 10
+          "x": 28,
+          "y": 12
         },
         {
           "id": 10,
-          "type": "potion",
-          "x": 35,
-          "y": 19
-        },
-        {
-          "id": 11,
-          "type": "potion",
-          "x": 44,
-          "y": 30
-        },
-        {
-          "id": 12,
           "type": "chest",
-          "x": 39,
-          "y": 28
+          "x": 18,
+          "y": 9
         }
       ],
-      "explored": 230,
-      "visible": 59,
-      "mapHash": 1711614683
+      "explored": 150,
+      "visible": 54,
+      "mapHash": 1152866694
     }
   },
   "skill": {
-    "seed": 3,
+    "seed": 27,
     "chest": {
-      "x": 33,
-      "y": 4
+      "x": 7,
+      "y": 8
     },
     "cmds": [
       {
-        "c": "Numpad8",
+        "c": "Numpad9",
         "t": 1,
+        "f": 1
+      },
+      {
+        "c": "Numpad6",
+        "t": 2,
         "f": 1
       }
     ],
