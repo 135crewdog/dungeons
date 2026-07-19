@@ -1,9 +1,10 @@
 # Dungeons
 
 A browser-based roguelike dungeon crawler built with **Phaser** and vanilla
-JavaScript, playable as an installable **offline PWA**. Rendered entirely in ASCII.
-There is no scripted story — everything emerges from the systems and procedural
-generation.
+JavaScript, playable as an installable **offline PWA**. Terrain renders from the
+Shattered Pixel Dungeon prison tileset with autotiled pseudo-3D walls; the player,
+monsters, and items are classic ASCII glyphs on top. There is no scripted story —
+everything emerges from the systems and procedural generation.
 
 Descend through procedurally generated floors, fight monsters that grow with the
 depth, loot chests, and see how deep you can get before you die — then put your
@@ -12,6 +13,9 @@ three initials on the cross-device leaderboard.
 ## Features
 
 - Procedurally generated floors (rooms + corridors + doors), different every run
+- **Sprite terrain** with SPD-style autotiling: stitched wall tops drawn over
+  actors (pseudo-3D), two door orientations that swing open as you step through,
+  per-cell floor variety — with the full ASCII look one switch away
 - Symmetric-shadowcasting field of view with remembered (dimmed) terrain
 - Goblins and skeletons that wake on sight and hunt you with A\* pathfinding — and
   give up the chase when you break their line of sight (closed doors block sight,
