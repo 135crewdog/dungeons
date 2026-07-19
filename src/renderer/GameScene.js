@@ -27,12 +27,18 @@ export class DungeonScene extends Phaser.Scene {
     this.state = this.registry.get('state');
     createGlyphTextures(this);
 
+    // Persistent, explicitly depth-ordered layers: terrain under items under
+    // entities under wall tops (the walls layer draws OVER actors — that
+    // occlusion is the SPD pseudo-3D; it stays empty in ASCII mode). Explicit
+    // depths, not add-order, so rebuildFloor can never scramble stacking.
+    this.groundLayer = this.add.layer().setDepth(0);
+    this.itemLayer = this.add.layer().setDepth(10);
+    this.entityLayer = this.add.layer().setDepth(20);
+    this.wallsLayer = this.add.layer().setDepth(30);
+
     this.grid = new GlyphGrid(this);
     this.grid.build(this.state.map);
 
-    // Items under entities under nothing; the grid is beneath both.
-    this.itemLayer = this.add.layer();
-    this.entityLayer = this.add.layer();
     this.itemImages = new Map();
     this.entityImages = new Map();
 
@@ -81,6 +87,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   // Discard the current floor's visuals and draw a freshly generated one.
+  // The depth layers persist; only their contents are rebuilt.
   rebuildFloor() {
     this.grid.destroy();
     this.grid = new GlyphGrid(this);
