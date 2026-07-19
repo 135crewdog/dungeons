@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { getPlayer, entitiesSorted, isVisible, isExplored } from '../core/query.js';
 import { EV } from '../core/events.js';
 import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
+import { SpriteTileGrid, TILESHEET_KEY } from './spriteLayer.js';
 import { computeZoom, tileToWorld, tileCenterWorld, worldToTile } from './camera.js';
 import {
   entityGlyph,
@@ -11,6 +12,7 @@ import {
   scaleColor,
   FLOAT_COLOR,
   BG_COLOR,
+  RENDER_STYLE,
 } from './tileStyle.js';
 import { spawnFloatingText } from './floatingText.js';
 
@@ -21,6 +23,27 @@ import { spawnFloatingText } from './floatingText.js';
 export class DungeonScene extends Phaser.Scene {
   constructor() {
     super('dungeon');
+  }
+
+  preload() {
+    if (RENDER_STYLE !== 'sprites') return;
+    // 16px frames on a 16-column sheet: frame index = col + 16*row, matching
+    // the indices autotile.js emits. The relative URL resolves against
+    // index.html in both dev and the `base: './'` production build.
+    this.load.spritesheet(TILESHEET_KEY, 'assets/environment/tiles_prison.png', {
+      frameWidth: 16,
+      frameHeight: 16,
+    });
+  }
+
+  // Sprites unless disabled — or unless the sheet failed to load, in which
+  // case the ASCII grid keeps the game fully playable.
+  useSprites() {
+    return RENDER_STYLE === 'sprites' && this.textures.exists(TILESHEET_KEY);
+  }
+
+  makeGrid() {
+    return this.useSprites() ? new SpriteTileGrid(this) : new GlyphGrid(this);
   }
 
   create() {
@@ -36,7 +59,7 @@ export class DungeonScene extends Phaser.Scene {
     this.entityLayer = this.add.layer().setDepth(20);
     this.wallsLayer = this.add.layer().setDepth(30);
 
-    this.grid = new GlyphGrid(this);
+    this.grid = this.makeGrid();
     this.grid.build(this.state.map);
 
     this.itemImages = new Map();
@@ -90,7 +113,7 @@ export class DungeonScene extends Phaser.Scene {
   // The depth layers persist; only their contents are rebuilt.
   rebuildFloor() {
     this.grid.destroy();
-    this.grid = new GlyphGrid(this);
+    this.grid = this.makeGrid();
     this.grid.build(this.state.map);
     for (const img of this.itemImages.values()) img.destroy();
     for (const img of this.entityImages.values()) img.destroy();
