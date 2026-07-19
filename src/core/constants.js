@@ -101,6 +101,26 @@ export const MIN_ROOMS = 7;
 export const MAX_ROOMS = 12;
 export const MIN_ROOM_SIZE = 4;
 export const MAX_ROOM_SIZE = 10;
+// Keep rooms clustered: a room must sit within this Manhattan distance
+// (center-to-center) of an existing room, so no single connecting corridor has
+// to span an empty quarter of the map (the long-hallway fix).
+export const MAX_NEIGHBOR_GAP = 30;
+
+// Corridor loops. Beyond the spanning tree we add a few loop corridors for
+// alternate routes, but only genuine shortcuts: a loop is carved only between
+// rooms at least LOOP_MIN_GRAPH_DIST hops apart in the corridor graph (so it
+// never runs parallel to an existing hall — a redundant triangle side is 2 hops
+// apart), no room takes on more than LOOP_MAX_ROOM_DEGREE corridors, and the
+// loop is no longer than LOOP_MAX_LENGTH_FACTOR x the median tree corridor.
+export const LOOP_MIN_GRAPH_DIST = 3;
+export const LOOP_MAX_ROOM_DEGREE = 3;
+export const LOOP_MAX_LENGTH_FACTOR = 1.5;
+
+// Punch a single door between two rooms that sit exactly one wall apart but are
+// far apart in the corridor graph, so physically-close rooms feel connected
+// instead of forcing a long detour.
+export const CONNECT_ADJACENT_ROOMS = true;
+export const ADJACENT_ROOM_MIN_GRAPH_DIST = 3;
 
 // Population per floor (mildly RNG-varied). Enemy count grows with depth:
 // +1 per ENEMY_COUNT_EVERY_FLOORS floors of descent, capped at

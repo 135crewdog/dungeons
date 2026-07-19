@@ -26,7 +26,7 @@ const STATS = [
   ['Floor', 'Dungeon floor, starts on 1, goes deeper and deeper'],
   ['STR', 'Strength, increases how much damage you deal to enemies'],
   ['ARM', 'Armor, reduces the damage enemies deal to you'],
-  ['SKILL', 'Skill, improves your hit or miss accuracy'],
+  ['SKL', 'Skill, improves your hit or miss accuracy'],
 ];
 
 const CONTROLS = [

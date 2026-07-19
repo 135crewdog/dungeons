@@ -9,8 +9,20 @@
 
 import { nextInt } from '../core/rng.js';
 import { idx, inBounds } from '../core/query.js';
-import { TILE } from '../core/constants.js';
+import {
+  TILE,
+  LOOP_MIN_GRAPH_DIST,
+  LOOP_MAX_ROOM_DEGREE,
+  LOOP_MAX_LENGTH_FACTOR,
+  CONNECT_ADJACENT_ROOMS,
+  ADJACENT_ROOM_MIN_GRAPH_DIST,
+} from '../core/constants.js';
 import { roomCenter } from './rooms.js';
+
+// Clamp v into the inclusive [lo, hi] range.
+function clamp(v, lo, hi) {
+  return v < lo ? lo : v > hi ? hi : v;
+}
 
 // Ordered tiles of an L-path from (x1,y1) to (x2,y2), inclusive of the end.
 function lPath(x1, y1, x2, y2, horizontalFirst) {
@@ -42,25 +54,28 @@ function rangeOverlap(a0, a1, b0, b1) {
   return lo <= hi ? [lo, hi] : null;
 }
 
-// Carve a corridor between two rooms. If their interiors share a column, run a
-// straight vertical tunnel through it; if they share a row, a straight
-// horizontal one; otherwise bend once between the two centers. Rooms never
-// overlap, so a shared column implies vertical separation (and vice versa).
-function tunnel(map, rng, a, b) {
+// Carve a corridor between two rooms. Routing is fully deterministic (no RNG),
+// so repeated corridors between aligned rooms coincide instead of scattering
+// one tile apart into a double-wide hall. If their interiors share a column,
+// run a straight vertical tunnel through the column nearest both centers; if
+// they share a row, a straight horizontal one; otherwise a single L-bend that
+// travels the longer axis first, so the elbow reads as one clean corner. Rooms
+// never overlap, so a shared column implies vertical separation (and vice versa).
+function tunnel(map, a, b) {
+  const ca = roomCenter(a);
+  const cb = roomCenter(b);
   const xo = rangeOverlap(a.x, a.x + a.w - 1, b.x, b.x + b.w - 1);
   const yo = rangeOverlap(a.y, a.y + a.h - 1, b.y, b.y + b.h - 1);
   if (xo) {
-    const cx = nextInt(rng, xo[0], xo[1]);
+    const cx = clamp(Math.round((ca.x + cb.x) / 2), xo[0], xo[1]);
     const [top, bot] = a.y < b.y ? [a, b] : [b, a];
     for (let y = top.y + top.h; y <= bot.y - 1; y++) carveFloor(map, cx, y);
   } else if (yo) {
-    const cy = nextInt(rng, yo[0], yo[1]);
+    const cy = clamp(Math.round((ca.y + cb.y) / 2), yo[0], yo[1]);
     const [left, right] = a.x < b.x ? [a, b] : [b, a];
     for (let x = left.x + left.w; x <= right.x - 1; x++) carveFloor(map, x, cy);
   } else {
-    const ca = roomCenter(a);
-    const cb = roomCenter(b);
-    const horizontalFirst = nextInt(rng, 0, 1) === 0;
+    const horizontalFirst = Math.abs(cb.x - ca.x) >= Math.abs(cb.y - ca.y);
     for (const { x, y } of lPath(ca.x, ca.y, cb.x, cb.y, horizontalFirst)) {
       carveFloor(map, x, y);
     }
@@ -133,11 +148,97 @@ function roomDist(a, b) {
   return Math.abs(ca.x - cb.x) + Math.abs(ca.y - cb.y);
 }
 
+// Hop count between two rooms over the current corridor graph (BFS), or
+// Infinity if they are not yet connected through it. Used to keep loop edges
+// meaningful: a redundant triangle side is only 2 hops apart, a real shortcut
+// is farther.
+function graphDist(adj, src, dst) {
+  if (src === dst) return 0;
+  const dist = new Map([[src, 0]]);
+  const queue = [src];
+  for (let head = 0; head < queue.length; head++) {
+    const u = queue[head];
+    const du = dist.get(u);
+    for (const v of adj[u]) {
+      if (dist.has(v)) continue;
+      if (v === dst) return du + 1;
+      dist.set(v, du + 1);
+      queue.push(v);
+    }
+  }
+  return Infinity;
+}
+
+// Median corridor length over the tree edges, for the loop-length cap.
+function medianTreeLength(treeEdges) {
+  if (treeEdges.length === 0) return 0;
+  const lens = treeEdges.map((e) => e.d).sort((a, b) => a - b);
+  const mid = lens.length >> 1;
+  return lens.length % 2 ? lens[mid] : (lens[mid - 1] + lens[mid]) / 2;
+}
+
+// The single wall tile to punch as a door between two rooms that sit exactly one
+// wall apart with overlapping columns (or rows), or null if they are not so
+// aligned. `horizontal` records which flanks must stay solid for a clean door.
+function adjacentDoorTile(a, b) {
+  const xo = rangeOverlap(a.x, a.x + a.w - 1, b.x, b.x + b.w - 1);
+  if (xo) {
+    const [top, bot] = a.y < b.y ? [a, b] : [b, a];
+    if (bot.y - (top.y + top.h) === 1) {
+      const ca = roomCenter(a);
+      const cb = roomCenter(b);
+      const x = clamp(Math.round((ca.x + cb.x) / 2), xo[0], xo[1]);
+      return { x, y: top.y + top.h, horizontal: true };
+    }
+  }
+  const yo = rangeOverlap(a.y, a.y + a.h - 1, b.y, b.y + b.h - 1);
+  if (yo) {
+    const [left, right] = a.x < b.x ? [a, b] : [b, a];
+    if (right.x - (left.x + left.w) === 1) {
+      const ca = roomCenter(a);
+      const cb = roomCenter(b);
+      const y = clamp(Math.round((ca.y + cb.y) / 2), yo[0], yo[1]);
+      return { x: left.x + left.w, y, horizontal: false };
+    }
+  }
+  return null;
+}
+
+// Link rooms that physically abut (one wall apart) but are far apart in the
+// corridor graph, by punching a single clean door through the dividing wall.
+// Only carves when the target tile is wall and both flanks are solid, so the
+// doorway pass turns it into exactly one door (never a wide opening).
+function connectAdjacentRooms(map, rooms, adj) {
+  for (let i = 0; i < rooms.length; i++) {
+    for (let j = i + 1; j < rooms.length; j++) {
+      if (graphDist(adj, i, j) < ADJACENT_ROOM_MIN_GRAPH_DIST) continue;
+      const door = adjacentDoorTile(rooms[i], rooms[j]);
+      if (!door) continue;
+      if (map.tiles[idx(map, door.x, door.y)] !== TILE.WALL) continue;
+      const flanks = door.horizontal
+        ? [
+            [-1, 0],
+            [1, 0],
+          ]
+        : [
+            [0, -1],
+            [0, 1],
+          ];
+      if (!flanks.every(([dx, dy]) => isSolid(map, door.x + dx, door.y + dy))) continue;
+      carveFloor(map, door.x, door.y);
+      adj[i].push(j);
+      adj[j].push(i);
+    }
+  }
+}
+
 // Connect all rooms. A minimum spanning tree (Kruskal over room-center
 // distances) guarantees full reachability with the shortest total corridor
-// length; a few of the next-shortest links are added for loops so topology
-// varies per floor. Doors are placed after all carving so the two passes see the
-// finished corridor layout.
+// length. A few loop corridors are then added for alternate routes, but only
+// ones that are genuine shortcuts (endpoints far apart in the graph, not piling
+// onto a hub room, not a second cross-map haul) so loops never run parallel to
+// an existing hall. Physically-adjacent rooms are finally linked by a door.
+// Doors are placed after all carving so the two passes see the finished layout.
 export function connectRooms(map, rng, rooms) {
   if (rooms.length < 2) return;
 
@@ -171,13 +272,35 @@ export function connectRooms(map, rng, rooms) {
     }
   }
 
-  for (const e of treeEdges) tunnel(map, rng, rooms[e.i], rooms[e.j]);
+  for (const e of treeEdges) tunnel(map, rooms[e.i], rooms[e.j]);
 
-  const extra = nextInt(rng, 0, Math.max(1, Math.floor(rooms.length / 3)));
-  for (let k = 0; k < extra && k < extraEdges.length; k++) {
-    const e = extraEdges[k];
-    tunnel(map, rng, rooms[e.i], rooms[e.j]);
+  // Loop corridors: keep the same budget draw, but only carve edges that are
+  // real shortcuts, so loops add topology without parallel/double-wide halls.
+  const adj = rooms.map(() => []);
+  const degree = rooms.map(() => 0);
+  for (const e of treeEdges) {
+    adj[e.i].push(e.j);
+    adj[e.j].push(e.i);
+    degree[e.i]++;
+    degree[e.j]++;
   }
+  const maxLoopLen = medianTreeLength(treeEdges) * LOOP_MAX_LENGTH_FACTOR;
+  const loopBudget = nextInt(rng, 0, Math.max(1, Math.floor(rooms.length / 3)));
+  let added = 0;
+  for (const e of extraEdges) {
+    if (added >= loopBudget) break;
+    if (e.d > maxLoopLen) continue;
+    if (degree[e.i] >= LOOP_MAX_ROOM_DEGREE || degree[e.j] >= LOOP_MAX_ROOM_DEGREE) continue;
+    if (graphDist(adj, e.i, e.j) < LOOP_MIN_GRAPH_DIST) continue;
+    tunnel(map, rooms[e.i], rooms[e.j]);
+    adj[e.i].push(e.j);
+    adj[e.j].push(e.i);
+    degree[e.i]++;
+    degree[e.j]++;
+    added++;
+  }
+
+  if (CONNECT_ADJACENT_ROOMS) connectAdjacentRooms(map, rooms, adj);
 
   placeDoors(map);
   collapseAdjacentDoors(map);

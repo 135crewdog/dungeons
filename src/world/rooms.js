@@ -4,11 +4,31 @@
 
 import { nextInt } from '../core/rng.js';
 import { idx } from '../core/query.js';
-import { TILE, MIN_ROOMS, MAX_ROOMS, MIN_ROOM_SIZE, MAX_ROOM_SIZE } from '../core/constants.js';
+import {
+  TILE,
+  MIN_ROOMS,
+  MAX_ROOMS,
+  MIN_ROOM_SIZE,
+  MAX_ROOM_SIZE,
+  MAX_NEIGHBOR_GAP,
+} from '../core/constants.js';
 
 // Two rooms conflict if their rectangles come within one tile of each other.
 function tooClose(a, b) {
   return a.x - 1 < b.x + b.w && a.x + a.w + 1 > b.x && a.y - 1 < b.y + b.h && a.y + a.h + 1 > b.y;
+}
+
+// Manhattan distance from a candidate's center to its nearest existing room
+// center (Infinity when there are no rooms yet).
+function nearestCenterDist(candidate, rooms) {
+  const c = roomCenter(candidate);
+  let best = Infinity;
+  for (const r of rooms) {
+    const rc = roomCenter(r);
+    const d = Math.abs(c.x - rc.x) + Math.abs(c.y - rc.y);
+    if (d < best) best = d;
+  }
+  return best;
 }
 
 // Rejection-sample non-overlapping rooms. Returns an array of
@@ -26,6 +46,10 @@ export function placeRooms(rng, width, height) {
     const y = nextInt(rng, 1, height - h - 1);
     const candidate = { id: rooms.length, x, y, w, h };
     if (rooms.some((r) => tooClose(candidate, r))) continue;
+    // Cluster rooms: after the first, a room must sit within MAX_NEIGHBOR_GAP of
+    // an existing one, so no single connecting corridor spans an empty quarter
+    // of the map.
+    if (rooms.length > 0 && nearestCenterDist(candidate, rooms) > MAX_NEIGHBOR_GAP) continue;
     rooms.push(candidate);
     if (rooms.length >= MIN_ROOMS && nextInt(rng, 0, 3) === 0) {
       // Occasionally stop early once past the minimum, for varied densities.
