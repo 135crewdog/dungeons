@@ -8,7 +8,7 @@
 // nothing here can go stale.
 
 import { TILE, TILE_SIZE } from '../core/constants.js';
-import { idx, tileAt } from '../core/query.js';
+import { idx, tileAt, entitiesSorted } from '../core/query.js';
 import { groundFrame, wallsFrame, NO_FRAME } from './autotile.js';
 import { SPRITE_DIM } from './tileStyle.js';
 
@@ -58,20 +58,27 @@ export class SpriteTileGrid {
   }
 
   // Repaint every cell's two layers from current state: lit if visible,
-  // grey-dimmed if only remembered, hidden if never seen.
+  // grey-dimmed if only remembered, hidden if never seen. Doors draw open —
+  // purely visually; the sim has no door state — while an entity stands in
+  // them, since frames are recomputed here every repaint anyway.
   sync(state) {
     const map = state.map;
     const { visible, explored } = state.vis;
     const salt = state.floor;
+
+    const occupied = new Set();
+    for (const e of entitiesSorted(state)) occupied.add(idx(map, e.x, e.y));
+    const isOpen = (x, y) => occupied.has(idx(map, x, y));
+
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const i = idx(map, x, y);
-        this.apply(this.ground[i], groundFrame(map, x, y, salt), visible, explored, i);
+        this.apply(this.ground[i], groundFrame(map, x, y, salt, isOpen), visible, explored, i);
         // Overhang art on a floor/stairs cell is the top of the wall BELOW
         // it, so it lights by that wall's visibility — a remembered wall
         // keeps its cap even while the floor strip above it is unexplored,
         // and never leaks the existence of unseen walls.
-        const wf = wallsFrame(map, x, y);
+        const wf = wallsFrame(map, x, y, isOpen);
         const t = map.tiles[i];
         const overhang =
           wf !== NO_FRAME && t !== TILE.WALL && t !== TILE.DOOR && wallish(tileAt(map, x, y + 1));
