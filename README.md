@@ -99,6 +99,11 @@ server/       Cloudflare Worker + D1 leaderboard backend (deployed separately)
 `CLAUDE.md` is the full project briefing and the source of truth for the rules and
 conventions.
 
+## Credits
+
+Environment tile art comes from **Shattered Pixel Dungeon** by Evan Debenham,
+based on **Pixel Dungeon** by Watabou — GPLv3. See `CREDITS.md` for details.
+
 ## Tech
 
 Phaser 3 · Vite · Vitest · vite-plugin-pwa (Workbox). Plain JavaScript, ES modules.
