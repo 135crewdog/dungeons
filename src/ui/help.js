@@ -5,11 +5,13 @@
 
 import { createOverlay } from './overlay.js';
 
+// The keys are the classic roguelike notation (and the ASCII-mode look);
+// in the dungeon these now wear their sprite art.
 const GLYPHS = [
-  ['@', 'You, the dungeon crawler'],
-  ['g', 'Goblin, a cackling green fiend with a taste for flesh'],
+  ['@', 'You, the armored dungeon crawler'],
+  ['g', 'Goblin, a cackling snaggle-toothed fiend with a taste for flesh'],
   ['s', 'Skeleton, a malevolent shambling pile of bones'],
-  ['B', 'Boss, a fat, drooling, warty slob with razor sharp teeth'],
+  ['B', 'Boss, a masked horror that guards the way down every fifth floor'],
   ['!', 'Health potion, drink this if you want to live'],
   ['$', 'Treasure chest, look inside to grab some loot, might also be a trap'],
   ['>', 'Stairs down, the only way is deeper'],
