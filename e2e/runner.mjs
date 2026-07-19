@@ -217,6 +217,12 @@ for (const [label, opts, expectTiles] of [
 {
   const { ctx, escaped } = await newGameContext(browser);
   const page = await newGamePage(ctx);
+  // The sprite terrain path needs the tilesheet; a 404 silently degrades to
+  // ASCII, so assert the asset actually loads.
+  let tilesheetStatus = 0;
+  page.on('response', (r) => {
+    if (r.url().includes('tiles_prison.png')) tilesheetStatus = r.status();
+  });
   const c0 = consoleLines.length;
   await gotoSeed(page, fixtures.move.seed);
   const s = await snapshot(page);
@@ -241,11 +247,12 @@ for (const [label, opts, expectTiles] of [
     url.includes(`seed=${fixtures.move.seed}`) &&
     !!seedLog &&
     bootMatches &&
+    tilesheetStatus === 200 &&
     escaped.length === 0;
   record(
     'E1/boot',
     ok,
-    `hud="${hud.trim().slice(0, 40)}..." version=${hudVersion.trim()} renderer=${rendererType} seedLog=${!!seedLog} bootParity=${bootMatches} escaped=${escaped.length}`,
+    `hud="${hud.trim().slice(0, 40)}..." version=${hudVersion.trim()} renderer=${rendererType} seedLog=${!!seedLog} bootParity=${bootMatches} tilesheet=${tilesheetStatus} escaped=${escaped.length}`,
   );
   await page.screenshot({ path: SHOTS + 'boot.png' });
   await ctx.close();

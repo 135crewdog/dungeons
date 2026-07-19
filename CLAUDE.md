@@ -210,12 +210,44 @@ on floor 1 with a **new random seed** (logged).
 
 ## Visual Style
 
-The entire game renders in **ASCII, monospace**. Floor `.` · Wall `#` · Player `@` ·
-Enemies single letters (`g` goblin, `s` skeleton, `B` boss) · Potion `!` · Chest `$` ·
-Stairs down `>` · Stairs up `<` · Door `+` · Unexplored space ·
-Explored-but-not-visible: same glyph, darker. This is the
-intentional art style, not a placeholder. The renderer is structured so sprites
-could swap in later (`tileStyle.js` is the seam) without touching game logic.
+**Terrain renders as sprites; everything that moves or is picked up stays ASCII.**
+
+Terrain (floors, walls, doors, stairs) draws from Shattered Pixel Dungeon's prison
+tilesheet (`public/assets/environment/tiles_prison.png`, 16×16 frames, GPLv3 — see
+`CREDITS.md` and the licensing note below) with SPD-style **autotiling**, ported as
+pure functions in `src/renderer/autotile.js` and drawn by `spriteLayer.js` in two
+image layers:
+
+- **Ground layer** (under actors): floor variants (stable per-cell hash, salted by
+  floor number), stairs, door faces, and raised-wall **front faces** (drawn on a wall
+  cell whose south neighbor is open, with edge bits for open left/right).
+- **Walls layer** (**over** actors): stitched wall **tops** (16 permutations keyed on
+  left/right/below-diagonal openness), the **overhang** a wall casts into the non-wall
+  cell above it, and door lintels. An actor standing directly below a wall is
+  partially occluded by its top — **intentional SPD pseudo-3D, not a bug**. Overhang
+  art keys its visibility off the wall cell below it, so remembered walls keep their
+  caps. Doors render **open while an entity stands in them** (purely visual; the sim
+  has a single door state). Doors come in two orientations: **raised** (walls
+  east/west — front-on door face) and **sideways** (walls north/south — edge-on door
+  in the wall run).
+
+Entities, items, and floating text remain **monospace ASCII glyphs** drawn on top:
+Player `@` · `g` goblin, `s` skeleton, `B` boss · Potion `!` · Chest `$` — that
+Brogue-style mix is the intentional look. `RENDER_STYLE` in
+`src/renderer/tileStyle.js` is the internal art switch (`'sprites'` default;
+`'ascii'` restores the full glyph grid — Floor `.` · Wall `#` · Door `+` · `>`/`<`
+stairs), and the scene falls back to ASCII by itself if the tilesheet fails to load.
+A pause-menu toggle can later flip the switch at runtime. Visibility states everywhere:
+**visible** (full color) · **explored** (dimmed — glyphs by scaled tint, sprites by a
+uniform grey multiply) · **unexplored** (black).
+
+## Asset Licensing
+
+The vendored tilesheet is from **Shattered Pixel Dungeon** (Evan Debenham), based on
+**Pixel Dungeon** (Watabou), both **GPLv3** — there is no permissive carve-out for
+SPD's art. Distributing this game with that art means honoring GPLv3: keep the
+attribution in `CREDITS.md` (source repo, pinned commit, sha256) and keep this
+repository's source public. Any future vendored art must get the same treatment.
 
 ## Canvas and Resolution
 
@@ -250,7 +282,8 @@ watermark (`v0.5.2` style) top-right on the row under the Menu text (kept apart 
 the realtime gameplay stats) and in the pause-menu footer, so screenshots identify the
 build — and it rides along on every leaderboard submission. Bump the version in the
 same commit as the change it describes (Phase 4, the leaderboard + help release, was
-**0.5.0**; `package.json` is always the current number).
+**0.5.0**; Phase 5, sprite terrain, was **0.6.0**; `package.json` is always the
+current number).
 
 ## PR Watching
 
@@ -267,13 +300,15 @@ src/
   world/      // dungeon generation (rooms, corridors, doors, stairs)
   entities/   // player, enemies, items, spawning
   systems/    // combat, pathfinding, fov, visibility, ai
-  renderer/   // ALL Phaser code only
+  renderer/   // ALL Phaser code only; autotile.js (pure sprite-frame logic) +
+              // spriteLayer.js (sprite terrain) + glyphLayer.js (ASCII terrain)
   ui/         // HUD, message log, game-over, menu, leaderboard, help (DOM overlays);
               // overlay.js is the shared modal factory, dom.js small DOM helpers
   input/      // keyboard, mouse, touch
   net/        // leaderboard client — the only fetch/localStorage code; never
               // imported by the sim (architecture-test enforced)
-assets/       // empty for now
+public/
+  assets/environment/  // vendored SPD tilesheet(s) — GPLv3, see CREDITS.md
 server/       // Cloudflare Worker + D1 leaderboard backend (deployed separately)
 ```
 
@@ -345,6 +380,17 @@ see the Leaderboard section) · **in-game Help page** (glyph/stat/control tables
 the menu). This is a deliberate exception to "offline and local": the sim remains
 fully offline; only `src/net/` and the composition root know the network exists.
 
+Phase 5 (complete): **sprite terrain** — the deferred Phase 2 (pixel art), revived
+for terrain only. Vendored SPD prison tilesheet (GPLv3, `CREDITS.md`) · SPD-style
+**autotiling** as pure unit-tested functions (`src/renderer/autotile.js`) ·
+two-layer rendering with wall tops drawn **over** actors (`spriteLayer.js`) ·
+per-cell floor/wall variants from a seed-stable hash · doors in both orientations
+that render open while occupied · explicit depth-ordered scene layers (fixing a
+latent rebuildFloor z-order bug) · ASCII fallback kept intact behind `RENDER_STYLE`
+(and used automatically if the sheet fails to load). Entities/items stay ASCII —
+see Visual Style. Enemy/item sprites, water/grass/decor, and the menu art-style
+toggle are **explicitly deferred**, not in scope.
+
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
 
@@ -363,7 +409,9 @@ per file via a `// @vitest-environment jsdom` docblock — `tests/ui-*.test.js`,
 leaderboard worker is plain `fetch(request, env)` JS, tested in Node with a fake D1
 (`tests/leaderboard-server.test.js`, which also guards the hand-inlined
 `worker.dashboard.js` copy against drift); the client tests inject fake
-fetch/storage (`tests/leaderboard.test.js`).
+fetch/storage (`tests/leaderboard.test.js`). The sprite autotiler is pure and
+covered by a decision-table suite (`tests/autotile.test.js`: corners, T-junctions,
+stubs, both door orientations, map borders, variance distribution).
 
 An opt-in **browser end-to-end** campaign lives in `e2e/` (Playwright via
 `playwright-core`): `npm run build && npm run test:e2e` drives the real PWA through

@@ -7,6 +7,18 @@ import { TILE } from '../core/constants.js';
 // Visibility levels a tile can be drawn at.
 export const VIS = Object.freeze({ UNSEEN: 0, EXPLORED: 1, VISIBLE: 2 });
 
+// Which terrain art the scene builds: 'sprites' (the SPD prison tileset with
+// autotiled walls) or 'ascii' (the original glyph grid). Entities, items, and
+// floating text are ASCII glyphs either way. A pause-menu toggle can later
+// swap this at runtime; for now it is a build-time switch, and the scene
+// falls back to 'ascii' on its own if the tilesheet fails to load.
+export const RENDER_STYLE = 'sprites';
+
+// Explored-but-not-visible sprite tiles get one uniform grey multiply —
+// sprites carry their own colors, so the per-type scaled tints above only
+// apply to the glyph path.
+export const SPRITE_DIM = 0x555555;
+
 // The void behind the map — the letterbox and camera background. This is the
 // ONE color shared with the DOM UI (index.html's --c-bg and the <body>
 // background must match it by hand) so canvas letterbox and page blend into

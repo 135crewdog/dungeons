@@ -50,6 +50,9 @@ export class GlyphGrid {
           .image(x * TILE_SIZE, y * TILE_SIZE, glyphKey('.'))
           .setOrigin(0, 0)
           .setVisible(false);
+        // Into the ground layer, never the scene root: terrain must sit below
+        // the item/entity layers even when rebuilt mid-session (floor change).
+        this.scene.groundLayer.add(img);
         this.images[idx(map, x, y)] = img;
       }
     }
