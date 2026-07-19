@@ -36,6 +36,20 @@ export function isTransparent(map, x, y) {
   return isTransparentTile(tileAt(map, x, y));
 }
 
+// Stairs are walkable for the player and the click planner (isWalkableTile),
+// but enemies treat them as obstacles — they can't use stairs, so they route
+// around. This predicate is the enemy-only exclusion; it never gates the player.
+export function isStairsTile(t) {
+  return t === TILE.STAIRS_DOWN || t === TILE.STAIRS_UP;
+}
+
+// Does an item (potion or chest) sit on this tile? Items are a small unindexed
+// array, so a linear scan matches entityAt's philosophy. Enemies route around
+// item tiles (they can't collect them); only the player picks them up.
+export function hasItemAt(state, x, y) {
+  return state.items.some((it) => it.x === x && it.y === y);
+}
+
 export function isExplored(state, x, y) {
   return inBounds(state.map, x, y) && state.vis.explored[idx(state.map, x, y)] === 1;
 }

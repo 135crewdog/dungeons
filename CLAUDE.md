@@ -104,7 +104,7 @@ builds every cell with `textContent` since rows are other players' input.
 ## Help
 
 A static menu-reachable overlay (`src/ui/help.js`): a glyph table (all eleven symbols,
-playful one-liners), a stats table (HP/Floor/STR/ARM/SKILL), and a controls list, in the
+playful one-liners), a stats table (HP/Floor/STR/ARM/SKL), and a controls list, in the
 same NetHack-ish panel style. It reads nothing and calls nothing back.
 
 ## Turn Order (strict, every turn)
@@ -127,7 +127,12 @@ the floor swaps and the enemy/pickup phases are skipped.
 
 ## Movement and Pathfinding
 
-8-directional movement (diagonals allowed).
+8-directional movement (diagonals allowed). Corridors are single-tile-wide and cut
+deterministically (no per-corridor RNG), so aligned rooms share one clean hall instead of
+scattering into double-wide/parallel runs; loop corridors beyond the spanning tree are kept
+only when they are genuine shortcuts (endpoints far apart in the corridor graph), and rooms
+that sit exactly one wall apart are linked by a single door. Rooms are also placed clustered
+(`MAX_NEIGHBOR_GAP`) so no connector spans an empty quarter of the map.
 
 - **Primary — click/tap.** Computes an A\* path to the destination using only tiles
   currently **known to be walkable** (unexplored tiles are treated as blocked). The
@@ -140,6 +145,11 @@ the floor swaps and the enemy/pickup phases are skipped.
   synchronous turn) — intended hold-to-walk, classic-roguelike behavior, not a bug.
 - **Diagonals forbid corner-cutting:** a diagonal step is illegal unless both
   orthogonal tiles between it and the mover are passable. Same rule for player and AI.
+- **Enemies route around stairs and items.** An enemy can't use stairs or collect
+  potions/chests, so it treats those tiles as obstacles and paths around them — stepping
+  onto one only when boxed in (the sole route to the player runs over it), so a player can't
+  hide behind a potion. Only the player uses stairs and picks up items; this is an
+  enemy-only pathing rule and never changes the shared `isWalkable`.
 
 ## Field of View
 

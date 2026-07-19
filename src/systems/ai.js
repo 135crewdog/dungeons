@@ -6,7 +6,15 @@
 // gets there empty-handed or after DEAGGRO_TURNS turns blind. Un-aggroed
 // enemies hold position.
 
-import { getPlayer, isVisible, isAdjacent, isWalkable } from '../core/query.js';
+import {
+  getPlayer,
+  isVisible,
+  isAdjacent,
+  isWalkable,
+  isStairsTile,
+  hasItemAt,
+  tileAt,
+} from '../core/query.js';
 import { DEAGGRO_TURNS } from '../core/constants.js';
 import { tryMove } from '../core/movement.js';
 import { resolveAttack } from './combat.js';
@@ -97,19 +105,32 @@ function moveIfReady(state, enemy, goal, events, occupied) {
 }
 
 // First step of an A* path from the enemy to a goal tile. Enemies see the whole
-// map (they are not fogged). Other entities (via `occupied`) block the path; the
-// goal tile itself is always allowed (it may hold the player). Returns
-// { dx, dy } or null.
+// map (they are not fogged). Other entities (via `occupied`) block the path.
+// Enemies can't use stairs or collect items, so they route AROUND those tiles —
+// but only when a clear route exists; if the only way to the player runs over a
+// stair/item (e.g. the player hid behind a potion in a one-wide chokepoint) the
+// enemy steps onto it rather than freeze. The goal tile itself is always allowed
+// (it may hold the player). Returns { dx, dy } or null.
 function stepToward(state, enemy, goal, occupied) {
   if (!goal) return null;
   const map = state.map;
   const w = map.width;
-  const passable = (x, y) => {
+  const start = { x: enemy.x, y: enemy.y };
+  // Base rule: walkable and not occupied by another entity (the goal is always
+  // allowed). This is the fallback route when boxed in.
+  const base = (x, y) => {
     if (!isWalkable(map, x, y)) return false;
-    if (x === goal.x && y === goal.y) return true; // the goal tile is allowed
-    return !occupied.has(y * w + x); // route around other entities
+    if (x === goal.x && y === goal.y) return true;
+    return !occupied.has(y * w + x);
   };
-  const path = aStar(passable, { x: enemy.x, y: enemy.y }, goal, map.width);
+  // Preferred rule: also steer clear of stairs and item tiles.
+  const around = (x, y) =>
+    base(x, y) &&
+    (x === goal.x && y === goal.y
+      ? true
+      : !isStairsTile(tileAt(map, x, y)) && !hasItemAt(state, x, y));
+  let path = aStar(around, start, goal, map.width);
+  if (!path || path.length < 2) path = aStar(base, start, goal, map.width);
   if (!path || path.length < 2) return null;
   const next = path[1];
   return { dx: next.x - enemy.x, dy: next.y - enemy.y };
