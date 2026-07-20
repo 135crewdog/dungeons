@@ -22,10 +22,11 @@ export function sheetKey(name) {
   return 'sprite:' + name;
 }
 
-// entity.kind → frame. The player is the warrior's bottom sheet row (SPD's
-// tier-6 "class armor" look); the boss is Tengu, the SPD prison-depth boss.
+// entity.kind → frame. The player is the warrior's tier-5 sheet row (rows
+// are 15px, row N = armor tier N); the boss is Tengu, the SPD prison-depth
+// boss.
 export const ENTITY_SPRITES = Object.freeze({
-  player: { sheet: 'warrior', x: 0, y: 90, w: 12, h: 15 },
+  player: { sheet: 'warrior', x: 0, y: 75, w: 12, h: 15 },
   goblin: { sheet: 'gnoll', x: 0, y: 0, w: 12, h: 15 },
   skeleton: { sheet: 'skeleton', x: 0, y: 0, w: 12, h: 15 },
   boss: { sheet: 'tengu', x: 0, y: 0, w: 14, h: 16 },
