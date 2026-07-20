@@ -219,7 +219,7 @@ for (const [label, opts, expectTiles] of [
   const page = await newGamePage(ctx);
   // The sprite paths need their sheets; a 404 silently degrades to ASCII, so
   // assert every art asset actually loads.
-  const ART = ['tiles_prison', 'warrior', 'gnoll', 'skeleton', 'tengu', 'items'];
+  const ART = ['tiles_prison', 'warrior', 'gnoll', 'skeleton', 'eye', 'items'];
   const artStatus = new Map();
   page.on('response', (r) => {
     const hit = ART.find((n) => r.url().includes(`${n}.png`));

@@ -16,7 +16,7 @@ which is based on **Pixel Dungeon** by Watabou (Oleg Dolya).
 | `sprites/warrior.png`          | `sprites/warrior.png`          | `a8825d5f67bff1464f2bdffcf41590a39b087e21a113d811191d08a0323f71d3` |
 | `sprites/gnoll.png`            | `sprites/gnoll.png`            | `1999a12b3c1482aeba208e1508d79199a8f98c3cc038e0bdcc9958c535e86706` |
 | `sprites/skeleton.png`         | `sprites/skeleton.png`         | `93514c942af556d447dee6119b1f39317f88e24a669c52860f821ec2ab3e6159` |
-| `sprites/tengu.png`            | `sprites/tengu.png`            | `a754b4ba9da4bfc8050df81e6745b2fe6ee7ace2729c3703ed38f772725c0949` |
+| `sprites/eye.png`              | `sprites/eye.png`              | `02bd2b6e5d859175699b11dcd4054da7426c561694378aa3f5e2bacf04e6ab0c` |
 | `sprites/items.png`            | `sprites/items.png`            | `ce2496368660e9b2c4b50401fe4436656cfab5f7785f667ef32aa6a294caacaf` |
 
 Shattered Pixel Dungeon (code and assets) is licensed under the
@@ -29,5 +29,5 @@ game is this repository. The wall/door autotiling scheme implemented in
 `src/renderer/autotile.js` is a JavaScript reimplementation of the tile-stitching
 logic described by Shattered Pixel Dungeon's `DungeonTileSheet`, and the entity/item
 frame rectangles in `src/renderer/entitySprites.js` correspond to frames defined by
-its sprite classes (`HeroSprite`, `GnollSprite`, `SkeletonSprite`, `TenguSprite`,
+its sprite classes (`HeroSprite`, `GnollSprite`, `SkeletonSprite`, `EyeSprite`,
 `ItemSpriteSheet`).

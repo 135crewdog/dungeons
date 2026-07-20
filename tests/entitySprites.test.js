@@ -4,6 +4,7 @@ import {
   SPRITE_SHEETS,
   ENTITY_SPRITES,
   ITEM_SPRITES,
+  SPRITE_LIFT,
   spriteOffset,
   sheetKey,
 } from '../src/renderer/entitySprites.js';
@@ -48,21 +49,19 @@ describe('frame rects against the vendored sheets', () => {
     }
   });
 
-  it('frames fit within one tile and offsets keep them inside it', () => {
+  it('frames fit the tile width and offsets keep them inside it horizontally', () => {
     for (const s of [...Object.values(ENTITY_SPRITES), ...Object.values(ITEM_SPRITES)]) {
       expect(s.w).toBeLessThanOrEqual(TILE_SIZE);
-      expect(s.h).toBeLessThanOrEqual(TILE_SIZE);
-      const { dx, dy } = spriteOffset(s);
+      const { dx } = spriteOffset(s);
       expect(dx).toBeGreaterThanOrEqual(0);
-      expect(dy).toBeGreaterThanOrEqual(0);
       expect(dx + s.w).toBeLessThanOrEqual(TILE_SIZE);
-      expect(dy + s.h).toBeLessThanOrEqual(TILE_SIZE);
     }
   });
 
-  it('feet sit on the tile bottom edge', () => {
-    const p = ENTITY_SPRITES.player;
-    expect(spriteOffset(p).dy + p.h).toBe(TILE_SIZE);
+  it('feet sit SPRITE_LIFT px above the tile bottom edge', () => {
+    for (const s of [...Object.values(ENTITY_SPRITES), ...Object.values(ITEM_SPRITES)]) {
+      expect(spriteOffset(s).dy + s.h).toBe(TILE_SIZE - SPRITE_LIFT);
+    }
   });
 });
 
