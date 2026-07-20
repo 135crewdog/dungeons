@@ -16,6 +16,7 @@ import {
   SPRITE_DIM,
 } from './tileStyle.js';
 import { spawnFloatingText } from './floatingText.js';
+import { applyEventFacing } from './facing.js';
 import {
   SPRITE_SHEETS,
   ENTITY_SPRITES,
@@ -89,6 +90,8 @@ export class DungeonScene extends Phaser.Scene {
 
     this.itemImages = new Map();
     this.entityImages = new Map();
+    // Renderer-local facing (id → 1 right | -1 left); see facing.js.
+    this.facing = new Map();
 
     this.cameras.main.setBackgroundColor(BG_COLOR);
     this.cameras.main.setRoundPixels(true);
@@ -149,6 +152,8 @@ export class DungeonScene extends Phaser.Scene {
     for (const img of this.entityImages.values()) img.destroy();
     this.itemImages.clear();
     this.entityImages.clear();
+    // Fresh floor, fresh cast: everyone re-enters facing right (default).
+    this.facing.clear();
     this.render();
   }
 
@@ -167,8 +172,15 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.centerOn(c.x, c.y);
   }
 
-  // Play transient effects from a turn's event list (floating numbers).
+  // Play transient effects from a turn's event list (floating numbers) and
+  // turn sprites toward their movement/attack direction. Facing must apply
+  // here, not on the next sync: the composition root renders durable state
+  // BEFORE playing the turn's events.
   playEvents(events) {
+    applyEventFacing(this.facing, events, (id) => this.state.entities.byId.get(id)?.x);
+    if (this.entitySprites) {
+      for (const [id, f] of this.facing) this.entityImages.get(id)?.setFlipX(f === -1);
+    }
     for (const ev of events) {
       if (ev.type === EV.ATTACK) {
         if (ev.hit) spawnFloatingText(this, ev.x, ev.y, `-${ev.damage}`, FLOAT_COLOR.damage);
@@ -245,10 +257,13 @@ export class DungeonScene extends Phaser.Scene {
       }
       const w = tileToWorld(e.x, e.y);
       if (spec) {
-        // Sprite art is authoritative — no tint. Center in the tile, feet on
-        // its bottom edge (frames are sub-tile: 12×15, Tengu 14×16).
+        // Sprite art is authoritative — no tint. Centered in the tile, feet
+        // just above its bottom edge (frames are sub-tile; see spriteOffset).
         const { dx, dy } = spriteOffset(spec);
         img.setPosition(w.x + dx, w.y + dy);
+        // Mirror in place to face the last move/attack direction (flipX
+        // flips about the frame center, so position needs no adjustment).
+        img.setFlipX(this.facing.get(e.id) === -1);
       } else {
         // An entity's glyph never changes, so only rebind if it does.
         const key = glyphKey(entityGlyph(e));
