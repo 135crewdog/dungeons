@@ -4,8 +4,8 @@
 // TenguSprite, ItemSpriteSheet) — the first idle frame of each animation, so
 // creatures render in their natural standing pose. Character frames are
 // smaller than the 16px tile (12×15, Tengu 14×16); spriteOffset() centers
-// them horizontally and plants their feet on the tile's bottom edge. Pure
-// data + one scene-wiring helper, so the table tests without Phaser.
+// them horizontally with feet SPRITE_LIFT px above the tile's bottom edge.
+// Pure data + one scene-wiring helper, so the table tests without Phaser.
 
 import { TILE_SIZE } from '../core/constants.js';
 
@@ -38,10 +38,17 @@ export const ITEM_SPRITES = Object.freeze({
   chest: { sheet: 'items', x: 80, y: 32, w: 16, h: 14 },
 });
 
-// Pixel offset that centers a frame horizontally in its tile and aligns its
-// bottom edge (feet) with the tile's bottom edge.
+// Feet sit this many pixels above the tile's bottom edge — nearer the tile's
+// center, so actors clear the south wall tops (drawn over them) and line up
+// with sideways doors instead of sinking behind the pseudo-3D wall layer.
+export const SPRITE_LIFT = 3;
+
+// Pixel offset that centers a frame horizontally in its tile and rests its
+// bottom edge (feet) SPRITE_LIFT px above the tile's bottom edge. dy may be
+// negative for frames taller than TILE_SIZE - SPRITE_LIFT: they extend into
+// the tile above, still underneath the walls layer.
 export function spriteOffset(spec) {
-  return { dx: Math.floor((TILE_SIZE - spec.w) / 2), dy: TILE_SIZE - spec.h };
+  return { dx: Math.floor((TILE_SIZE - spec.w) / 2), dy: TILE_SIZE - spec.h - SPRITE_LIFT };
 }
 
 // Register every frame on its loaded sheet texture, named by entity kind /
