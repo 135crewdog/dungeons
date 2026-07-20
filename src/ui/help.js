@@ -11,7 +11,7 @@ const GLYPHS = [
   ['@', 'You, the armored dungeon crawler'],
   ['g', 'Goblin, a cackling snaggle-toothed fiend with a taste for flesh'],
   ['s', 'Skeleton, a malevolent shambling pile of bones'],
-  ['B', 'Boss, a masked horror that guards the way down every fifth floor'],
+  ['B', 'Boss, a baleful unblinking eye that guards the way down every fifth floor'],
   ['!', 'Health potion, drink this if you want to live'],
   ['$', 'Treasure chest, look inside to grab some loot, might also be a trap'],
   ['>', 'Stairs down, the only way is deeper'],

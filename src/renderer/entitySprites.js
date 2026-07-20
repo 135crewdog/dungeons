@@ -1,11 +1,12 @@
 // Static sprite frames for entities and items, from the vendored SPD sheets.
 // Each frame is an exact sub-rect of its sheet, taken from Shattered Pixel
 // Dungeon's own sprite classes (HeroSprite, GnollSprite, SkeletonSprite,
-// TenguSprite, ItemSpriteSheet) — the first idle frame of each animation, so
+// EyeSprite, ItemSpriteSheet) — the first idle frame of each animation, so
 // creatures render in their natural standing pose. Character frames are
-// smaller than the 16px tile (12×15, Tengu 14×16); spriteOffset() centers
-// them horizontally with feet SPRITE_LIFT px above the tile's bottom edge.
-// Pure data + one scene-wiring helper, so the table tests without Phaser.
+// sub-tile (12×15; the eye 16×18, poking above its tile); spriteOffset()
+// centers them horizontally with feet SPRITE_LIFT px above the tile's bottom
+// edge. Pure data + one scene-wiring helper, so the table tests without
+// Phaser.
 
 import { TILE_SIZE } from '../core/constants.js';
 
@@ -14,7 +15,7 @@ export const SPRITE_SHEETS = Object.freeze({
   warrior: 'assets/sprites/warrior.png',
   gnoll: 'assets/sprites/gnoll.png',
   skeleton: 'assets/sprites/skeleton.png',
-  tengu: 'assets/sprites/tengu.png',
+  eye: 'assets/sprites/eye.png',
   items: 'assets/sprites/items.png',
 });
 
@@ -23,13 +24,14 @@ export function sheetKey(name) {
 }
 
 // entity.kind → frame. The player is the warrior's tier-5 sheet row (rows
-// are 15px, row N = armor tier N); the boss is Tengu, the SPD prison-depth
-// boss.
+// are 15px, row N = armor tier N); the boss is SPD's evil Eye (16×18 frames
+// per EyeSprite's TextureFilm — taller than a tile, so it floats up into
+// the cell above).
 export const ENTITY_SPRITES = Object.freeze({
   player: { sheet: 'warrior', x: 0, y: 75, w: 12, h: 15 },
   goblin: { sheet: 'gnoll', x: 0, y: 0, w: 12, h: 15 },
   skeleton: { sheet: 'skeleton', x: 0, y: 0, w: 12, h: 15 },
-  boss: { sheet: 'tengu', x: 0, y: 0, w: 14, h: 16 },
+  boss: { sheet: 'eye', x: 0, y: 0, w: 16, h: 18 },
 });
 
 // item.type → frame: SPD's POTION_CRIMSON flask and LOCKED_CHEST (the golden
