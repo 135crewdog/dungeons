@@ -227,20 +227,31 @@ image layers:
   cell above it, and door lintels. An actor standing directly below a wall is
   partially occluded by its top — **intentional SPD pseudo-3D, not a bug**. Overhang
   art keys its visibility off the wall cell below it, so remembered walls keep their
-  caps. Doors render **open while an entity stands in them** (purely visual; the sim
+  caps. A wall cell's own art only renders when **anchored** — at least one of its 8
+  neighbors is an explored non-wall cell (`wallCapAnchored` in `autotile.js`) — so
+  lone wall cells marked explored by shadowcasting or the room-reveal ring never
+  float as detached caps in unexplored blackness (room corner caps stay: the
+  diagonal room floor anchors them). Doors render **open while an entity stands in
+  them** (purely visual; the sim
   has a single door state). Doors come in two orientations: **raised** (walls
   east/west — front-on door face) and **sideways** (walls north/south — edge-on door
   in the wall run).
 
 Creatures and items draw as **static SPD sprite frames** — the first idle frame of
 each SPD sprite class, mapped in `src/renderer/entitySprites.js` (pure data, tested
-against the shipped PNGs' headers): player = **warrior, bottom sheet row** (tier-6
-class armor) · goblin = **gnoll** · skeleton = **skeleton** · boss = **Tengu** (SPD's
-prison boss) · potion = **crimson flask** · chest = **golden locked chest**.
-Character frames are sub-tile (12×15, Tengu 14×16) and render centered with feet on
-the tile's bottom edge, untinted; remembered items dim with the same grey multiply
-as terrain. The renderer stays event-driven — **no animation clock**; animated
-sprites would be a separate, deliberate architectural step.
+against the shipped PNGs' headers): player = **warrior, tier-5 sheet row** (rows are
+15px, row N = armor tier N) · goblin = **gnoll** · skeleton = **skeleton** · boss =
+**evil Eye** (16×18 frames — taller than a tile, it floats up into the cell above) ·
+potion = **crimson flask** · chest = **golden locked chest**. Frames render centered
+with feet **`SPRITE_LIFT` (3px) above the tile's bottom edge** — nearer the tile
+center, so actors clear the south wall tops drawn over them and line up with
+sideways doors — untinted; remembered items dim with the same grey multiply as
+terrain. Sprites **mirror horizontally to face their last move or attack
+direction** (right is the sheets' native default; vertical movement keeps the last
+facing) via a renderer-local facing map fed by the turn's events
+(`src/renderer/facing.js`) — a static-frame mirror, not animation. The renderer
+stays event-driven — **no animation clock**; animated sprites would be a separate,
+deliberate architectural step.
 
 Floating text stays text, and the whole cast falls back to **monospace ASCII
 glyphs together** (never a mixed cast) if any sprite sheet fails to load: Player
@@ -414,6 +425,14 @@ centered feet-on-tile · all-or-nothing glyph fallback (a missing sheet reverts 
 whole cast, terrain independent) · Help flavor refreshed. **Static frames only** —
 the renderer keeps its event-driven no-animation-clock model; sprite animation,
 water/grass/decor, and the menu art-style toggle remain **explicitly deferred**.
+
+Post-Phase-6 polish (**0.7.1**): sprite-mode playtest fixes — `SPRITE_LIFT` (feet
+3px above the tile bottom) · wall-cap anchoring (no floating caps) · canvas CSS
+size derived from the buffer (exact 1:1 device-pixel mapping at fractional dpr) ·
+left/right sprite facing from move/attack events · player re-skinned to the tier-5
+warrior row · boss re-skinned to SPD's evil Eye (tengu sheet retired). _(The Phase
+5/6 notes above predate this and still say Tengu/tier-6/feet-on-bottom; the Visual
+Style section is authoritative.)_
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
