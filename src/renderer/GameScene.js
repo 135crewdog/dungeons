@@ -127,8 +127,13 @@ export class DungeonScene extends Phaser.Scene {
     this.scale.resize(bufW, bufH);
     const canvas = this.game.canvas;
     if (canvas) {
-      canvas.style.width = cssW + 'px';
-      canvas.style.height = cssH + 'px';
+      // Display size derived from the buffer, not the window: at fractional
+      // dpr, floor(cssW * dpr) truncates, and displaying that buffer at the
+      // un-truncated CSS width would rescale it by a non-integer hair —
+      // every camera scroll then resamples on a shifted subpixel phase.
+      // bufW / dpr may be a fractional CSS length; that is exact on purpose.
+      canvas.style.width = bufW / dpr + 'px';
+      canvas.style.height = bufH / dpr + 'px';
     }
     this.cameras.resize(bufW, bufH);
     this.cameras.main.setZoom(computeZoom(dpr));
