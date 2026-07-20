@@ -8,7 +8,7 @@
 // here is a pure function of the map, so it unit-tests without Phaser.
 
 import { TILE } from '../core/constants.js';
-import { tileAt } from '../core/query.js';
+import { inBounds, tileAt } from '../core/query.js';
 
 // Frame indices in tiles_prison.png (identical layout across all SPD
 // environment sheets), verified against DungeonTileSheet at commit 7b8b845a.
@@ -58,6 +58,28 @@ function wallish(t) {
 }
 
 const noOpenDoors = () => false;
+
+// Whether a wall cell's art (top, lintel, front face) may render: it must
+// border somewhere the player has actually seen — at least one of its eight
+// neighbors is an in-bounds, non-wall, explored cell. Shadowcasting and the
+// room-reveal ring both mark lone wall cells explored (far-seen wall tips,
+// rectangle corners), and an isolated wall cap drawn in otherwise-black space
+// reads as a floating fragment; anchoring kills those while room corner caps
+// survive (the room floor diagonal to a corner anchors it).
+export function wallCapAnchored(map, explored, x, y) {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!inBounds(map, nx, ny)) continue; // out-of-bounds never anchors
+      const i = ny * map.width + nx;
+      if (map.tiles[i] === TILE.WALL) continue; // walls never anchor each other
+      if (explored[i]) return true;
+    }
+  }
+  return false;
+}
 
 // Ground layer (drawn under items/entities). Returns a frame index or
 // NO_FRAME. `isOpen(x, y)` is the renderer's purely-visual predicate for "the

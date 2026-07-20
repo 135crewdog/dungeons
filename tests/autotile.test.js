@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { F, NO_FRAME, variance, groundFrame, wallsFrame } from '../src/renderer/autotile.js';
+import {
+  F,
+  NO_FRAME,
+  variance,
+  groundFrame,
+  wallsFrame,
+  wallCapAnchored,
+} from '../src/renderer/autotile.js';
 import { TILE } from '../src/core/constants.js';
 
 // Build a map from ASCII art rows: '#' wall, '.' floor, '+' door,
@@ -276,5 +283,102 @@ describe('walls next to stairs', () => {
     expect(groundFrame(m, 1, 0, SALT)).toBe(base); // walls both sides: no bits
     // The stairs cell receives the bottom wall's overhang.
     expect(wallsFrame(m, 1, 1)).toBe(F.WALL_OVERHANG);
+  });
+});
+
+describe('wallCapAnchored', () => {
+  // Explored grid from ASCII rows: 'x' explored, anything else not.
+  function exploredOf(rows) {
+    const explored = new Uint8Array(rows.length * rows[0].length);
+    for (let y = 0; y < rows.length; y++) {
+      for (let x = 0; x < rows[y].length; x++) {
+        if (rows[y][x] === 'x') explored[y * rows[0].length + x] = 1;
+      }
+    }
+    return explored;
+  }
+
+  it('anchors a room corner cap via its diagonal explored floor', () => {
+    const m = mapOf([
+      '###', //
+      '#..',
+      '#..',
+    ]);
+    const seen = exploredOf([
+      '...', //
+      '.xx',
+      '.xx',
+    ]);
+    expect(wallCapAnchored(m, seen, 0, 0)).toBe(true);
+  });
+
+  it('hides a lone far-seen wall tip with no explored open neighbors', () => {
+    const m = mapOf([
+      '#..', //
+      '...',
+      '...',
+    ]);
+    const seen = exploredOf([
+      '...', //
+      '...',
+      '..x',
+    ]);
+    expect(wallCapAnchored(m, seen, 0, 0)).toBe(false);
+  });
+
+  it('never anchors through explored walls', () => {
+    const m = mapOf([
+      '###', //
+      '###',
+      '###',
+    ]);
+    const seen = exploredOf([
+      'xxx', //
+      'xxx',
+      'xxx',
+    ]);
+    expect(wallCapAnchored(m, seen, 1, 1)).toBe(false);
+  });
+
+  it('anchors a lintel wall to the explored door below it', () => {
+    const m = mapOf([
+      '###', //
+      '#+#',
+      '#.#',
+    ]);
+    const seen = exploredOf([
+      '...', //
+      '.x.',
+      '...',
+    ]);
+    expect(wallCapAnchored(m, seen, 1, 0)).toBe(true);
+  });
+
+  it('ignores out-of-bounds neighbors at the map rim', () => {
+    const m = mapOf([
+      '#.', //
+      '..',
+    ]);
+    const seen = exploredOf([
+      '..', //
+      '..',
+    ]);
+    expect(wallCapAnchored(m, seen, 0, 0)).toBe(false);
+  });
+
+  it('anchors via an orthogonal explored corridor floor', () => {
+    const m = mapOf([
+      '###', //
+      '...',
+      '###',
+    ]);
+    const seen = exploredOf([
+      '...', //
+      '.x.',
+      '...',
+    ]);
+    expect(wallCapAnchored(m, seen, 1, 0)).toBe(true);
+    expect(wallCapAnchored(m, seen, 1, 2)).toBe(true);
+    expect(wallCapAnchored(m, seen, 0, 0)).toBe(true); // diagonal reach
   });
 });

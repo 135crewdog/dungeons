@@ -9,7 +9,7 @@
 
 import { TILE, TILE_SIZE } from '../core/constants.js';
 import { idx, tileAt, entitiesSorted } from '../core/query.js';
-import { groundFrame, wallsFrame, NO_FRAME } from './autotile.js';
+import { groundFrame, wallsFrame, wallCapAnchored, NO_FRAME } from './autotile.js';
 import { SPRITE_DIM } from './tileStyle.js';
 
 export const TILESHEET_KEY = 'tiles';
@@ -73,15 +73,25 @@ export class SpriteTileGrid {
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const i = idx(map, x, y);
-        this.apply(this.ground[i], groundFrame(map, x, y, salt, isOpen), visible, explored, i);
+        const t = map.tiles[i];
+        // Wall art (tops, lintels, front faces — and the overhang a wall
+        // casts into the open cell above it) renders only when the wall is
+        // anchored to an explored open neighbor. Shadowcasting and the room
+        // reveal ring mark lone wall cells explored, and an unanchored
+        // wall's art would float detached in unexplored black.
+        const wf0 = wallsFrame(map, x, y, isOpen);
+        const overhang =
+          wf0 !== NO_FRAME && t !== TILE.WALL && t !== TILE.DOOR && wallish(tileAt(map, x, y + 1));
+        let anchored = true;
+        if (t === TILE.WALL) anchored = wallCapAnchored(map, explored, x, y);
+        else if (overhang) anchored = wallCapAnchored(map, explored, x, y + 1);
+        const gf = t === TILE.WALL && !anchored ? NO_FRAME : groundFrame(map, x, y, salt, isOpen);
+        this.apply(this.ground[i], gf, visible, explored, i);
         // Overhang art on a floor/stairs cell is the top of the wall BELOW
         // it, so it lights by that wall's visibility — a remembered wall
         // keeps its cap even while the floor strip above it is unexplored,
         // and never leaks the existence of unseen walls.
-        const wf = wallsFrame(map, x, y, isOpen);
-        const t = map.tiles[i];
-        const overhang =
-          wf !== NO_FRAME && t !== TILE.WALL && t !== TILE.DOOR && wallish(tileAt(map, x, y + 1));
+        const wf = anchored ? wf0 : NO_FRAME;
         this.apply(this.walls[i], wf, visible, explored, overhang ? i + map.width : i);
       }
     }
