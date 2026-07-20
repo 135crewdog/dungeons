@@ -217,11 +217,13 @@ for (const [label, opts, expectTiles] of [
 {
   const { ctx, escaped } = await newGameContext(browser);
   const page = await newGamePage(ctx);
-  // The sprite terrain path needs the tilesheet; a 404 silently degrades to
-  // ASCII, so assert the asset actually loads.
-  let tilesheetStatus = 0;
+  // The sprite paths need their sheets; a 404 silently degrades to ASCII, so
+  // assert every art asset actually loads.
+  const ART = ['tiles_prison', 'warrior', 'gnoll', 'skeleton', 'tengu', 'items'];
+  const artStatus = new Map();
   page.on('response', (r) => {
-    if (r.url().includes('tiles_prison.png')) tilesheetStatus = r.status();
+    const hit = ART.find((n) => r.url().includes(`${n}.png`));
+    if (hit) artStatus.set(hit, r.status());
   });
   const c0 = consoleLines.length;
   await gotoSeed(page, fixtures.move.seed);
@@ -247,12 +249,13 @@ for (const [label, opts, expectTiles] of [
     url.includes(`seed=${fixtures.move.seed}`) &&
     !!seedLog &&
     bootMatches &&
-    tilesheetStatus === 200 &&
+    ART.every((n) => artStatus.get(n) === 200) &&
     escaped.length === 0;
+  const artOk = ART.filter((n) => artStatus.get(n) === 200).length;
   record(
     'E1/boot',
     ok,
-    `hud="${hud.trim().slice(0, 40)}..." version=${hudVersion.trim()} renderer=${rendererType} seedLog=${!!seedLog} bootParity=${bootMatches} tilesheet=${tilesheetStatus} escaped=${escaped.length}`,
+    `hud="${hud.trim().slice(0, 40)}..." version=${hudVersion.trim()} renderer=${rendererType} seedLog=${!!seedLog} bootParity=${bootMatches} art=${artOk}/${ART.length} escaped=${escaped.length}`,
   );
   await page.screenshot({ path: SHOTS + 'boot.png' });
   await ctx.close();

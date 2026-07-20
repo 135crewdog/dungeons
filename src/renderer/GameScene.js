@@ -13,8 +13,17 @@ import {
   FLOAT_COLOR,
   BG_COLOR,
   RENDER_STYLE,
+  SPRITE_DIM,
 } from './tileStyle.js';
 import { spawnFloatingText } from './floatingText.js';
+import {
+  SPRITE_SHEETS,
+  ENTITY_SPRITES,
+  ITEM_SPRITES,
+  sheetKey,
+  spriteOffset,
+  registerSpriteFrames,
+} from './entitySprites.js';
 
 // The one Phaser scene. It OBSERVES the game state and draws it — glyph grid,
 // items, entities — and follows the player with an integer-zoomed camera. It
@@ -34,12 +43,26 @@ export class DungeonScene extends Phaser.Scene {
       frameWidth: 16,
       frameHeight: 16,
     });
+    // Entity/item sheets load as plain images; their (non-16-aligned) frames
+    // are carved out by registerSpriteFrames once the textures exist.
+    for (const [name, url] of Object.entries(SPRITE_SHEETS)) {
+      this.load.image(sheetKey(name), url);
+    }
   }
 
   // Sprites unless disabled — or unless the sheet failed to load, in which
   // case the ASCII grid keeps the game fully playable.
   useSprites() {
     return RENDER_STYLE === 'sprites' && this.textures.exists(TILESHEET_KEY);
+  }
+
+  // Entity/item sprites need every sheet; any missing texture falls the whole
+  // group back to glyphs so the cast never renders half-and-half.
+  useEntitySprites() {
+    return (
+      RENDER_STYLE === 'sprites' &&
+      Object.keys(SPRITE_SHEETS).every((name) => this.textures.exists(sheetKey(name)))
+    );
   }
 
   makeGrid() {
@@ -49,6 +72,8 @@ export class DungeonScene extends Phaser.Scene {
   create() {
     this.state = this.registry.get('state');
     createGlyphTextures(this);
+    this.entitySprites = this.useEntitySprites();
+    if (this.entitySprites) registerSpriteFrames(this);
 
     // Persistent, explicitly depth-ordered layers: terrain under items under
     // entities under wall tops (the walls layer draws OVER actors — that
@@ -163,19 +188,33 @@ export class DungeonScene extends Phaser.Scene {
     const alive = new Set();
     for (const item of this.state.items) {
       alive.add(item.id);
+      const spec = this.entitySprites ? ITEM_SPRITES[item.type] : null;
       let img = this.itemImages.get(item.id);
       if (!img) {
-        img = this.add.image(0, 0, glyphKey(itemGlyph(item))).setOrigin(0, 0);
+        img = spec
+          ? this.add.image(0, 0, sheetKey(spec.sheet), item.type).setOrigin(0, 0)
+          : this.add.image(0, 0, glyphKey(itemGlyph(item))).setOrigin(0, 0);
         this.itemLayer.add(img);
         this.itemImages.set(item.id, img);
       }
       const w = tileToWorld(item.x, item.y);
-      img.setPosition(w.x, w.y);
+      if (spec) {
+        const { dx, dy } = spriteOffset(spec);
+        img.setPosition(w.x + dx, w.y + dy);
+      } else {
+        img.setPosition(w.x, w.y);
+      }
       // Remembered while explored; full color only when currently visible.
       const seen = isExplored(this.state, item.x, item.y);
       const lit = isVisible(this.state, item.x, item.y);
       img.setVisible(seen);
-      img.setTint(lit ? itemColor(item) : scaleColor(itemColor(item), 0.32));
+      if (spec) {
+        // Sprites carry their own colors: dim remembered ones uniformly.
+        if (lit) img.clearTint();
+        else img.setTint(SPRITE_DIM);
+      } else {
+        img.setTint(lit ? itemColor(item) : scaleColor(itemColor(item), 0.32));
+      }
     }
     for (const [id, img] of this.itemImages) {
       if (!alive.has(id)) {
@@ -190,18 +229,28 @@ export class DungeonScene extends Phaser.Scene {
     const playerId = this.state.entities.playerId;
     for (const e of entitiesSorted(this.state)) {
       alive.add(e.id);
+      const spec = this.entitySprites ? ENTITY_SPRITES[e.kind] : null;
       let img = this.entityImages.get(e.id);
       if (!img) {
-        img = this.add.image(0, 0, glyphKey(entityGlyph(e))).setOrigin(0, 0);
+        img = spec
+          ? this.add.image(0, 0, sheetKey(spec.sheet), e.kind).setOrigin(0, 0)
+          : this.add.image(0, 0, glyphKey(entityGlyph(e))).setOrigin(0, 0);
         this.entityLayer.add(img);
         this.entityImages.set(e.id, img);
       }
-      // An entity's glyph never changes, so only rebind the texture if it does.
-      const key = glyphKey(entityGlyph(e));
-      if (img.texture.key !== key) img.setTexture(key);
-      img.setTint(entityColor(e));
       const w = tileToWorld(e.x, e.y);
-      img.setPosition(w.x, w.y);
+      if (spec) {
+        // Sprite art is authoritative — no tint. Center in the tile, feet on
+        // its bottom edge (frames are sub-tile: 12×15, Tengu 14×16).
+        const { dx, dy } = spriteOffset(spec);
+        img.setPosition(w.x + dx, w.y + dy);
+      } else {
+        // An entity's glyph never changes, so only rebind if it does.
+        const key = glyphKey(entityGlyph(e));
+        if (img.texture.key !== key) img.setTexture(key);
+        img.setTint(entityColor(e));
+        img.setPosition(w.x, w.y);
+      }
       // The player is always shown; enemies only when currently in view.
       img.setVisible(e.id === playerId || isVisible(this.state, e.x, e.y));
     }

@@ -210,7 +210,8 @@ on floor 1 with a **new random seed** (logged).
 
 ## Visual Style
 
-**Terrain renders as sprites; everything that moves or is picked up stays ASCII.**
+**Everything renders as SPD sprites — terrain, creatures, and items — with the
+full ASCII look kept one switch away.**
 
 Terrain (floors, walls, doors, stairs) draws from Shattered Pixel Dungeon's prison
 tilesheet (`public/assets/environment/tiles_prison.png`, 16×16 frames, GPLv3 — see
@@ -231,15 +232,26 @@ image layers:
   east/west — front-on door face) and **sideways** (walls north/south — edge-on door
   in the wall run).
 
-Entities, items, and floating text remain **monospace ASCII glyphs** drawn on top:
-Player `@` · `g` goblin, `s` skeleton, `B` boss · Potion `!` · Chest `$` — that
-Brogue-style mix is the intentional look. `RENDER_STYLE` in
-`src/renderer/tileStyle.js` is the internal art switch (`'sprites'` default;
-`'ascii'` restores the full glyph grid — Floor `.` · Wall `#` · Door `+` · `>`/`<`
-stairs), and the scene falls back to ASCII by itself if the tilesheet fails to load.
-A pause-menu toggle can later flip the switch at runtime. Visibility states everywhere:
-**visible** (full color) · **explored** (dimmed — glyphs by scaled tint, sprites by a
-uniform grey multiply) · **unexplored** (black).
+Creatures and items draw as **static SPD sprite frames** — the first idle frame of
+each SPD sprite class, mapped in `src/renderer/entitySprites.js` (pure data, tested
+against the shipped PNGs' headers): player = **warrior, bottom sheet row** (tier-6
+class armor) · goblin = **gnoll** · skeleton = **skeleton** · boss = **Tengu** (SPD's
+prison boss) · potion = **crimson flask** · chest = **golden locked chest**.
+Character frames are sub-tile (12×15, Tengu 14×16) and render centered with feet on
+the tile's bottom edge, untinted; remembered items dim with the same grey multiply
+as terrain. The renderer stays event-driven — **no animation clock**; animated
+sprites would be a separate, deliberate architectural step.
+
+Floating text stays text, and the whole cast falls back to **monospace ASCII
+glyphs together** (never a mixed cast) if any sprite sheet fails to load: Player
+`@` · `g` goblin, `s` skeleton, `B` boss · Potion `!` · Chest `$`. `RENDER_STYLE`
+in `src/renderer/tileStyle.js` is the internal art switch (`'sprites'` default;
+`'ascii'` restores the full glyph game — Floor `.` · Wall `#` · Door `+` · `>`/`<`
+stairs), with terrain likewise self-falling-back if the tilesheet is missing. A
+pause-menu toggle can later flip the switch at runtime. Visibility states
+everywhere: **visible** (full color) · **explored** (dimmed — glyphs by scaled
+tint, sprites by a uniform grey multiply; enemies are simply hidden when not in
+view) · **unexplored** (black).
 
 ## Asset Licensing
 
@@ -282,8 +294,8 @@ watermark (`v0.5.2` style) top-right on the row under the Menu text (kept apart 
 the realtime gameplay stats) and in the pause-menu footer, so screenshots identify the
 build — and it rides along on every leaderboard submission. Bump the version in the
 same commit as the change it describes (Phase 4, the leaderboard + help release, was
-**0.5.0**; Phase 5, sprite terrain, was **0.6.0**; `package.json` is always the
-current number).
+**0.5.0**; Phase 5, sprite terrain, was **0.6.0**; Phase 6, entity/item sprites, was
+**0.7.0**; `package.json` is always the current number).
 
 ## PR Watching
 
@@ -301,7 +313,8 @@ src/
   entities/   // player, enemies, items, spawning
   systems/    // combat, pathfinding, fov, visibility, ai
   renderer/   // ALL Phaser code only; autotile.js (pure sprite-frame logic) +
-              // spriteLayer.js (sprite terrain) + glyphLayer.js (ASCII terrain)
+              // spriteLayer.js (sprite terrain) + glyphLayer.js (ASCII terrain) +
+              // entitySprites.js (entity/item frame table)
   ui/         // HUD, message log, game-over, menu, leaderboard, help (DOM overlays);
               // overlay.js is the shared modal factory, dom.js small DOM helpers
   input/      // keyboard, mouse, touch
@@ -309,6 +322,7 @@ src/
               // imported by the sim (architecture-test enforced)
 public/
   assets/environment/  // vendored SPD tilesheet(s) — GPLv3, see CREDITS.md
+  assets/sprites/      // vendored SPD creature/item sheets — same licensing
 server/       // Cloudflare Worker + D1 leaderboard backend (deployed separately)
 ```
 
@@ -391,6 +405,16 @@ latent rebuildFloor z-order bug) · ASCII fallback kept intact behind `RENDER_ST
 see Visual Style. Enemy/item sprites, water/grass/decor, and the menu art-style
 toggle are **explicitly deferred**, not in scope.
 
+Phase 6 (complete): **entity and item sprites** — the rest of the cast joins the
+terrain: vendored SPD warrior/gnoll/skeleton/tengu/items sheets ·
+`src/renderer/entitySprites.js` frame table (first idle frame of each SPD sprite
+class; player = warrior bottom row, boss = Tengu, potion = crimson flask, chest =
+golden locked chest), tested against the shipped PNG headers · sub-tile frames
+centered feet-on-tile · all-or-nothing glyph fallback (a missing sheet reverts the
+whole cast, terrain independent) · Help flavor refreshed. **Static frames only** —
+the renderer keeps its event-driven no-animation-clock model; sprite animation,
+water/grass/decor, and the menu art-style toggle remain **explicitly deferred**.
+
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
 
@@ -411,7 +435,10 @@ leaderboard worker is plain `fetch(request, env)` JS, tested in Node with a fake
 `worker.dashboard.js` copy against drift); the client tests inject fake
 fetch/storage (`tests/leaderboard.test.js`). The sprite autotiler is pure and
 covered by a decision-table suite (`tests/autotile.test.js`: corners, T-junctions,
-stubs, both door orientations, map borders, variance distribution).
+stubs, both door orientations, map borders, variance distribution). The entity/item
+frame table is verified against the vendored sheets themselves
+(`tests/entitySprites.test.js` reads each PNG's IHDR and asserts every frame rect
+lies inside its sheet — a bad rect or swapped asset fails in CI).
 
 An opt-in **browser end-to-end** campaign lives in `e2e/` (Playwright via
 `playwright-core`): `npm run build && npm run test:e2e` drives the real PWA through

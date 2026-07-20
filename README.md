@@ -1,10 +1,11 @@
 # Dungeons
 
 A browser-based roguelike dungeon crawler built with **Phaser** and vanilla
-JavaScript, playable as an installable **offline PWA**. Terrain renders from the
-Shattered Pixel Dungeon prison tileset with autotiled pseudo-3D walls; the player,
-monsters, and items are classic ASCII glyphs on top. There is no scripted story —
-everything emerges from the systems and procedural generation.
+JavaScript, playable as an installable **offline PWA**. The dungeon renders from
+Shattered Pixel Dungeon art: autotiled pseudo-3D walls from the prison tileset,
+with the warrior, gnolls, skeletons, Tengu, and loot as SPD sprites (classic ASCII
+one switch away). There is no scripted story — everything emerges from the systems
+and procedural generation.
 
 Descend through procedurally generated floors, fight monsters that grow with the
 depth, loot chests, and see how deep you can get before you die — then put your
@@ -13,9 +14,11 @@ three initials on the cross-device leaderboard.
 ## Features
 
 - Procedurally generated floors (rooms + corridors + doors), different every run
-- **Sprite terrain** with SPD-style autotiling: stitched wall tops drawn over
+- **SPD sprite art** with SPD-style autotiling: stitched wall tops drawn over
   actors (pseudo-3D), two door orientations that swing open as you step through,
-  per-cell floor variety — with the full ASCII look one switch away
+  per-cell floor variety — plus sprite creatures and items (warrior, gnoll,
+  skeleton, Tengu boss, potion, golden chest), with the full ASCII look one
+  switch away
 - Symmetric-shadowcasting field of view with remembered (dimmed) terrain
 - Goblins and skeletons that wake on sight and hunt you with A\* pathfinding — and
   give up the chase when you break their line of sight (closed doors block sight,
@@ -49,11 +52,12 @@ three initials on the cross-device leaderboard.
   press a key.
 - **Escape** (or the "Menu" text, top-right) opens the pause menu: new run,
   restart this seed, enter a seed, leaderboard, help.
-- Attack by moving into an enemy. Walk onto `>` to descend, `<` to ascend, onto
-  `!` to drink, onto `$` to open a chest (some are trapped).
+- Attack by moving into an enemy. Walk onto the stairs to descend or ascend, onto
+  a potion to drink it, onto a chest to open it (some are trapped).
 
-Glyphs: `@` you · `#` wall · `.` floor · `+` door · `>` stairs down · `<` stairs up ·
-`!` potion · `$` chest · `g` goblin · `s` skeleton · `B` boss.
+Classic notation (and the ASCII-mode look): `@` you · `#` wall · `.` floor · `+`
+door · `>` stairs down · `<` stairs up · `!` potion · `$` chest · `g` goblin ·
+`s` skeleton · `B` boss.
 
 ## Getting started
 
