@@ -114,57 +114,57 @@ describe('auto-walk controller', () => {
   });
 });
 
-describe('auto-walk cancellation triggers', () => {
-  // A longer corridor (y=1, x=1..12 in a 14x3 field) with real visibility, an
-  // optional closed door, and an optional wall pocket at (pocketX, 0) for an
-  // enemy that flanks the corridor. Everything is pre-explored (memory) so
-  // click paths can be planned; `visible` comes from updateVisibility.
-  function hallState({ playerX, doorX = null, pocketX = null } = {}) {
-    const width = 14;
-    const height = 3;
-    const tiles = new Uint8Array(width * height); // WALL
-    const map = {
-      width,
-      height,
-      tiles,
-      rooms: [],
-      roomAt: new Int16Array(width * height).fill(-1),
-      stairsDown: null,
-      stairsUp: null,
-    };
-    for (let x = 1; x <= 12; x++) tiles[idx(map, x, 1)] = TILE.FLOOR;
-    if (doorX !== null) tiles[idx(map, doorX, 1)] = TILE.DOOR;
-    if (pocketX !== null) tiles[idx(map, pocketX, 0)] = TILE.FLOOR;
-    const player = {
-      id: 1,
-      kind: 'player',
-      x: playerX,
-      y: 1,
-      hp: 20,
-      maxHp: 20,
-      attackDie: 8,
-      glyph: '@',
-      strength: 0,
-      skill: 0,
-      armor: 0,
-    };
-    const state = {
-      rng: createRng(1),
-      status: 'playing',
-      turn: 0,
-      floor: 1,
-      map,
-      vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
-      entities: { nextId: 2, playerId: 1, byId: new Map([[1, player]]) },
-      items: [],
-      path: null,
-      log: [],
-    };
-    state.vis.explored.fill(1); // the whole hall is remembered from a previous visit
-    updateVisibility(state);
-    return { state, player };
-  }
+// A longer corridor (y=1, x=1..12 in a 14x3 field) with real visibility, an
+// optional closed door, and an optional wall pocket at (pocketX, 0) for an
+// enemy that flanks the corridor. Everything is pre-explored (memory) so
+// click paths can be planned; `visible` comes from updateVisibility.
+function hallState({ playerX, doorX = null, pocketX = null } = {}) {
+  const width = 14;
+  const height = 3;
+  const tiles = new Uint8Array(width * height); // WALL
+  const map = {
+    width,
+    height,
+    tiles,
+    rooms: [],
+    roomAt: new Int16Array(width * height).fill(-1),
+    stairsDown: null,
+    stairsUp: null,
+  };
+  for (let x = 1; x <= 12; x++) tiles[idx(map, x, 1)] = TILE.FLOOR;
+  if (doorX !== null) tiles[idx(map, doorX, 1)] = TILE.DOOR;
+  if (pocketX !== null) tiles[idx(map, pocketX, 0)] = TILE.FLOOR;
+  const player = {
+    id: 1,
+    kind: 'player',
+    x: playerX,
+    y: 1,
+    hp: 20,
+    maxHp: 20,
+    attackDie: 8,
+    glyph: '@',
+    strength: 0,
+    skill: 0,
+    armor: 0,
+  };
+  const state = {
+    rng: createRng(1),
+    status: 'playing',
+    turn: 0,
+    floor: 1,
+    map,
+    vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
+    entities: { nextId: 2, playerId: 1, byId: new Map([[1, player]]) },
+    items: [],
+    path: null,
+    log: [],
+  };
+  state.vis.explored.fill(1); // the whole hall is remembered from a previous visit
+  updateVisibility(state);
+  return { state, player };
+}
 
+describe('auto-walk cancellation triggers', () => {
   const syncSchedule = (fn) => {
     fn();
     return () => {};
@@ -218,5 +218,154 @@ describe('auto-walk cancellation triggers', () => {
     controller.dispatch({ type: 'moveTo', x: 12, y: 1 });
     expect(player.x).toBe(12); // arrived
     expect(state.path).toBeNull(); // cleared on arrival
+  });
+});
+
+describe('attack intent (clicking a visible enemy)', () => {
+  const syncSchedule = (fn) => {
+    fn();
+    return () => {};
+  };
+
+  // Advance ticks on demand so enemy state can be mutated between steps.
+  function manualSchedule(pending) {
+    return (fn) => {
+      pending.push(fn);
+      return () => {
+        const i = pending.indexOf(fn);
+        if (i >= 0) pending.splice(i, 1);
+      };
+    };
+  }
+
+  function addFrozenGoblin(state, id, x, y) {
+    const enemy = createEnemy(ENEMY_TYPES.goblin, x, y, 1);
+    enemy.id = id;
+    enemy.moveCooldown = 99; // hold position; attacking is never gated
+    state.entities.byId.set(id, enemy);
+    updateVisibility(state);
+    return enemy;
+  }
+
+  const playerSwings = (events) => events.filter((e) => e.type === 'attack' && e.attackerId === 1);
+
+  it('clicking an adjacent enemy delivers one swing and stops', () => {
+    const { state, player } = hallState({ playerX: 5 });
+    addFrozenGoblin(state, 2, 6, 1);
+    const events = [];
+    const controller = createController(state, (evs) => events.push(...evs), syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 6, y: 1 });
+    expect(player.x).toBe(5); // the swing replaced the move
+    expect(playerSwings(events)).toHaveLength(1); // exactly one swing per click
+    expect(state.path).toBeNull();
+  });
+
+  it('pursues a distant enemy to melee range, lands one swing, and stops', () => {
+    // The goblin strikes back the moment the player steps adjacent; that hit
+    // must not abort the pursuit before the promised swing.
+    const { state, player } = hallState({ playerX: 1 });
+    addFrozenGoblin(state, 2, 9, 1);
+    const events = [];
+    const controller = createController(state, (evs) => events.push(...evs), syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 9, y: 1 });
+    expect(player.x).toBe(8); // stopped adjacent, never on the enemy's tile
+    expect(playerSwings(events)).toHaveLength(1);
+    expect(state.path).toBeNull();
+  });
+
+  it("re-plans each turn to track the enemy's current position", () => {
+    const { state, player } = hallState({ playerX: 1 });
+    const enemy = addFrozenGoblin(state, 2, 6, 1);
+    const pending = [];
+    const events = [];
+    const controller = createController(
+      state,
+      (evs) => events.push(...evs),
+      manualSchedule(pending),
+    );
+    controller.dispatch({ type: 'moveTo', x: 6, y: 1 });
+    expect(player.x).toBe(2); // took the first step toward x=6
+    // The enemy relocates down the hall (still visible); the pursuit must follow.
+    enemy.x = 11;
+    updateVisibility(state);
+    while (pending.length) pending.shift()();
+    expect(player.x).toBe(10); // adjacent to the NEW position, not the old one
+    expect(playerSwings(events)).toHaveLength(1);
+    expect(state.path).toBeNull();
+  });
+
+  it('the damage-cancel still applies while closing in', () => {
+    // Mirror of the plain-walk damage test: the pocket goblin at (7,0) flanks
+    // the route to the clicked target at the far end of the hall. Its first
+    // swing lands (deterministic seed) and the pursuit stops there.
+    const { state, player } = hallState({ playerX: 5, pocketX: 7 });
+    addFrozenGoblin(state, 2, 7, 0);
+    addFrozenGoblin(state, 3, 12, 1);
+    const events = [];
+    const controller = createController(state, (evs) => events.push(...evs), syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 12, y: 1 });
+    expect(player.hp).toBeLessThan(20); // the flanker's swing landed
+    expect(player.x).toBeLessThan(11); // and the pursuit stopped short of melee
+    expect(playerSwings(events)).toHaveLength(0);
+    expect(state.path).toBeNull();
+  });
+
+  it('stops cleanly when the target dies mid-pursuit', () => {
+    const { state, player } = hallState({ playerX: 1 });
+    addFrozenGoblin(state, 2, 9, 1);
+    const pending = [];
+    const controller = createController(state, () => {}, manualSchedule(pending));
+    controller.dispatch({ type: 'moveTo', x: 9, y: 1 });
+    expect(player.x).toBe(2);
+    state.entities.byId.delete(2); // slain by other means between ticks
+    while (pending.length) pending.shift()();
+    expect(player.x).toBe(2); // no further steps
+    expect(state.path).toBeNull();
+  });
+
+  it('stops when the target leaves line of sight', () => {
+    const { state, player } = hallState({ playerX: 1, doorX: 5 });
+    const enemy = addFrozenGoblin(state, 2, 4, 1); // near side of the door, visible
+    const pending = [];
+    const controller = createController(state, () => {}, manualSchedule(pending));
+    controller.dispatch({ type: 'moveTo', x: 4, y: 1 });
+    expect(player.x).toBe(2);
+    enemy.x = 9; // slips behind the closed door
+    updateVisibility(state);
+    while (pending.length) pending.shift()();
+    expect(player.x).toBe(2); // pursuit ended where sight was lost
+    expect(state.path).toBeNull();
+  });
+
+  it('clicking the tile of an enemy that is not visible starts a plain walk', () => {
+    // Same fixture as the newly-visible cancel test: the door at x=5 hides the
+    // enemy at x=9. Clicking its tile is a plain walk (the player can't know),
+    // which then cancels in the doorway when the enemy comes into view.
+    const { state, player } = hallState({ playerX: 1, doorX: 5 });
+    const enemy = createEnemy(ENEMY_TYPES.goblin, 9, 1, 1);
+    enemy.id = 2;
+    state.entities.byId.set(2, enemy);
+    updateVisibility(state);
+    const events = [];
+    const controller = createController(state, (evs) => events.push(...evs), syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 9, y: 1 });
+    expect(player.x).toBe(5); // stopped in the doorway by the newly-visible check
+    expect(playerSwings(events)).toHaveLength(0); // no attack intent was formed
+    expect(state.path).toBeNull();
+  });
+
+  it('a corner-blocked diagonal swing detours to a legal angle', () => {
+    // The pocket enemy at (7,0) is diagonal-adjacent from (6,1), but the wall
+    // at (6,0) forbids the diagonal bump (no corner-cutting). The pursuit must
+    // detour through (7,1) and swing from the cardinal instead.
+    const { state, player } = hallState({ playerX: 6, pocketX: 7 });
+    addFrozenGoblin(state, 2, 7, 0);
+    const events = [];
+    const controller = createController(state, (evs) => events.push(...evs), syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 7, y: 0 });
+    expect(player.x).toBe(7);
+    expect(player.y).toBe(1); // swung from below, never cut the corner
+    expect(playerSwings(events)).toHaveLength(1);
+    expect(state.path).toBeNull();
   });
 });

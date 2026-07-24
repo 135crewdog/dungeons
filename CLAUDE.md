@@ -139,6 +139,14 @@ that sit exactly one wall apart are linked by a single door. Rooms are also plac
   path is stored and executed one tile per turn. It cancels automatically if a
   _newly_-visible enemy enters line of sight, the player takes damage, the path becomes
   invalid, or the player issues a new movement command. A click and a tap are identical.
+  Clicking a **visible enemy** is an **attack intent** instead: the path re-aims at the
+  enemy's current tile every turn (so a moving target is tracked, not chased to a stale
+  tile) and on reaching melee range the player lands **one bump attack and stops** — one
+  swing per click; clicking an already-adjacent enemy is a single swing. The same
+  cancellation rules apply while closing in, with one carve-out: damage taken on the very
+  step that reached melee doesn't abort (enemies strike the moment the player arrives, and
+  the swing is the next action). Losing the target — dead or out of sight — also ends the
+  pursuit. Clicking a tile that holds a _non_-visible enemy is a plain walk.
 - **Secondary — keyboard.** Arrow keys and WASD move one cardinal tile per keypress;
   the **numpad (1–9)** provides all 8 directions including diagonals. Holding a
   movement key **repeats** at the OS key-repeat rate (each repeat is one discrete,
