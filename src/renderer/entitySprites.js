@@ -44,7 +44,7 @@ export const ITEM_SPRITES = Object.freeze({
 // Feet sit this many pixels above the tile's bottom edge — nearer the tile's
 // center, so actors clear the south wall tops (drawn over them) and line up
 // with sideways doors instead of sinking behind the pseudo-3D wall layer.
-export const SPRITE_LIFT = 3;
+export const SPRITE_LIFT = 5;
 
 // Pixel offset that centers a frame horizontally in its tile and rests its
 // bottom edge (feet) SPRITE_LIFT px above the tile's bottom edge. dy may be

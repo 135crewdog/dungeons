@@ -243,7 +243,7 @@ against the shipped PNGs' headers): player = **warrior, tier-5 sheet row** (rows
 15px, row N = armor tier N) · goblin = **gnoll** · skeleton = **skeleton** · boss =
 **evil Eye** (16×18 frames — taller than a tile, it floats up into the cell above) ·
 potion = **crimson flask** · chest = **golden locked chest**. Frames render centered
-with feet **`SPRITE_LIFT` (3px) above the tile's bottom edge** — nearer the tile
+with feet **`SPRITE_LIFT` (5px) above the tile's bottom edge** — nearer the tile
 center, so actors clear the south wall tops drawn over them and line up with
 sideways doors — untinted; remembered items dim with the same grey multiply as
 terrain. Sprites **mirror horizontally to face their last move or attack
