@@ -8,7 +8,7 @@
 // nothing here can go stale.
 
 import { TILE, TILE_SIZE } from '../core/constants.js';
-import { idx, tileAt, entitiesSorted } from '../core/query.js';
+import { idx, tileAt, entitiesSorted, getPlayer } from '../core/query.js';
 import { groundFrame, wallsFrame, wallCapAnchored, NO_FRAME } from './autotile.js';
 import { SPRITE_DIM } from './tileStyle.js';
 
@@ -65,6 +65,9 @@ export class SpriteTileGrid {
     const map = state.map;
     const { visible, explored } = state.vis;
     const salt = state.floor;
+    // Ring of Sight: render the whole floor fully lit (presentation only —
+    // the sim's arrays are untouched; apply() reads this flag).
+    this.sightAll = getPlayer(state)?.ringSight ?? false;
 
     const occupied = new Set();
     for (const e of entitiesSorted(state)) occupied.add(idx(map, e.x, e.y));
@@ -98,12 +101,12 @@ export class SpriteTileGrid {
   }
 
   apply(img, frame, visible, explored, visIdx) {
-    if (frame === NO_FRAME || (!visible[visIdx] && !explored[visIdx])) {
+    if (frame === NO_FRAME || (!this.sightAll && !visible[visIdx] && !explored[visIdx])) {
       img.setVisible(false);
       return;
     }
     img.setFrame(frame);
-    if (visible[visIdx]) img.clearTint();
+    if (this.sightAll || visible[visIdx]) img.clearTint();
     else img.setTint(SPRITE_DIM);
     img.setVisible(true);
   }

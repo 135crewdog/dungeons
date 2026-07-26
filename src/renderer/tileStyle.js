@@ -49,8 +49,23 @@ const ENTITY_COLOR = {
   boss: 0xd05a5a,
 };
 
-const POTION_COLOR = 0xe0556b;
-const CHEST_COLOR = 0xe0b74a;
+// Item glyphs and lit colors, by item type. Rings never normally lie on the
+// floor for long (they drop beside an unlocked chest), but they render like
+// any other item while they do.
+const ITEM_GLYPH = {
+  potion: '!',
+  chest: '$',
+  lockedChest: '&',
+  key: '*',
+  ring: '=',
+};
+const ITEM_COLOR = {
+  potion: 0xe0556b,
+  chest: 0xe0b74a,
+  lockedChest: 0x6fc7e0, // crystal blue, like its sprite
+  key: 0xf2d64b,
+  ring: 0xb48ff0,
+};
 
 // Floating combat/pickup text colors, as CSS hex strings (Phaser Text takes a
 // string fill). Kept here in the style seam rather than inline in the scene so
@@ -63,10 +78,13 @@ export const FLOAT_COLOR = Object.freeze({
   strength: '#e0b74a',
   skill: '#b48ff0',
   armor: '#6db3f2',
+  key: '#f2d64b',
+  ring: '#b48ff0',
+  locked: '#aab2c4',
 });
 
 // Every glyph the renderer can draw — used to pre-bake glyph textures.
-export const ALL_GLYPHS = ['#', '.', '+', '>', '<', '@', 'g', 's', 'B', '!', '$'];
+export const ALL_GLYPHS = ['#', '.', '+', '>', '<', '@', 'g', 's', 'B', '!', '$', '&', '*', '='];
 
 export function tileGlyph(tileType) {
   return TILE_GLYPH[tileType] ?? ' ';
@@ -98,9 +116,9 @@ export function entityColor(entity) {
 }
 
 export function itemGlyph(item) {
-  return item.type === 'chest' ? '$' : '!';
+  return ITEM_GLYPH[item.type] ?? '!';
 }
 
 export function itemColor(item) {
-  return item.type === 'chest' ? CHEST_COLOR : POTION_COLOR;
+  return ITEM_COLOR[item.type] ?? 0xffffff;
 }

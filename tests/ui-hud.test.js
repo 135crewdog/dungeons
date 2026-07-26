@@ -41,6 +41,43 @@ describe('HUD', () => {
     expect(el.querySelector('b').getAttribute('style')).toContain('var(--c-bad)');
   });
 
+  it('shows key and ring chips only when held, with injected icons', () => {
+    const iconHtml = (kind) => `<span class="ui-icon" data-kind="${kind}"></span>`;
+    const { update, el } = createHud(document.body, { iconHtml });
+    update(stateWith({ hp: 20, maxHp: 20, strength: 0, skill: 0, armor: 0 }));
+    expect(el.textContent).not.toContain('KEY');
+    expect(el.textContent).not.toContain('Shadow');
+    update(
+      stateWith({
+        hp: 20,
+        maxHp: 20,
+        strength: 0,
+        skill: 0,
+        armor: 0,
+        keys: 2,
+        ringShadow: true,
+        ringSpeed: true,
+      }),
+    );
+    expect(el.textContent).toContain('KEY');
+    expect(el.textContent).toContain('×2');
+    expect(el.textContent).toContain('Shadow');
+    expect(el.textContent).toContain('Speed');
+    expect(el.textContent).not.toContain('Sight');
+    expect(el.querySelector('[data-kind="key"]')).toBeTruthy();
+    expect(el.querySelector('[data-kind="ring:shadow"]')).toBeTruthy();
+  });
+
+  it('key and ring chips degrade to text without an icon injection', () => {
+    const { update, el } = createHud(document.body);
+    update(
+      stateWith({ hp: 20, maxHp: 20, strength: 0, skill: 0, armor: 0, keys: 1, ringSight: true }),
+    );
+    expect(el.textContent).toContain('KEY');
+    expect(el.textContent).toContain('Sight');
+    expect(el.querySelector('.ui-icon')).toBeNull();
+  });
+
   it('exposes a static version watermark', () => {
     createHud(document.body);
     const v = document.getElementById('hudversion');
@@ -78,5 +115,25 @@ describe('message log', () => {
     expect(el.textContent).toContain('+1 Skill');
     // the earliest descend lines fell off the 6-line window
     expect(el.textContent).not.toContain('floor 2.');
+  });
+
+  it('narrates the secrets: glimmer, locked, unlock, key, ring, survival', () => {
+    const { update, el } = createMessageLog(document.body);
+    update(
+      log([
+        { type: 'reveal', data: {} },
+        { type: 'locked', data: {} },
+        { type: 'unlock', data: { ring: 'shadow' } },
+        { type: 'pickup', data: { item: 'key' } },
+        { type: 'pickup', data: { item: 'ring', ring: 'shadow' } },
+        { type: 'survival', data: {} },
+      ]),
+    );
+    expect(el.textContent).toContain('A glimmer catches your eye.');
+    expect(el.textContent).toContain('The chest is locked — you need a key.');
+    expect(el.textContent).toContain('a ring tumbles out!');
+    expect(el.textContent).toContain('You pick up a golden key.');
+    expect(el.textContent).toContain('You slip on the Ring of Shadow.');
+    expect(el.textContent).toContain('crumbles to dust');
   });
 });

@@ -8,7 +8,7 @@ beforeEach(() => {
 });
 
 describe('help overlay', () => {
-  it('opens and closes and lists glyphs, stats, and controls', () => {
+  it('opens and closes and lists the legend, stats, and controls', () => {
     const help = createHelp(document.body);
     expect(help.isOpen()).toBe(false);
     help.open();
@@ -17,8 +17,8 @@ describe('help overlay', () => {
     expect(text).toContain('Goblin');
     expect(text).toContain('Strength');
     expect(text).toContain('Numpad');
-    // three tables: symbols, stats, controls
-    expect(help.el.querySelectorAll('.help-table').length).toBe(3);
+    // six tables: denizens, loot, rings, dungeon, stats, controls
+    expect(help.el.querySelectorAll('.help-table').length).toBe(6);
     help.close();
     expect(help.isOpen()).toBe(false);
   });

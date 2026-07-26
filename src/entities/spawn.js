@@ -22,7 +22,8 @@ import {
 import { idx, entityAt } from '../core/query.js';
 import { addEntity, allocId } from '../core/entity.js';
 import { createEnemy } from './enemies.js';
-import { createPotion, createChest } from './items.js';
+import { createPotion, createChest, createKey, createLockedChest } from './items.js';
+import { bandOf, secretPlan } from '../world/secrets.js';
 
 // A random unoccupied FLOOR tile within a room, or null if none found quickly.
 // FLOOR excludes doors and stairs, so nothing spawns in a doorway or on '>'.
@@ -43,6 +44,7 @@ export function populateFloor(state, floorNumber) {
   if (floorNumber % BOSS_FLOOR_INTERVAL === 0) spawnBoss(state, floorNumber);
   spawnPotions(state);
   spawnChests(state);
+  spawnSecrets(state, floorNumber);
 }
 
 // One boss guarding the down-stairs. The down-stairs sit at the center of the
@@ -118,4 +120,45 @@ function spawnChests(state) {
     chest.id = allocId(state);
     state.items.push(chest);
   }
+}
+
+// The band's secrets (Phase 7): if this floor is its band's keyFloor, hide the
+// key here; if it's the chestFloor, place the locked chest. WHICH floors (and
+// WHICH ring) come from the pure per-band plan; WHERE on the floor uses the
+// main RNG like every other spawn. The key never spawns in the start room —
+// no instant glimmer where the player arrives. On total placement failure
+// (vanishingly rare) the item is skipped: keys are interchangeable, so a
+// later band's key still opens the chest.
+function spawnSecrets(state, floorNumber) {
+  const rooms = state.map.rooms;
+  if (rooms.length < 2) return;
+  const plan = secretPlan(state.seed, bandOf(floorNumber));
+  if (floorNumber === plan.keyFloor) {
+    const tile = freeItemTile(state, () => rooms[nextInt(state.rng, 1, rooms.length - 1)]);
+    if (tile) {
+      const key = createKey(tile.x, tile.y);
+      key.id = allocId(state);
+      state.items.push(key);
+    }
+  }
+  if (floorNumber === plan.chestFloor) {
+    const tile = freeItemTile(state, () => pick(state.rng, rooms));
+    if (tile) {
+      const chest = createLockedChest(tile.x, tile.y, plan.ring);
+      chest.id = allocId(state);
+      state.items.push(chest);
+    }
+  }
+}
+
+// Retry wrapper with the item-overlap guard the potion/chest spawners inline:
+// a free FLOOR tile in a room chosen by roomPick, not already holding an item.
+function freeItemTile(state, roomPick, attempts = 10) {
+  for (let i = 0; i < attempts; i++) {
+    const tile = randomFreeFloorInRoom(state, roomPick());
+    if (!tile) continue;
+    if (state.items.some((it) => it.x === tile.x && it.y === tile.y)) continue;
+    return tile;
+  }
+  return null;
 }

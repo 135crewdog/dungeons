@@ -5,7 +5,7 @@
 // integer zoom.
 
 import { TILE_SIZE } from '../core/constants.js';
-import { idx } from '../core/query.js';
+import { idx, getPlayer } from '../core/query.js';
 import { ALL_GLYPHS, tileGlyph, tileColor, VIS } from './tileStyle.js';
 
 const FONT_PX = 16;
@@ -69,10 +69,13 @@ export class GlyphGrid {
   sync(state) {
     const map = state.map;
     const { visible, explored } = state.vis;
+    // Ring of Sight: the whole floor renders fully lit. Presentation only —
+    // the sim's visible/explored arrays are untouched.
+    const sightAll = getPlayer(state)?.ringSight ?? false;
     for (let i = 0; i < map.tiles.length; i++) {
       const img = this.images[i];
       let vis;
-      if (visible[i]) vis = VIS.VISIBLE;
+      if (sightAll || visible[i]) vis = VIS.VISIBLE;
       else if (explored[i]) vis = VIS.EXPLORED;
       else {
         img.setVisible(false);

@@ -19,7 +19,12 @@ describe('tileStyle glyph coverage', () => {
   });
 
   it('covers every item glyph', () => {
-    expect(ALL_GLYPHS).toContain(itemGlyph({ type: 'potion' }));
-    expect(ALL_GLYPHS).toContain(itemGlyph({ type: 'chest' }));
+    for (const type of ['potion', 'chest', 'lockedChest', 'key', 'ring']) {
+      expect(ALL_GLYPHS, `missing glyph for ${type}`).toContain(itemGlyph({ type }));
+    }
+  });
+
+  it('the locked chest glyph differs from the regular chest', () => {
+    expect(itemGlyph({ type: 'lockedChest' })).not.toBe(itemGlyph({ type: 'chest' }));
   });
 });

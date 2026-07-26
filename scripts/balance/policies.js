@@ -178,8 +178,15 @@ export const thorough = {
   name: 'thorough',
   decide(state) {
     const player = getPlayer(state);
+    // With the Ring of Shadow, unprovoked enemies can't see the player — so
+    // they are not threats, and (crucially) not hunt targets: they hold
+    // position forever, and hunting/fleeing a statue at the edge of view
+    // ping-pongs the bot into a stall. Provoked enemies fight as usual.
+    const hiddenFrom = (e) => (player.ringShadow ?? false) && !(e.provoked ?? false);
     const threats = enemiesSorted(state).filter(
-      (e) => isVisible(state, e.x, e.y) || chebyshev(player.x, player.y, e.x, e.y) === 1,
+      (e) =>
+        !hiddenFrom(e) &&
+        (isVisible(state, e.x, e.y) || chebyshev(player.x, player.y, e.x, e.y) === 1),
     );
     const potions = knownPotions(state);
 
@@ -254,11 +261,19 @@ export const thorough = {
       }
     }
 
+    // Loot worth walking to. Locked chests only count once a key is held (a
+    // keyless bot would oscillate onto and off the tile forever); hidden keys
+    // are invisible to the bot too — no cheating — but revealed keys and
+    // dropped rings are always worth grabbing.
     const wanted = tileSet(
       state.items.filter(
         (it) =>
           isExplored(state, it.x, it.y) &&
-          (it.type === 'chest' || (it.type === 'potion' && player.hp <= player.maxHp - it.heal)),
+          (it.type === 'chest' ||
+            (it.type === 'lockedChest' && (player.keys ?? 0) > 0) ||
+            (it.type === 'key' && !it.hidden) ||
+            it.type === 'ring' ||
+            (it.type === 'potion' && player.hp <= player.maxHp - it.heal)),
       ),
     );
     if (wanted.size) {

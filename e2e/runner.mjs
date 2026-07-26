@@ -427,7 +427,7 @@ for (const [label, opts, expectTiles] of [
   record(
     'E11/parity',
     parity && escaped.length === 0,
-    `188-command replay deep-equals the headless engine prediction: ${parity}; escaped=${escaped.length}`,
+    `${fixtures.trip.cmds.length}-command replay deep-equals the headless engine prediction: ${parity}; escaped=${escaped.length}`,
   );
   if (!parity) {
     writeFileSync(

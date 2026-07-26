@@ -94,6 +94,35 @@ export const CHEST_TABLE = Object.freeze({
   // 91-100 → trap (10%)
 });
 
+// Secrets: each SECRET_BAND_FLOORS-floor band (1–5, 6–10, …) hides one key on
+// an earlier floor and one locked chest (holding a magic ring) on a strictly
+// later floor of the same band. Which floors host them — and which ring the
+// chest holds — derive from the run seed via a pure per-band hash
+// (world/secrets.js), never the main RNG stream, so any floor's plan is
+// computable in isolation. The key is invisible until the player is within
+// KEY_REVEAL_RADIUS tiles (Chebyshev) AND its tile is in the player's FOV.
+// Keys are interchangeable: any key opens any locked chest.
+export const SECRET_BAND_FLOORS = 5;
+export const KEY_REVEAL_RADIUS = 2;
+// Ring of Speed: steps per movement turn. Attacks always end the turn, and
+// the extra step never attacks (and is forfeited on stairs or over loot).
+export const SPEED_STEPS = 2;
+// The four ring effects, and the player field each one sets when worn.
+// Rings are passive and run-long (Survival consumes itself when it fires).
+export const RING = Object.freeze({
+  SIGHT: 'sight', // whole floor rendered/known; enemy aggro still needs true LOS
+  SHADOW: 'shadow', // invisible to each enemy until the player attacks that one
+  SPEED: 'speed', // two steps per movement turn
+  SURVIVAL: 'survival', // once: at 0 HP restore to full, the ring crumbles
+});
+export const RING_TYPES = Object.freeze(Object.values(RING));
+export const RING_FLAG = Object.freeze({
+  sight: 'ringSight',
+  shadow: 'ringShadow',
+  speed: 'ringSpeed',
+  survival: 'ringSurvival',
+});
+
 // Map + generation.
 export const MAP_WIDTH = 72;
 export const MAP_HEIGHT = 44;
