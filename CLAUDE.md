@@ -317,8 +317,8 @@ image layers:
   east/west — front-on door face) and **sideways** (walls north/south — edge-on door
   in the wall run).
 
-Creatures and items draw as **static SPD sprite frames** — the first idle frame of
-each SPD sprite class, mapped in `src/renderer/entitySprites.js` (pure data, tested
+Creatures draw as **animated SPD sprites** (Phase 8) and items as static frames,
+mapped in `src/renderer/entitySprites.js` (pure data, tested
 against the shipped PNGs' headers): player = **warrior, tier-5 sheet row** (rows are
 15px, row N = armor tier N) · goblin = **gnoll** · skeleton = **skeleton** · boss =
 **evil Eye** (16×18 frames — taller than a tile, it floats up into the cell above) ·
@@ -333,9 +333,33 @@ sideways doors — untinted; remembered items dim with the same grey multiply as
 terrain. Sprites **mirror horizontally to face their last move or attack
 direction** (right is the sheets' native default; vertical movement keeps the last
 facing) via a renderer-local facing map fed by the turn's events
-(`src/renderer/facing.js`) — a static-frame mirror, not animation. The renderer
-stays event-driven — **no animation clock**; animated sprites would be a separate,
-deliberate architectural step.
+(`src/renderer/facing.js`).
+
+**Animation (Phase 8)** — the old "no animation clock" policy is deliberately
+reversed; the renderer remains strictly observation-only (no gameplay in any tween
+or animation callback), but it now moves:
+
+- **Idle/walk cycles** from the frames the SPD sheets always shipped: each entity
+  spec carries `anims` (column indices along its row — warrior idle 0–1 / walk 2–7,
+  gnoll 0–1 / 2–6, skeleton 0–1 / 2–5, the legless eye wobbles 0–2 faster when
+  "walking"); `registerSpriteFrames` creates the looping Phaser Animations, entities
+  are Sprites playing idle from creation.
+- **Move tweens** (`src/renderer/motion.js`): the pure half, `motionIntents()`,
+  reduces a turn's events to per-entity glides (facing.js model, Node-tested;
+  consecutive moves chain — a Ring-of-Speed turn is one two-tile slide) and the
+  Phaser half rewinds the already-snapped sprite to its origin tile and glides it
+  home over `TWEEN_MOVE_MS` (80ms — **always < STEP_DELAY_MS** so auto-walk never
+  overlaps a glide). Policy: **one tween per entity, latest wins** (held-key turns
+  arrive every ~30ms); `syncEntities` skips position writes for mid-glide sprites;
+  gliders play their walk cycle and return to idle on arrival; floor changes clear
+  everything. **Attack lunges**: a 4px yoyo nudge toward the target per swing.
+- **Camera pan in lockstep**: `centerOnPlayer` pans (same duration/ease) instead of
+  snapping, with instant reframes on floor change/resize/first frame. **Clicks
+  unproject against the SETTLED camera center** (`screenToTile` no longer reads the
+  live camera matrix), so spam-clicking during a pan can never mistarget.
+- **Excluded, deliberately**: frame-based attack animations (the lunge sells the
+  hit) and death animations (the sim deletes the entity and its sprite the same
+  turn — a corpse-sprite pool is real new machinery; deferred).
 
 Floating text stays text, and the whole cast falls back to **monospace ASCII
 glyphs together** (never a mixed cast) if any sprite sheet fails to load: Player
@@ -394,8 +418,8 @@ the realtime gameplay stats) and in the pause-menu footer, so screenshots identi
 build — and it rides along on every leaderboard submission. Bump the version in the
 same commit as the change it describes (Phase 4, the leaderboard + help release, was
 **0.5.0**; Phase 5, sprite terrain, was **0.6.0**; Phase 6, entity/item sprites, was
-**0.7.0**; Phase 7, secrets, was **0.8.0**; `package.json` is always the current
-number).
+**0.7.0**; Phase 7, secrets, was **0.8.0**; Phase 8, animation, was **0.9.0**;
+`package.json` is always the current number).
 
 ## PR Watching
 
@@ -511,9 +535,10 @@ terrain: vendored SPD warrior/gnoll/skeleton/tengu/items sheets ·
 class; player = warrior bottom row, boss = Tengu, potion = crimson flask, chest =
 golden locked chest), tested against the shipped PNG headers · sub-tile frames
 centered feet-on-tile · all-or-nothing glyph fallback (a missing sheet reverts the
-whole cast, terrain independent) · Help flavor refreshed. **Static frames only** —
-the renderer keeps its event-driven no-animation-clock model; sprite animation,
-water/grass/decor, and the menu art-style toggle remain **explicitly deferred**.
+whole cast, terrain independent) · Help flavor refreshed. _(Phase 6 shipped static
+frames only; Phase 8 later reversed the no-animation-clock policy — see Visual
+Style, which is authoritative.)_ Water/grass/decor and the menu art-style toggle
+remain **explicitly deferred**.
 
 Post-Phase-6 polish (**0.7.1**): sprite-mode playtest fixes — `SPRITE_LIFT` (feet
 3px above the tile bottom) · wall-cap anchoring (no floating caps) · canvas CSS
@@ -537,6 +562,15 @@ opt-out; shadow-aware threat filter), e2e fixtures regenerated. Balance snapshot
 (200-run thorough bot): floor-10 clear 19% → 30% — floors 1–4 untouched, the
 mid/late lift is the rings working; whether that's too generous is an open tuning
 question for a patch (candidate lever: the boss seeing through Shadow).
+
+Phase 8 (complete): **animation** — the deliberate reversal of the
+no-animation-clock policy, entirely inside the renderer (sim, input timing, and
+e2e parity untouched): move tweens with a pure Node-tested intent reducer
+(`renderer/motion.js`; latest-wins preemption, speed-ring moves chain into one
+glide) · camera panning in lockstep with settled-center click unprojection ·
+attack lunges · idle/walk cycles from the frames the vendored sheets always
+shipped (no new assets, no licensing change). Full spec in Visual Style.
+Frame-based attack/death animations and water/grass/decor stay deferred.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,
@@ -570,7 +604,10 @@ purity/determinism + real-run spawn cadence), `tests/lockedChest.test.js`
 (locked/unlock/ring-drop flow), `tests/keyReveal.test.js` (proximity + FOV gating),
 and `tests/rings.test.js` (all four ring effects, including the Ring of Speed's
 turn-engine invariants and both Survival lethal sites), plus ring-speed auto-walk
-cases in `tests/autowalk.test.js`.
+cases in `tests/autowalk.test.js`. The animation layer's pure half is covered by
+`tests/motion.test.js` (intent reduction, move chaining, the
+TWEEN_MOVE_MS < STEP_DELAY_MS contract), and the animation-cycle frame rects by
+the entitySprites suite.
 
 An opt-in **browser end-to-end** campaign lives in `e2e/` (Playwright via
 `playwright-core`): `npm run build && npm run test:e2e` drives the real PWA through
