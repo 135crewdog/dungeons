@@ -8,6 +8,7 @@ import { createPhaserGame } from './renderer/phaserConfig.js';
 import { createController } from './input/controller.js';
 import { attachKeyboard } from './input/keyboard.js';
 import { attachPointer } from './input/pointer.js';
+import { UI_ICONS, SHEET_SIZES } from './renderer/uiIcons.js';
 import { createHud } from './ui/hud.js';
 import { createMessageLog } from './ui/messageLog.js';
 import { createGameOver } from './ui/gameOver.js';
@@ -56,7 +57,29 @@ window.__game = state; // exposed for debugging / reproducibility
 const parent = document.getElementById('game');
 const game = createPhaserGame(parent, state);
 
-const hud = createHud(document.body);
+// Sprite icons for the DOM overlays (Help legend, HUD chips): a <span>
+// cropping the real sheet via CSS at 2x, pixelated — the same art the dungeon
+// draws. Only this composition root may bridge renderer data into ui/.
+const ICON_SCALE = 2;
+function spriteIconEl(kind) {
+  const spec = UI_ICONS[kind];
+  if (!spec) return null;
+  const sheet = SHEET_SIZES[spec.url];
+  const s = document.createElement('span');
+  s.className = 'ui-icon';
+  s.style.width = `${spec.w * ICON_SCALE}px`;
+  s.style.height = `${spec.h * ICON_SCALE}px`;
+  s.style.backgroundImage = `url(${spec.url})`;
+  s.style.backgroundPosition = `-${spec.x * ICON_SCALE}px -${spec.y * ICON_SCALE}px`;
+  s.style.backgroundSize = `${sheet.width * ICON_SCALE}px ${sheet.height * ICON_SCALE}px`;
+  return s;
+}
+function spriteIconHtml(kind) {
+  const el = spriteIconEl(kind);
+  return el ? el.outerHTML : '';
+}
+
+const hud = createHud(document.body, { iconHtml: spriteIconHtml });
 const messageLog = createMessageLog(document.body);
 
 // Cross-device leaderboard client (disabled while LEADERBOARD_URL is empty).
@@ -150,7 +173,7 @@ const menu = createMenu(document.body, {
 // after the menu's, so one Escape press closes only the topmost layer (the
 // menu defers via isChildOpen, then the child's own handler closes it).
 const leaderboard = createLeaderboard(document.body, { fetchScores: () => lb.fetchScores() });
-const help = createHelp(document.body);
+const help = createHelp(document.body, { iconFor: spriteIconEl });
 
 // While the menu (or an overlay layered above it) is open the game is paused:
 // swallow movement/tap commands so nothing advances underneath. The overlays

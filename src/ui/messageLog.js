@@ -34,7 +34,17 @@ function format(entry) {
             return 'You open a chest.';
         }
       }
+      if (d.item === 'key') return 'You pick up a golden key.';
+      if (d.item === 'ring') return `You slip on the ${ringName(d.ring)}.`;
       return `You drink a potion (+${d.heal} HP).`;
+    case 'reveal':
+      return 'A glimmer catches your eye.';
+    case 'locked':
+      return 'The chest is locked — you need a key.';
+    case 'unlock':
+      return 'You unlock the chest — a ring tumbles out!';
+    case 'survival':
+      return 'Your ring flares and crumbles to dust — you feel life surge back!';
     case 'descend':
       return `You descend to floor ${d.floor}.`;
     case 'ascend':
@@ -42,6 +52,12 @@ function format(entry) {
     default:
       return '';
   }
+}
+
+// 'sight' → 'Ring of Sight' (shared vocabulary with the HUD chips).
+export function ringName(ring) {
+  const cap = typeof ring === 'string' && ring ? ring[0].toUpperCase() + ring.slice(1) : '?';
+  return `Ring of ${cap}`;
 }
 
 export function createMessageLog(parent) {

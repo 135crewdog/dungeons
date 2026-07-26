@@ -348,6 +348,26 @@
       .help-panel {
         width: min(380px, 92vw);
       }
+      /* The sprite legend made Help taller: scroll inside the panel rather
+         than overflow the viewport on short screens. */
+      .help-panel {
+        max-height: 86vh;
+        overflow-y: auto;
+      }
+      /* Sprite icons in DOM overlays (Help legend, HUD chips): a CSS crop of
+         the real sheet, integer-scaled and pixelated like the canvas. */
+      .ui-icon {
+        display: inline-block;
+        image-rendering: pixelated;
+        background-repeat: no-repeat;
+        vertical-align: middle;
+      }
+      #hud .ui-icon {
+        margin-right: 4px;
+      }
+      .help-table .help-icon {
+        margin-right: 6px;
+      }
       /* Section header inside a panel — same visual language as the menu's
          seed label, shared by the leaderboard and help overlays. */
       .panel-label {
@@ -434,18 +454,14 @@
         vertical-align: top;
         color: #8a93a6;
       }
-      /* One shared key-column width across all three help tables (Symbols /
+      /* One shared key-column width across all help tables (legend sections /
          Stats / Controls) so every description column lines up on the same
-         left edge. 116px fits the widest key ("Arrows / WASD") without
-         overflow. */
+         left edge. 150px fits the widest key ("Ring of Survival" plus its
+         sprite icon) without overflow. */
       .help-table .help-key {
-        width: 116px;
+        width: 150px;
         color: var(--c-text);
         white-space: nowrap;
-      }
-      .help-table .help-glyph {
-        color: var(--c-text-hi);
-        font-weight: 700;
       }
 
       #gameover {

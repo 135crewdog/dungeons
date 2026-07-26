@@ -34,12 +34,30 @@ export const ENTITY_SPRITES = Object.freeze({
   boss: { sheet: 'eye', x: 0, y: 0, w: 16, h: 18 },
 });
 
-// item.type → frame: SPD's POTION_CRIMSON flask and LOCKED_CHEST (the golden
-// treasure chest).
+// item.type → frame: SPD's POTION_CRIMSON flask, the golden treasure chest,
+// the blue CRYSTAL_CHEST (the Phase-7 locked chest — deliberately a different
+// chest so "locked" reads at a glance), and the GOLDEN_KEY.
 export const ITEM_SPRITES = Object.freeze({
   potion: { sheet: 'items', x: 0, y: 352, w: 12, h: 14 },
   chest: { sheet: 'items', x: 80, y: 32, w: 16, h: 14 },
+  lockedChest: { sheet: 'items', x: 96, y: 32, w: 16, h: 14 },
+  key: { sheet: 'items', x: 128, y: 48, w: 8, h: 14 },
 });
+
+// ring effect → frame: the SPD ring row (y=224), one gem per effect —
+// Sapphire for Sight, Onyx for Shadow, Topaz for Speed, Ruby for Survival.
+// Ring items carry `item.ring`, so they key off this table, not ITEM_SPRITES.
+export const RING_SPRITES = Object.freeze({
+  sight: { sheet: 'items', x: 112, y: 224, w: 8, h: 10 },
+  shadow: { sheet: 'items', x: 64, y: 224, w: 8, h: 10 },
+  speed: { sheet: 'items', x: 32, y: 224, w: 8, h: 10 },
+  survival: { sheet: 'items', x: 16, y: 224, w: 8, h: 10 },
+});
+
+// Texture-frame name for a ring effect (registered alongside the item frames).
+export function ringFrameName(ring) {
+  return 'ring:' + ring;
+}
 
 // Feet sit this many pixels above the tile's bottom edge — nearer the tile's
 // center, so actors clear the south wall tops (drawn over them) and line up
@@ -55,12 +73,17 @@ export function spriteOffset(spec) {
 }
 
 // Register every frame on its loaded sheet texture, named by entity kind /
-// item type, so images can be created as (sheetKey(sheet), name).
+// item type / ring effect, so images can be created as (sheetKey(sheet), name).
 export function registerSpriteFrames(scene) {
   for (const table of [ENTITY_SPRITES, ITEM_SPRITES]) {
     for (const [name, s] of Object.entries(table)) {
       const tex = scene.textures.get(sheetKey(s.sheet));
       if (!tex.has(name)) tex.add(name, 0, s.x, s.y, s.w, s.h);
     }
+  }
+  for (const [ring, s] of Object.entries(RING_SPRITES)) {
+    const tex = scene.textures.get(sheetKey(s.sheet));
+    const name = ringFrameName(ring);
+    if (!tex.has(name)) tex.add(name, 0, s.x, s.y, s.w, s.h);
   }
 }

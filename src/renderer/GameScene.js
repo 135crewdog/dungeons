@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { getPlayer, entitiesSorted, isVisible, isExplored } from '../core/query.js';
+import { getPlayer, entitiesSorted, isExplored, isRevealed } from '../core/query.js';
 import { EV } from '../core/events.js';
 import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
 import { SpriteTileGrid, TILESHEET_KEY } from './spriteLayer.js';
@@ -21,6 +21,8 @@ import {
   SPRITE_SHEETS,
   ENTITY_SPRITES,
   ITEM_SPRITES,
+  RING_SPRITES,
+  ringFrameName,
   sheetKey,
   spriteOffset,
   registerSpriteFrames,
@@ -186,7 +188,13 @@ export class DungeonScene extends Phaser.Scene {
         if (ev.hit) spawnFloatingText(this, ev.x, ev.y, `-${ev.damage}`, FLOAT_COLOR.damage);
         else spawnFloatingText(this, ev.x, ev.y, 'Miss!', FLOAT_COLOR.miss);
       } else if (ev.type === EV.PICKUP) {
-        if (ev.heal > 0) {
+        if (ev.item === 'key') {
+          spawnFloatingText(this, ev.x, ev.y, '+Key', FLOAT_COLOR.key);
+        } else if (ev.item === 'ring') {
+          spawnFloatingText(this, ev.x, ev.y, '+Ring', FLOAT_COLOR.ring);
+        } else if (ev.item === 'lockedChest') {
+          spawnFloatingText(this, ev.x, ev.y, 'Unlocked!', FLOAT_COLOR.key);
+        } else if (ev.heal > 0) {
           spawnFloatingText(this, ev.x, ev.y, `+${ev.heal}`, FLOAT_COLOR.heal);
         } else if (ev.effect === 'strength') {
           spawnFloatingText(this, ev.x, ev.y, `+${ev.amount} STR`, FLOAT_COLOR.strength);
@@ -197,6 +205,12 @@ export class DungeonScene extends Phaser.Scene {
         } else if (ev.effect === 'trap') {
           spawnFloatingText(this, ev.x, ev.y, `-${ev.amount}`, FLOAT_COLOR.damage);
         }
+      } else if (ev.type === EV.REVEAL) {
+        spawnFloatingText(this, ev.x, ev.y, '*', FLOAT_COLOR.key);
+      } else if (ev.type === EV.LOCKED) {
+        spawnFloatingText(this, ev.x, ev.y, 'Locked', FLOAT_COLOR.locked);
+      } else if (ev.type === EV.SURVIVAL) {
+        spawnFloatingText(this, ev.x, ev.y, 'Saved!', FLOAT_COLOR.heal);
       }
     }
   }
@@ -209,11 +223,18 @@ export class DungeonScene extends Phaser.Scene {
       // only way in.
       if (item.hidden) continue;
       alive.add(item.id);
-      const spec = this.entitySprites ? ITEM_SPRITES[item.type] : null;
+      // Ring items carry their gem in `item.ring`; everything else keys off
+      // the type. Both resolve to a named frame registered at boot.
+      const spec = this.entitySprites
+        ? item.type === 'ring'
+          ? RING_SPRITES[item.ring]
+          : ITEM_SPRITES[item.type]
+        : null;
       let img = this.itemImages.get(item.id);
       if (!img) {
+        const frame = item.type === 'ring' ? ringFrameName(item.ring) : item.type;
         img = spec
-          ? this.add.image(0, 0, sheetKey(spec.sheet), item.type).setOrigin(0, 0)
+          ? this.add.image(0, 0, sheetKey(spec.sheet), frame).setOrigin(0, 0)
           : this.add.image(0, 0, glyphKey(itemGlyph(item))).setOrigin(0, 0);
         this.itemLayer.add(img);
         this.itemImages.set(item.id, img);
@@ -225,9 +246,10 @@ export class DungeonScene extends Phaser.Scene {
       } else {
         img.setPosition(w.x, w.y);
       }
-      // Remembered while explored; full color only when currently visible.
+      // Remembered while explored; full color when currently visible — or
+      // anywhere, with the Ring of Sight (isRevealed).
       const seen = isExplored(this.state, item.x, item.y);
-      const lit = isVisible(this.state, item.x, item.y);
+      const lit = isRevealed(this.state, item.x, item.y);
       img.setVisible(seen);
       if (spec) {
         // Sprites carry their own colors: dim remembered ones uniformly.
@@ -275,8 +297,9 @@ export class DungeonScene extends Phaser.Scene {
         img.setTint(entityColor(e));
         img.setPosition(w.x, w.y);
       }
-      // The player is always shown; enemies only when currently in view.
-      img.setVisible(e.id === playerId || isVisible(this.state, e.x, e.y));
+      // The player is always shown; enemies when currently in view — or
+      // everywhere, full color, with the Ring of Sight (isRevealed).
+      img.setVisible(e.id === playerId || isRevealed(this.state, e.x, e.y));
     }
     for (const [id, img] of this.entityImages) {
       if (!alive.has(id)) {
