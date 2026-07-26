@@ -103,9 +103,15 @@ builds every cell with `textContent` since rows are other players' input.
 
 ## Help
 
-A static menu-reachable overlay (`src/ui/help.js`): a glyph table (all eleven symbols,
-playful one-liners), a stats table (HP/Floor/STR/ARM/SKL), and a controls list, in the
-same NetHack-ish panel style. It reads nothing and calls nothing back.
+A static menu-reachable overlay (`src/ui/help.js`), **sprite-first**: the legend shows
+the real sheet art (five sections — Denizens / Loot / Rings / Dungeon — plus Stats and
+Controls tables) with playful one-liners; glyph notation no longer appears anywhere in
+the UI. The icons are CSS crops of the public sprite sheets, built by an `iconFor`
+factory that **the composition root injects** (`src/renderer/uiIcons.js` holds the
+pure specs; `ui/` never imports `renderer/`, so main.js is the bridge — same pattern
+feeds the HUD's key/ring chips via `iconHtml`). Without the injection the rows fall
+back to name-only text. The panel scrolls inside itself on short screens. It reads
+nothing and calls nothing back.
 
 ## Turn Order (strict, every turn)
 
@@ -114,7 +120,9 @@ same NetHack-ish panel style. It reads nothing and calls nothing back.
 3. Update field of view and visibility. (FOV depends only on walls + player
    position, so it is computed right after the player acts and is stable
    through the enemy phase — this is what gives enemies correct line of sight
-   for same-turn aggro.)
+   for same-turn aggro.) Hidden keys within `KEY_REVEAL_RADIUS` **and** in FOV
+   reveal right after the FOV update — before enemies act and before pickups,
+   so stepping blindly onto a hidden key reveals then collects it in one turn.
 4. For each enemy in ascending entity-id order: attack if adjacent, else move
    one step toward the player. (An enemy that closes to melee range this turn
    does **not** also attack this turn.)
@@ -124,6 +132,17 @@ same NetHack-ish panel style. It reads nothing and calls nothing back.
 
 Stepping onto a staircase ends the turn immediately after the player's move:
 the floor swaps and the enemy/pickup phases are skipped.
+
+**Ring of Speed** grants a second step per movement turn, inserted between
+steps 2 and 3 with its own FOV/reveal pass so the intermediate tile is
+explored honestly. Invariants: a bump-attack consumes the whole turn; the
+second step repeats the first step's direction, never attacks (silently
+skipped when blocked or occupied), is forfeited when the first step lands on
+stairs (floor swaps immediately) or on an item ("you stop over loot" — this is
+what keeps pickups un-skippable); `state.turn` still advances once per
+command; the enemy phase and pickups run once, at the final position. Commands
+carry an optional `single: true` to opt out of the doubling (auto-walk path
+corners, attack pursuit, and the balance bots use it).
 
 ## Movement and Pathfinding
 
@@ -147,6 +166,13 @@ that sit exactly one wall apart are linked by a single door. Rooms are also plac
   step that reached melee doesn't abort (enemies strike the moment the player arrives, and
   the swing is the next action). Losing the target — dead or out of sight — also ends the
   pursuit. Clicking a tile that holds a _non_-visible enemy is a plain walk.
+- **Ring of Speed and auto-walk.** With the ring on, a plain walk consumes two
+  **colinear** path nodes per turn and lets the engine double the step; at a path
+  corner the controller forces `single: true` (the engine's doubling can only repeat
+  a direction). If the engine forfeits the second step (loot underfoot, occupied
+  tile), the controller detects the one-tile-short landing, **rewinds the path
+  cursor**, and carries on instead of cancelling. Attack pursuit always sends
+  `single: true` — precision over pace while closing in.
 - **Secondary — keyboard.** Arrow keys and WASD move one cardinal tile per keypress;
   the **numpad (1–9)** provides all 8 directions including diagonals. Holding a
   movement key **repeats** at the OS key-repeat rate (each repeat is one discrete,
@@ -214,7 +240,53 @@ keep their numbers.
 ## Death
 
 Permadeath. At 0 HP a minimal "You died" overlay appears; restarting begins a fresh run
-on floor 1 with a **new random seed** (logged).
+on floor 1 with a **new random seed** (logged). The one exception: an armed **Ring of
+Survival** fires at the moment HP would hit 0 (both lethal sites — enemy hits and
+chest traps), restoring full HP and crumbling to dust. It works once; a later
+Survival ring re-arms it.
+
+## Secrets (Phase 7)
+
+Each **5-floor band** (1–5, 6–10, …) hides exactly one **key** and one **locked
+chest** holding a magic ring, always on different floors: the key strictly earlier,
+so the natural descent meets it first (miss it and you can climb back — floors
+persist). WHICH floors host them and WHICH ring the chest holds derive from a pure
+per-band hash of the run seed (`src/world/secrets.js` — `secretPlan(seed, band)`,
+never the main RNG stream, so any floor's plan is computable in isolation); WHERE on
+the floor uses the main RNG like every other spawn. Constants: `SECRET_BAND_FLOORS`,
+`KEY_REVEAL_RADIUS`, `SPEED_STEPS`, `RING`/`RING_TYPES`/`RING_FLAG`.
+
+- **The key** spawns `hidden` (never rendered, not even dimmed) in a non-start room
+  and reveals with "A glimmer catches your eye." when the player is within 2 tiles
+  **and** the tile is in FOV (no glimmers through walls or closed doors — and the
+  Ring of Sight does NOT reveal keys). Walking over it banks it on the player
+  (`player.keys` — interchangeable across bands, HUD chip, survives floor swaps since
+  the player object is carried by reference).
+- **The locked chest** is visibly a different chest (blue crystal vs. the golden
+  regular chest). Keyless, it announces "locked" once per arrival and never opens.
+  With a key it consumes one and **drops its ring on an adjacent tile** (deterministic
+  DIRS8 scan, boss-chest style; if boxed in, the ring goes straight onto the finger).
+- **The four rings** are passive, auto-worn on walk-over, kept for the run
+  (`restart` wipes them), shown as HUD gem chips, one per band in a seed-shuffled
+  cycle (bands 0–3 all differ; deeper bands wrap — a duplicate permanent ring is a
+  no-op, a duplicate Survival ring re-arms):
+  - **Sight** — the whole floor renders fully lit and `explored` fills (full-floor
+    click pathing). Presentation reads `query.isRevealed`; the sim's `visible` array
+    stays strictly shadowcast, so **enemy aggro still requires true line of sight**
+    (no floor-wide dinner bell) and auto-walk cancel semantics are unchanged.
+  - **Shadow** — invisible **per-enemy**: each enemy ignores the player until the
+    player attacks _it_ (hit or miss sets `enemy.provoked` in combat.js; ai.js gates
+    the sighting on it). Unprovoked enemies never aggro and never swing even when
+    adjacent; an already-chasing enemy loses the trail through the normal de-aggro
+    machinery. Bystanders stay oblivious while their neighbor is stabbed.
+  - **Speed** — two steps per movement turn (see Turn Order for the exact rules).
+  - **Survival** — one cheated death (see Death).
+
+Enemies route around item tiles already, so hidden keys and locked chests bend their
+paths slightly — harmless. Known accepted quirks: a key within reveal range of the
+arrival stair glimmers on the first command after arrival, not on arrival itself;
+Sight's `explored` fill lags one turn behind the unlock for click-pathing purposes
+(the full-bright rendering is immediate).
 
 ## Visual Style
 
@@ -250,7 +322,11 @@ each SPD sprite class, mapped in `src/renderer/entitySprites.js` (pure data, tes
 against the shipped PNGs' headers): player = **warrior, tier-5 sheet row** (rows are
 15px, row N = armor tier N) · goblin = **gnoll** · skeleton = **skeleton** · boss =
 **evil Eye** (16×18 frames — taller than a tile, it floats up into the cell above) ·
-potion = **crimson flask** · chest = **golden locked chest**. Frames render centered
+potion = **crimson flask** · chest = **golden chest** · locked chest = **blue
+crystal chest** (deliberately a different chest, so "locked" reads at a glance) ·
+key = **golden key** (spawns `hidden`; unrendered until revealed) · rings = the SPD
+gem-ring row (Sapphire = Sight · Onyx = Shadow · Topaz = Speed · Ruby = Survival,
+via `RING_SPRITES`). Frames render centered
 with feet **`SPRITE_LIFT` (5px) above the tile's bottom edge** — nearer the tile
 center, so actors clear the south wall tops drawn over them and line up with
 sideways doors — untinted; remembered items dim with the same grey multiply as
@@ -263,14 +339,18 @@ deliberate architectural step.
 
 Floating text stays text, and the whole cast falls back to **monospace ASCII
 glyphs together** (never a mixed cast) if any sprite sheet fails to load: Player
-`@` · `g` goblin, `s` skeleton, `B` boss · Potion `!` · Chest `$`. `RENDER_STYLE`
+`@` · `g` goblin, `s` skeleton, `B` boss · Potion `!` · Chest `$` · Locked chest
+`&` · Key `*` · Ring `=`. `RENDER_STYLE`
 in `src/renderer/tileStyle.js` is the internal art switch (`'sprites'` default;
 `'ascii'` restores the full glyph game — Floor `.` · Wall `#` · Door `+` · `>`/`<`
-stairs), with terrain likewise self-falling-back if the tilesheet is missing. A
-pause-menu toggle can later flip the switch at runtime. Visibility states
+stairs), with terrain likewise self-falling-back if the tilesheet is missing. The
+fallback is a **silent safety net only** — since Phase 7 no UI surfaces glyph
+notation (the Help legend is sprite-based). Visibility states
 everywhere: **visible** (full color) · **explored** (dimmed — glyphs by scaled
 tint, sprites by a uniform grey multiply; enemies are simply hidden when not in
-view) · **unexplored** (black).
+view) · **unexplored** (black) — plus the Ring of Sight's full-floor reveal,
+which renders everything fully lit through `query.isRevealed` without touching
+the sim's visibility arrays.
 
 ## Asset Licensing
 
@@ -314,7 +394,8 @@ the realtime gameplay stats) and in the pause-menu footer, so screenshots identi
 build — and it rides along on every leaderboard submission. Bump the version in the
 same commit as the change it describes (Phase 4, the leaderboard + help release, was
 **0.5.0**; Phase 5, sprite terrain, was **0.6.0**; Phase 6, entity/item sprites, was
-**0.7.0**; `package.json` is always the current number).
+**0.7.0**; Phase 7, secrets, was **0.8.0**; `package.json` is always the current
+number).
 
 ## PR Watching
 
@@ -446,8 +527,21 @@ now the evil Eye itself — derived from the boss sprite's first frame by
 re-encode; run it to regenerate) with a matching CREDITS.md "App icons" section,
 since the icons are GPLv3-derived art rather than unmodified SPD files.
 
+Phase 7 (complete): **secrets** — once per 5-floor band, a hidden proximity-revealed
+key (earlier floor) and a locked crystal chest holding one of four passive rings
+(later floor): Sight / Shadow / Speed / Survival — full spec in the Secrets section.
+Seed-hash band plans (`world/secrets.js`), turn-engine reveal + unlock + speed-step
+rules, per-enemy provoke, two lethal-site survival hook, sprite-first Help legend +
+HUD chips via composition-root icon injection, balance-bot awareness (single-step
+opt-out; shadow-aware threat filter), e2e fixtures regenerated. Balance snapshot
+(200-run thorough bot): floor-10 clear 19% → 30% — floors 1–4 untouched, the
+mid/late lift is the rings working; whether that's too generous is an open tuning
+question for a patch (candidate lever: the boss seeing through Shadow).
+
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
-mechanic not listed here.
+mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,
+auto-worn pickups** — flat flags on the player, no slots, no managing — not a
+managed inventory/equipment system, which stays out of scope.)
 
 ## Testing
 
@@ -469,13 +563,22 @@ covered by a decision-table suite (`tests/autotile.test.js`: corners, T-junction
 stubs, both door orientations, map borders, variance distribution). The entity/item
 frame table is verified against the vendored sheets themselves
 (`tests/entitySprites.test.js` reads each PNG's IHDR and asserts every frame rect
-lies inside its sheet — a bad rect or swapped asset fails in CI).
+lies inside its sheet — a bad rect or swapped asset fails in CI; the same file
+guards the ring frames and the DOM-icon sheet dimensions in `renderer/uiIcons.js`).
+The secrets feature has four dedicated suites: `tests/secrets.test.js` (band-plan
+purity/determinism + real-run spawn cadence), `tests/lockedChest.test.js`
+(locked/unlock/ring-drop flow), `tests/keyReveal.test.js` (proximity + FOV gating),
+and `tests/rings.test.js` (all four ring effects, including the Ring of Speed's
+turn-engine invariants and both Survival lethal sites), plus ring-speed auto-walk
+cases in `tests/autowalk.test.js`.
 
 An opt-in **browser end-to-end** campaign lives in `e2e/` (Playwright via
 `playwright-core`): `npm run build && npm run test:e2e` drives the real PWA through
 16 scenarios — rendering, input→sim→renderer round-trips, floor persistence, overlay
-layering, the death/leaderboard flow, PWA offline boot, and a 188-command
-**sim/browser parity** replay that deep-equals the headless engine. It spawns its
+layering, the death/leaderboard flow, PWA offline boot, and a recorded-command
+**sim/browser parity** replay that deep-equals the headless engine (the fixture —
+and so the replay's length — is regenerated by `node e2e/discover.mjs` after any
+generation-affecting change). It spawns its
 own preview server, stubs the production leaderboard (asserting zero requests
 escape), and is **not** part of `npm test` (needs a browser + build). See
 `e2e/README.md`.
