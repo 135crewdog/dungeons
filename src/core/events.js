@@ -7,6 +7,9 @@ export const EV = Object.freeze({
   MOVE: 'move',
   ATTACK: 'attack',
   PICKUP: 'pickup',
+  REVEAL: 'reveal',
+  LOCKED: 'locked',
+  SURVIVAL: 'survival',
   DESCEND: 'descend',
   ASCEND: 'ascend',
   DEATH: 'death',
@@ -28,6 +31,21 @@ export function pickupEvent(
   { item = 'potion', heal = 0, effect = null, amount = 0 } = {},
 ) {
   return { type: EV.PICKUP, itemId, x, y, item, heal, effect, amount };
+}
+
+// A hidden key blinked into view (the proximity reveal).
+export function revealEvent(itemId, x, y) {
+  return { type: EV.REVEAL, itemId, x, y };
+}
+
+// The player stood on a locked chest with no key to spend.
+export function lockedEvent(x, y) {
+  return { type: EV.LOCKED, x, y };
+}
+
+// The Ring of Survival fired: death averted, ring consumed.
+export function survivalEvent(x, y) {
+  return { type: EV.SURVIVAL, x, y };
 }
 
 export function descendEvent(floor) {

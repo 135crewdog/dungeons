@@ -43,6 +43,26 @@ export function createChest(rng, x, y) {
   return { id: 0, type: 'chest', x, y, effect, amount };
 }
 
+// A secret key (Phase 7). Spawns hidden; the turn engine flips `hidden` off
+// when the player passes close by, and walking over it adds to player.keys.
+// Any key opens any locked chest.
+export function createKey(x, y) {
+  return { id: 0, type: 'key', x, y, hidden: true };
+}
+
+// The once-per-band locked chest (Phase 7). `ring` comes from the band's
+// secretPlan — no RNG draw here, so its contents are independent of where the
+// placement rolls happen to put it.
+export function createLockedChest(x, y, ring) {
+  return { id: 0, type: 'lockedChest', x, y, ring };
+}
+
+// A magic ring lying on the floor — dropped beside a locked chest the moment
+// it is unlocked. Walking over it wears it (sets the matching player flag).
+export function createRing(x, y, ring) {
+  return { id: 0, type: 'ring', x, y, ring };
+}
+
 // The chest a boss drops where it dies: always a bonus, never a trap —
 // 1/3 strength, 1/3 armor, 1/3 health. Same item shape as createChest.
 export function createBossChest(rng, x, y) {

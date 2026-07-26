@@ -204,6 +204,10 @@ export class DungeonScene extends Phaser.Scene {
   syncItems() {
     const alive = new Set();
     for (const item of this.state.items) {
+      // Hidden secrets (unrevealed keys) don't exist visually — not even
+      // dimmed, not even with the Ring of Sight; the proximity reveal is the
+      // only way in.
+      if (item.hidden) continue;
       alive.add(item.id);
       const spec = this.entitySprites ? ITEM_SPRITES[item.type] : null;
       let img = this.itemImages.get(item.id);

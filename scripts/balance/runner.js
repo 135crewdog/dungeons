@@ -49,7 +49,13 @@ export function runGame(seed, policyName, { maxFloor = 12, floorTurnCap = 2000 }
       stalled = true;
       break;
     }
-    const events = processCommand(state, { type: 'move', dx: step.dx, dy: step.dy });
+    // `single: true` opts the bots out of the Ring of Speed's doubled step.
+    // The policies re-derive their goal from scratch every turn, so a doubled
+    // step can vault the bot across a "which goal is nearest" boundary and
+    // ping-pong it forever (two goals straddling the bot flip on alternate
+    // tiles). Real players steer through that; the BFS heuristics can't.
+    // Cost: balance reports slightly UNDERSTATE the Ring of Speed's value.
+    const events = processCommand(state, { type: 'move', dx: step.dx, dy: step.dy, single: true });
     if (events.length === 0) {
       // The engine refused the command (invalid move). The policy should never
       // produce one; a few in a row means the bot is wedged, not the game.

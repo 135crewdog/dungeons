@@ -164,6 +164,93 @@ function hallState({ playerX, doorX = null, pocketX = null } = {}) {
   return { state, player };
 }
 
+describe('auto-walk with the Ring of Speed', () => {
+  const syncSchedule = (fn) => {
+    fn();
+    return () => {};
+  };
+
+  it('covers straight runs two tiles per turn', () => {
+    const { state, player } = corridorState(8);
+    player.ringSpeed = true;
+    let turns = 0;
+    const controller = createController(state, () => (turns += 1), syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 8, y: 1 });
+    expect(player.x).toBe(8);
+    expect(turns).toBe(4); // 7 tiles as 2+2+2+1
+    expect(state.path).toBeNull();
+  });
+
+  it('takes corners one tile at a time (the double never turns mid-step)', () => {
+    // An L: east along y=1 to (4,1), then south to (4,3).
+    const width = 6;
+    const height = 5;
+    const tiles = new Uint8Array(width * height); // WALL
+    const map = {
+      width,
+      height,
+      tiles,
+      rooms: [],
+      roomAt: new Int16Array(width * height).fill(-1),
+      stairs: null,
+    };
+    const floors = [
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [4, 1],
+      [4, 2],
+      [4, 3],
+    ];
+    for (const [x, y] of floors) tiles[idx(map, x, y)] = TILE.FLOOR;
+    const explored = new Uint8Array(width * height).fill(1);
+    const player = {
+      id: 1,
+      kind: 'player',
+      x: 1,
+      y: 1,
+      hp: 20,
+      maxHp: 20,
+      attackDie: 8,
+      ringSpeed: true,
+      glyph: '@',
+    };
+    const state = {
+      rng: createRng(1),
+      status: 'playing',
+      turn: 0,
+      floor: 1,
+      map,
+      vis: { visible: new Uint8Array(width * height), explored },
+      entities: { nextId: 2, playerId: 1, byId: new Map([[1, player]]) },
+      items: [],
+      path: null,
+      log: [],
+    };
+    let turns = 0;
+    const controller = createController(state, () => (turns += 1), syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 4, y: 3 });
+    expect(player.x).toBe(4);
+    expect(player.y).toBe(3);
+    // E,E (double) · E (single: the path turns) · S,S (double).
+    expect(turns).toBe(3);
+    expect(state.path).toBeNull();
+  });
+
+  it('loot underfoot pauses the double without cancelling the walk', () => {
+    const { state, player } = corridorState(8);
+    player.ringSpeed = true;
+    state.items.push({ id: 30, type: 'potion', x: 4, y: 1, heal: 8 });
+    let turns = 0;
+    const controller = createController(state, () => (turns += 1), syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 8, y: 1 });
+    expect(player.x).toBe(8); // still arrived
+    expect(state.items).toHaveLength(0); // and collected the potion en route
+    expect(turns).toBe(4); // 2 · 1 (stopped over loot) · 2 · 2
+    expect(state.path).toBeNull();
+  });
+});
+
 describe('auto-walk cancellation triggers', () => {
   const syncSchedule = (fn) => {
     fn();

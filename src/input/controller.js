@@ -15,6 +15,8 @@ import {
   processCommand,
   planPath,
   nextPathStep,
+  nextPathStepMulti,
+  rewindPathStep,
   pathFinished,
   clearPath,
 } from '../core/turnEngine.js';
@@ -80,17 +82,28 @@ export function createController(state, onTurn, schedule = defaultSchedule) {
   function stepAlongPath() {
     cancelTimer = null;
     const player = getPlayer(state);
-    const step = nextPathStep(state);
+    // With the Ring of Speed, consume two colinear path nodes and let the
+    // engine double the step; at a path corner (or ringless) it's one node
+    // and `single: true` pins the engine to exactly one step.
+    const step = nextPathStepMulti(state, player.ringSpeed ?? false);
     if (!step) return stopAutoWalk();
 
     const hpBefore = player.hp;
-    const targetX = player.x + step.dx;
-    const targetY = player.y + step.dy;
-    runTurn({ type: 'move', dx: step.dx, dy: step.dy });
+    const targetX = player.x + step.dx * step.steps;
+    const targetY = player.y + step.dy * step.steps;
+    runTurn({ type: 'move', dx: step.dx, dy: step.dy, single: step.steps === 1 });
 
     // Cancellation conditions, in order.
     if (state.status !== 'playing') return stopAutoWalk();
-    if (player.x !== targetX || player.y !== targetY) return stopAutoWalk(); // blocked / bumped / descended
+    if (player.x !== targetX || player.y !== targetY) {
+      // A double that landed exactly one tile short isn't a failure: the
+      // engine forfeited the extra step (loot underfoot / occupied tile).
+      // Rewind the cursor to the un-walked node and carry on next tick.
+      const shortStop =
+        step.steps === 2 && player.x === targetX - step.dx && player.y === targetY - step.dy;
+      if (!shortStop) return stopAutoWalk(); // blocked / bumped / descended
+      rewindPathStep(state);
+    }
     if (player.hp < hpBefore) return stopAutoWalk(); // took damage
     for (const id of visibleEnemyIds()) {
       if (!baselineSeen.has(id)) return stopAutoWalk(); // a new enemy entered view
@@ -111,7 +124,7 @@ export function createController(state, onTurn, schedule = defaultSchedule) {
     const dx = target.x - player.x;
     const dy = target.y - player.y;
     if (isAdjacent(player.x, player.y, target.x, target.y) && canStep(state, player, dx, dy)) {
-      runTurn({ type: 'move', dx, dy });
+      runTurn({ type: 'move', dx, dy, single: true });
       return stopAutoWalk();
     }
 
@@ -123,7 +136,8 @@ export function createController(state, onTurn, schedule = defaultSchedule) {
     const hpBefore = player.hp;
     const targetX = player.x + step.dx;
     const targetY = player.y + step.dy;
-    runTurn({ type: 'move', dx: step.dx, dy: step.dy });
+    // Attack pursuit never speed-steps: precision beats pace when closing in.
+    runTurn({ type: 'move', dx: step.dx, dy: step.dy, single: true });
 
     // Same cancellation conditions as a plain walk, in the same order, with one
     // carve-out: enemies strike the moment the player steps into melee range,

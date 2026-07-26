@@ -27,6 +27,13 @@ export function updateVisibility(state) {
   computeFov(player.x, player.y, isBlocking, mark, Math.max(map.width, map.height));
 
   revealRoom(state, player.x, player.y);
+
+  // Ring of Sight: the whole floor becomes KNOWN (explored) — full-floor
+  // click pathing and remembered rendering — while `visible` stays strictly
+  // shadowcast, so enemy aggro (ai.js reads isVisible) and auto-walk
+  // cancellation keep true line-of-sight semantics. The renderer's
+  // full-bright treatment reads the ring through query.isRevealed instead.
+  if (player.ringSight ?? false) explored.fill(1);
 }
 
 // On entering a room, mark the whole room (and its enclosing wall ring)

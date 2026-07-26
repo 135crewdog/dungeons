@@ -4,7 +4,7 @@
 
 import { HIT_DIE, HIT_THRESHOLD, TILE, DIRS8 } from '../core/constants.js';
 import { nextInt } from '../core/rng.js';
-import { attackEvent, deathEvent } from '../core/events.js';
+import { attackEvent, deathEvent, survivalEvent } from '../core/events.js';
 import { pushLog, allocId } from '../core/entity.js';
 import { tileAt, entityAt } from '../core/query.js';
 import { createBossChest } from '../entities/items.js';
@@ -22,6 +22,11 @@ export function resolveAttack(state, attackerId, targetId) {
   const attacker = state.entities.byId.get(attackerId);
   const target = state.entities.byId.get(targetId);
   if (!attacker || !target) return events;
+
+  // The player's swing — hit or miss — provokes the target: a Ring-of-Shadow
+  // player stays invisible to each enemy only until they attack it (ai.js
+  // reads `provoked`). Harmless bookkeeping when the ring isn't worn.
+  if (attackerId === state.entities.playerId) target.provoked = true;
 
   // To-hit: roll a d20 — a natural 1 always misses; otherwise the attack
   // lands if roll + skill clears the threshold. Every combatant resolves
@@ -42,6 +47,11 @@ export function resolveAttack(state, attackerId, targetId) {
   pushLog(state, 'hit', { attacker: attacker.kind, target: target.kind, damage, roll });
 
   if (target.hp <= 0) {
+    // The Ring of Survival cheats exactly one death: full HP instead of the
+    // grave, and the ring is spent.
+    if (target.id === state.entities.playerId && tryRingSurvival(state, target, events)) {
+      return events;
+    }
     target.hp = 0;
     events.push(deathEvent(target.id, target.kind));
     pushLog(state, 'death', { kind: target.kind });
@@ -84,6 +94,20 @@ function dropBossChest(state, x, y) {
   const chest = createBossChest(state.rng, dropX, dropY);
   chest.id = allocId(state);
   state.items.push(chest);
+}
+
+// The Ring of Survival's moment: called wherever player HP would cross zero
+// (enemy hits here in resolveAttack, chest traps in the turn engine). If the
+// ring is armed, restore full HP, consume it, and report true — the caller
+// skips its death handling. A run can re-arm it by finding another Survival
+// ring in a later band.
+export function tryRingSurvival(state, player, events) {
+  if (!(player.ringSurvival ?? false)) return false;
+  player.ringSurvival = false;
+  player.hp = player.maxHp;
+  events.push(survivalEvent(player.x, player.y));
+  pushLog(state, 'survival', {});
+  return true;
 }
 
 // Player and enemies are the only two factions: a bump attacks only across the

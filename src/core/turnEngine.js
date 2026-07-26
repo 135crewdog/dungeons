@@ -2,15 +2,33 @@
 // from the briefing and returns the events it produced. It mutates state in
 // place (the single source of truth) but never touches the renderer.
 
-import { getPlayer, enemiesSorted, tileAt, isKnownWalkable } from './query.js';
-import { TILE, CHEST_EFFECT } from './constants.js';
-import { tryMove } from './movement.js';
+import {
+  getPlayer,
+  enemiesSorted,
+  tileAt,
+  isKnownWalkable,
+  isVisible,
+  entityAt,
+  hasItemAt,
+  chebyshev,
+} from './query.js';
+import { TILE, CHEST_EFFECT, KEY_REVEAL_RADIUS, RING_FLAG, DIRS8 } from './constants.js';
+import { tryMove, canStep } from './movement.js';
 import { descend, ascend } from './gameState.js';
-import { pushLog } from './entity.js';
-import { pickupEvent, descendEvent, ascendEvent, deathEvent } from './events.js';
+import { pushLog, allocId } from './entity.js';
+import {
+  EV,
+  pickupEvent,
+  revealEvent,
+  lockedEvent,
+  descendEvent,
+  ascendEvent,
+  deathEvent,
+} from './events.js';
+import { createRing } from '../entities/items.js';
 import { updateVisibility } from '../systems/visibility.js';
 import { enemyTurn, buildOccupancy } from '../systems/ai.js';
-import { mitigatedDamage } from '../systems/combat.js';
+import { mitigatedDamage, tryRingSurvival } from '../systems/combat.js';
 import { aStar } from '../systems/pathfinding.js';
 
 // Run a turn from a player command. Returns events, or an empty array if the
@@ -26,30 +44,64 @@ export function processCommand(state, command) {
   const acted = executePlayerAction(state, command, events);
   if (!acted) return events;
 
-  // Stepping onto a staircase ends this floor immediately: swap floors and skip
-  // the enemy phase (the player has left this floor behind). Only a real step
-  // onto the stair counts — not a bump-attack made while already standing on it,
-  // nor the tile the player was placed on when they arrived — so the player
-  // doesn't ricochet straight back the way they came.
-  const movedOntoTile = player.x !== fromX || player.y !== fromY;
-  if (movedOntoTile) {
-    const tile = tileAt(state.map, player.x, player.y);
-    if (tile === TILE.STAIRS_DOWN) {
-      descend(state);
-      pushLog(state, 'descend', { floor: state.floor });
-      events.push(descendEvent(state.floor));
-      return events;
-    }
-    if (tile === TILE.STAIRS_UP) {
-      ascend(state);
-      pushLog(state, 'ascend', { floor: state.floor });
-      events.push(ascendEvent(state.floor));
-      return events;
+  if (resolveStairStep(state, player, fromX, fromY, events)) return events;
+
+  // Ring of Speed: one extra step in the same direction, unless the command
+  // opted out (`single: true` — auto-walk path corners do), the first action
+  // was a bump-attack (an attack consumes the whole turn), or the player just
+  // stepped onto loot (you stop over an item — this keeps pickups
+  // un-skippable, and the balance bots overshoot-safe). Visibility and key
+  // reveals run between the steps so the intermediate tile is explored — and
+  // can glimmer — like any other tile walked over. The extra step never
+  // attacks: it is silently skipped when the tile is blocked or occupied. If
+  // it lands on stairs the floor swaps right here, same as a first step.
+  const movedFirst = player.x !== fromX || player.y !== fromY;
+  if (
+    (player.ringSpeed ?? false) &&
+    !command.single &&
+    movedFirst &&
+    !hasItemAt(state, player.x, player.y)
+  ) {
+    updateVisibility(state);
+    revealNearbyKeys(state, events);
+    const stepX = player.x;
+    const stepY = player.y;
+    if (
+      canStep(state, player, command.dx, command.dy) &&
+      !entityAt(state, stepX + command.dx, stepY + command.dy)
+    ) {
+      tryMove(state, player, command.dx, command.dy, events);
+      if (resolveStairStep(state, player, stepX, stepY, events)) return events;
     }
   }
 
   advanceWorld(state, events);
   return events;
+}
+
+// Stepping onto a staircase ends this floor immediately: swap floors and skip
+// the enemy phase (the player has left this floor behind). Only a real step
+// onto the stair counts — not a bump-attack made while already standing on it,
+// nor the tile the player was placed on when they arrived — so the player
+// doesn't ricochet straight back the way they came. Returns true when the
+// floor changed: the caller must stop cold (the whole floor state was swapped,
+// and any remaining Ring-of-Speed step is forfeited).
+function resolveStairStep(state, player, fromX, fromY, events) {
+  if (player.x === fromX && player.y === fromY) return false;
+  const tile = tileAt(state.map, player.x, player.y);
+  if (tile === TILE.STAIRS_DOWN) {
+    descend(state);
+    pushLog(state, 'descend', { floor: state.floor });
+    events.push(descendEvent(state.floor));
+    return true;
+  }
+  if (tile === TILE.STAIRS_UP) {
+    ascend(state);
+    pushLog(state, 'ascend', { floor: state.floor });
+    events.push(ascendEvent(state.floor));
+    return true;
+  }
+  return false;
 }
 
 function executePlayerAction(state, command, events) {
@@ -69,10 +121,30 @@ function advanceWorld(state, events) {
   state.turn++;
   // Step 5 (computed early, see above): update field of view and visibility.
   updateVisibility(state);
+  // Hidden keys glimmer as soon as the fresh FOV is in — before enemies act
+  // and before pickups, so stepping straight onto a hidden key reveals then
+  // collects it in this same turn.
+  revealNearbyKeys(state, events);
   // Step 3: each enemy acts in ascending id order.
   enemyPhase(state, events);
   // Step 4: resolve item pickups (the player walking over an item).
   resolvePickups(state, events);
+}
+
+// Hidden keys blink into view when the player passes close by: within
+// KEY_REVEAL_RADIUS tiles (Chebyshev) AND currently inside the player's FOV —
+// no glimmers through walls or closed doors.
+function revealNearbyKeys(state, events) {
+  const player = getPlayer(state);
+  if (!player) return;
+  for (const item of state.items) {
+    if (item.type !== 'key' || !item.hidden) continue;
+    if (chebyshev(player.x, player.y, item.x, item.y) > KEY_REVEAL_RADIUS) continue;
+    if (!isVisible(state, item.x, item.y)) continue;
+    item.hidden = false;
+    events.push(revealEvent(item.id, item.x, item.y));
+    pushLog(state, 'reveal', {});
+  }
 }
 
 // If the player stands on an item, apply it and remove it. Potions heal up to
@@ -98,7 +170,65 @@ function resolvePickups(state, events) {
   if (item.type === 'chest') {
     state.items.splice(i, 1);
     openChest(state, player, item, events);
+    return;
   }
+
+  if (item.type === 'key') {
+    if (item.hidden) return; // defensive: the reveal pass always runs first
+    player.keys = (player.keys ?? 0) + 1;
+    state.items.splice(i, 1);
+    events.push(pickupEvent(item.id, item.x, item.y, { item: 'key' }));
+    pushLog(state, 'pickup', { item: 'key' });
+    return;
+  }
+
+  if (item.type === 'ring') {
+    player[RING_FLAG[item.ring]] = true;
+    state.items.splice(i, 1);
+    events.push(pickupEvent(item.id, item.x, item.y, { item: 'ring', effect: item.ring }));
+    pushLog(state, 'pickup', { item: 'ring', ring: item.ring });
+    return;
+  }
+
+  if (item.type === 'lockedChest') {
+    if ((player.keys ?? 0) > 0) {
+      player.keys--;
+      state.items.splice(i, 1);
+      events.push(pickupEvent(item.id, item.x, item.y, { item: 'lockedChest', effect: item.ring }));
+      pushLog(state, 'unlock', { ring: item.ring });
+      dropRing(state, item.x, item.y, item.ring, player);
+    } else if (events.some((e) => e.type === EV.MOVE && e.id === player.id)) {
+      // Locked and keyless: the chest is never spliced, so announce only on
+      // the turn the player ARRIVES (this turn has a player move event). A
+      // stationary bump-attack turn on the tile stays silent; stepping off
+      // and back on re-announces.
+      events.push(lockedEvent(item.x, item.y));
+      pushLog(state, 'locked', {});
+    }
+    return;
+  }
+}
+
+// The unlocked chest's ring tumbles onto the first adjacent unoccupied,
+// item-free floor/door tile — the same deterministic DIRS8 scan as the boss
+// chest drop (no RNG draw, so replays match). The player is standing ON the
+// chest tile, so the ring never lands underfoot; if every neighbor is blocked
+// (vanishingly rare) it goes straight onto the player's finger instead.
+function dropRing(state, x, y, ring, player) {
+  for (const { dx, dy } of DIRS8) {
+    const nt = tileAt(state.map, x + dx, y + dy);
+    const free =
+      (nt === TILE.FLOOR || nt === TILE.DOOR) &&
+      !entityAt(state, x + dx, y + dy) &&
+      !state.items.some((it) => it.x === x + dx && it.y === y + dy);
+    if (free) {
+      const item = createRing(x + dx, y + dy, ring);
+      item.id = allocId(state);
+      state.items.push(item);
+      return;
+    }
+  }
+  player[RING_FLAG[ring]] = true;
 }
 
 function openChest(state, player, item, events) {
@@ -124,7 +254,7 @@ function openChest(state, player, item, events) {
   events.push(pickupEvent(item.id, item.x, item.y, { item: 'chest', effect, amount, heal }));
   pushLog(state, 'pickup', { item: 'chest', effect, amount });
 
-  if (player.hp <= 0) {
+  if (player.hp <= 0 && !tryRingSurvival(state, player, events)) {
     player.hp = 0;
     events.push(deathEvent(player.id, 'player'));
     pushLog(state, 'death', { kind: 'player' });
@@ -172,6 +302,38 @@ export function nextPathStep(state) {
   if (!isKnownWalkable(state, nxt.x, nxt.y)) return null;
   p.index++;
   return { dx: nxt.x - cur.x, dy: nxt.y - cur.y };
+}
+
+// One or two stored-path steps for this turn. The double is taken only when
+// `allowDouble` (the Ring of Speed) AND the next two nodes continue in the
+// same direction — the engine's extra step can only repeat a direction, so a
+// path corner must be walked one tile at a time. Returns { dx, dy, steps } or
+// null (same invalidation contract as nextPathStep).
+export function nextPathStepMulti(state, allowDouble) {
+  const step = nextPathStep(state);
+  if (!step) return null;
+  if (allowDouble) {
+    const p = state.path;
+    const cur = p.nodes[p.index];
+    const nxt = p.nodes[p.index + 1];
+    if (
+      nxt &&
+      nxt.x - cur.x === step.dx &&
+      nxt.y - cur.y === step.dy &&
+      isKnownWalkable(state, nxt.x, nxt.y)
+    ) {
+      p.index++;
+      return { dx: step.dx, dy: step.dy, steps: 2 };
+    }
+  }
+  return { dx: step.dx, dy: step.dy, steps: 1 };
+}
+
+// Walk the path cursor back one node: the engine forfeited the second half of
+// a double step (loot underfoot, occupied tile), so the un-walked node must be
+// re-issued on the next tick instead of being skipped.
+export function rewindPathStep(state) {
+  if (state.path && state.path.index > 0) state.path.index--;
 }
 
 export function pathFinished(state) {

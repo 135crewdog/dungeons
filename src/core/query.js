@@ -64,6 +64,15 @@ export function isKnownWalkable(state, x, y) {
   return isExplored(state, x, y) && isWalkable(state.map, x, y);
 }
 
+// Presentation-only visibility: does this tile render fully lit? True line of
+// sight — or anywhere in bounds once the Ring of Sight is worn. Gameplay
+// reads (AI aggro, auto-walk cancels, path planning) use isVisible/isExplored
+// directly so the ring never changes what enemies or the engine can "see".
+export function isRevealed(state, x, y) {
+  if (isVisible(state, x, y)) return true;
+  return (getPlayer(state)?.ringSight ?? false) && inBounds(state.map, x, y);
+}
+
 export function getPlayer(state) {
   return state.entities.byId.get(state.entities.playerId);
 }
