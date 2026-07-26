@@ -440,7 +440,11 @@ size derived from the buffer (exact 1:1 device-pixel mapping at fractional dpr) 
 left/right sprite facing from move/attack events · player re-skinned to the tier-5
 warrior row · boss re-skinned to SPD's evil Eye (tengu sheet retired). _(The Phase
 5/6 notes above predate this and still say Tengu/tier-6/feet-on-bottom; the Visual
-Style section is authoritative.)_
+Style section is authoritative.)_ **0.7.4**: the PWA icon set (`public/icons/`) is
+now the evil Eye itself — derived from the boss sprite's first frame by
+`scripts/make-icons.js` (zero-dependency PNG decode → nearest-neighbor upscale →
+re-encode; run it to regenerate) with a matching CREDITS.md "App icons" section,
+since the icons are GPLv3-derived art rather than unmodified SPD files.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here.
