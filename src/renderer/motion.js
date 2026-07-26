@@ -17,6 +17,7 @@
 
 import { EV } from '../core/events.js';
 import { TILE_SIZE } from '../core/constants.js';
+import { ENTITY_SPRITES, animKey } from './entitySprites.js';
 
 export const TWEEN_MOVE_MS = 80; // < STEP_DELAY_MS; also the camera pan time
 export const LUNGE_PX = 4; // attack lunge reach, in world pixels
@@ -83,13 +84,22 @@ export function createMotion(scene) {
         endX - (m.to.x - m.from.x) * TILE_SIZE,
         endY - (m.to.y - m.from.y) * TILE_SIZE,
       );
+      // Walk cycle for the glide's duration, back to idle on arrival
+      // (`true` = don't restart an already-playing walk on a chained move).
+      const kind = scene.state.entities.byId.get(id)?.kind;
+      const anims = ENTITY_SPRITES[kind]?.anims;
+      const animated = Boolean(anims && img.play);
+      if (animated && anims.walk) img.play(animKey(kind, 'walk'), true);
       const tween = scene.tweens.add({
         targets: img,
         x: endX,
         y: endY,
         duration: TWEEN_MOVE_MS,
         ease: 'Linear',
-        onComplete: () => active.delete(id),
+        onComplete: () => {
+          active.delete(id);
+          if (animated && anims.idle && img.active) img.play(animKey(kind, 'idle'), true);
+        },
       });
       active.set(id, tween);
     }

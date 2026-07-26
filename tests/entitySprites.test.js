@@ -84,6 +84,26 @@ describe('frame rects against the vendored sheets', () => {
     }
   });
 
+  it('every animation column rect fits inside its sheet', () => {
+    // Phase 8: idle/walk cycles are columns along each entity's row —
+    // frame rect = (x + col*w, y, w, h). All of them must lie inside the
+    // shipped PNG, or a bad column list would sample garbage pixels.
+    for (const [kind, s] of Object.entries(ENTITY_SPRITES)) {
+      expect(s.anims?.idle?.frames?.length, `${kind} has no idle cycle`).toBeGreaterThan(0);
+      expect(s.anims?.walk?.frames?.length, `${kind} has no walk cycle`).toBeGreaterThan(0);
+      const size = pngSize(`public/${SPRITE_SHEETS[s.sheet]}`);
+      for (const [name, a] of Object.entries(s.anims)) {
+        expect(a.fps, `${kind} ${name} fps`).toBeGreaterThan(0);
+        for (const col of a.frames) {
+          expect(s.x + col * s.w + s.w, `${kind} ${name} col ${col} overflows`).toBeLessThanOrEqual(
+            size.width,
+          );
+          expect(s.y + s.h).toBeLessThanOrEqual(size.height);
+        }
+      }
+    }
+  });
+
   it("the UI-icon sheet sizes match the shipped PNGs' headers", () => {
     // uiIcons.js scales CSS crops by these dimensions; a re-vendored sheet
     // with different geometry must fail here, not mis-crop silently.

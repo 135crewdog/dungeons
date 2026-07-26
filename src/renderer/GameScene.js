@@ -24,6 +24,7 @@ import {
   ITEM_SPRITES,
   RING_SPRITES,
   ringFrameName,
+  animKey,
   sheetKey,
   spriteOffset,
   registerSpriteFrames,
@@ -319,9 +320,12 @@ export class DungeonScene extends Phaser.Scene {
       const spec = this.entitySprites ? ENTITY_SPRITES[e.kind] : null;
       let img = this.entityImages.get(e.id);
       if (!img) {
+        // Entities are Sprites (they animate — idle loop from creation, walk
+        // while gliding via motion.js); the ASCII fallback stays on Images.
         img = spec
-          ? this.add.image(0, 0, sheetKey(spec.sheet), e.kind).setOrigin(0, 0)
+          ? this.add.sprite(0, 0, sheetKey(spec.sheet), e.kind).setOrigin(0, 0)
           : this.add.image(0, 0, glyphKey(entityGlyph(e))).setOrigin(0, 0);
+        if (spec?.anims?.idle) img.play(animKey(e.kind, 'idle'));
         this.entityLayer.add(img);
         this.entityImages.set(e.id, img);
       }
