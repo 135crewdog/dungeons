@@ -231,6 +231,37 @@ describe('client', () => {
     expect(queueOf(storage)).toEqual([]);
   });
 
+  it('keeps a score submitted while a flush is already in flight', async () => {
+    // The death screen can submit during a boot/online flush. The drain works
+    // from a snapshot, so writing that snapshot back at the end would discard
+    // the new entry — after submit() had already reported it as queued.
+    let releaseQueued;
+    const held = new Promise((r) => {
+      releaseQueued = r;
+    });
+    const { client, storage } = makeClient({
+      fetchFn: async (_url, opts) => {
+        const payload = JSON.parse(opts.body);
+        if (payload.turns === 1) {
+          await held; // the queued entry: in flight until we say otherwise
+          return okJson();
+        }
+        return httpFail(500); // the fresh submission: retryable, so it queues
+      },
+    });
+    storage.setItem('lb.queue', JSON.stringify([{ ...PAYLOAD, turns: 1 }]));
+
+    const flushing = client.flushQueue();
+    const submitted = await client.submit({ ...PAYLOAD, turns: 2 });
+    expect(submitted).toMatchObject({ queued: true });
+
+    releaseQueued();
+    const res = await flushing;
+
+    expect(res).toMatchObject({ sent: 1, kept: 1 });
+    expect(queueOf(storage).map((p) => p.turns)).toEqual([2]);
+  });
+
   it('defers a flush while a Retry-After backoff is in force', async () => {
     let clock = 1_000_000;
     let posts = 0;

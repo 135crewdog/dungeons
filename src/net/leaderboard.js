@@ -146,6 +146,16 @@ export function createLeaderboardClient({
     };
   }
 
+  // Scores that submit() appended to storage while the drain was awaiting a
+  // POST. The drain works from a snapshot taken before its first request, so
+  // writing that snapshot back would silently discard anything queued in the
+  // meantime — a death-screen submission that failed retryably mid-flush would
+  // report `queued: true` and then vanish. submit() only ever appends, so
+  // everything past the snapshot's length is new.
+  function arrivedDuringDrain(snapshotLength) {
+    return readQueue().slice(snapshotLength);
+  }
+
   // Drain the queue in order. A permanently-rejected entry is DISCARDED and the
   // drain continues — one bad payload used to block every later score forever.
   // A retryable failure stops the drain and keeps that entry plus the rest.
@@ -161,14 +171,16 @@ export function createLeaderboardClient({
       if (res.ok) {
         sent += 1;
       } else if (res.retryable) {
-        writeQueue(queue.slice(i));
-        return { sent, dropped, kept: queue.length - i, reason: res.reason };
+        const kept = [...queue.slice(i), ...arrivedDuringDrain(queue.length)];
+        writeQueue(kept);
+        return { sent, dropped, kept: kept.length, reason: res.reason };
       } else {
         dropped += 1;
       }
     }
-    writeQueue([]);
-    return { sent, dropped, kept: 0 };
+    const late = arrivedDuringDrain(queue.length);
+    writeQueue(late);
+    return { sent, dropped, kept: late.length };
   }
 
   return {

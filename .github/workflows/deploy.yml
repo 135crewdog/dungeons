@@ -29,10 +29,38 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      # The same gate a PR faces — a direct push to main used to reach
-      # production having run only the unit tests, with no lint, no formatting,
-      # and no bundle budget. `check` ends in the build that is published.
-      - run: npm run check
+
+      # The full gate, not a subset. test.yml only triggers on pull requests,
+      # so a direct push to main is deployed by this workflow alone — if it ran
+      # `check` only, a Phaser, input, or service-worker regression that the PR
+      # campaign would have caught could still be published. `check:full` is
+      # check (lint, format, unit, build, bundle budget) plus the browser
+      # campaign, and it ends in the very build that gets uploaded.
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('./node_modules/playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright-core install --with-deps chromium
+      - name: Install Chromium system dependencies
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright-core install-deps chromium
+
+      - run: npm run check:full
+      - run: npm run test:coverage
+
+      - name: Upload E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts-deploy
+          path: e2e/.artifacts/
+          retention-days: 7
       - uses: actions/configure-pages@v5
         with:
           # Enable Pages and set its source to GitHub Actions automatically.
