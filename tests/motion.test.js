@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { motionIntents, TWEEN_MOVE_MS } from '../src/renderer/motion.js';
+import {
+  motionIntents,
+  glideDuration,
+  TWEEN_MOVE_MS,
+  MIN_MOVE_MS,
+} from '../src/renderer/motion.js';
+import { idlePhase, ENTITY_SPRITES } from '../src/renderer/entitySprites.js';
 import { STEP_DELAY_MS } from '../src/core/constants.js';
 import { moveEvent, attackEvent, pickupEvent, deathEvent } from '../src/core/events.js';
 
@@ -52,7 +58,61 @@ describe('motionIntents', () => {
 });
 
 describe('timing contract', () => {
-  it('the move tween always finishes inside one auto-walk step', () => {
-    expect(TWEEN_MOVE_MS).toBeLessThan(STEP_DELAY_MS);
+  // A glide must FILL its step, not finish early: a glide shorter than the
+  // step leaves the world frozen in the gap, which is what read as camera
+  // jitter. It must not out-run the step either, or the sprite can never
+  // catch up and the lag compounds every step.
+  it('a move glide spans exactly one auto-walk step', () => {
+    expect(TWEEN_MOVE_MS).toBe(STEP_DELAY_MS);
+  });
+
+  it('a full-length gap between turns gets the full glide', () => {
+    expect(glideDuration(Infinity)).toBe(TWEEN_MOVE_MS); // first move of a walk
+    expect(glideDuration(STEP_DELAY_MS)).toBe(TWEEN_MOVE_MS);
+    expect(glideDuration(STEP_DELAY_MS * 3)).toBe(TWEEN_MOVE_MS);
+  });
+
+  it('turns arriving faster than a step shorten the glide to match', () => {
+    // Held-key walking fires at the OS repeat rate, well under a step. The
+    // glide tracks it so the sprite stays with the simulation.
+    expect(glideDuration(30)).toBe(30);
+    expect(glideDuration(60)).toBe(60);
+  });
+
+  it('never glides shorter than MIN_MOVE_MS, however fast turns arrive', () => {
+    expect(glideDuration(0)).toBe(MIN_MOVE_MS);
+    expect(glideDuration(5)).toBe(MIN_MOVE_MS);
+  });
+});
+
+describe('idlePhase', () => {
+  it('is deterministic and in [0, 1)', () => {
+    for (const id of [1, 2, 7, 42, 1000]) {
+      expect(idlePhase(id)).toBe(idlePhase(id));
+      expect(idlePhase(id)).toBeGreaterThanOrEqual(0);
+      expect(idlePhase(id)).toBeLessThan(1);
+    }
+  });
+
+  it('spreads consecutive ids apart so neighbours do not idle in unison', () => {
+    // Entity ids are allocated consecutively, so this is the case that matters:
+    // a room of goblins must not all glance on the same frame.
+    for (let id = 1; id < 40; id++) {
+      expect(Math.abs(idlePhase(id) - idlePhase(id + 1))).toBeGreaterThan(0.3);
+    }
+  });
+});
+
+describe('idle cycles are SPD-calm', () => {
+  // Measured off an SPD recording: their hero holds one frame for 1.5-2s at a
+  // time. An even two-frame flip reads as a permanent head shake instead.
+  it('humanoids hold the still frame far longer than the turned one', () => {
+    for (const kind of ['player', 'goblin', 'skeleton']) {
+      const { frames, fps } = ENTITY_SPRITES[kind].anims.idle;
+      const still = frames.filter((f) => f === 0).length;
+      expect(still).toBeGreaterThan(frames.length - still); // mostly standing
+      expect((frames.length - still) / fps).toBeGreaterThanOrEqual(1); // ...but a readable glance
+      expect(frames.length / fps).toBeGreaterThanOrEqual(3); // whole cycle is slow
+    }
   });
 });

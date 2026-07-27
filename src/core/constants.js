@@ -171,8 +171,13 @@ export const MAX_CHESTS = 2;
 // before giving up (it heads to the last place it saw the player first).
 export const DEAGGRO_TURNS = 6;
 
-// Auto-walk pacing: ms between stored-path steps so movement is visible.
-export const STEP_DELAY_MS = 90;
+// Auto-walk pacing: ms between stored-path steps so movement is visible. The
+// renderer's move glide is exactly this long (renderer/motion.js), so each
+// step's slide runs edge to edge with the next and the world never stops
+// mid-walk. Measured against Shattered Pixel Dungeon, which walks at ~110ms
+// per tile; the extra 20ms over the old 90 also leaves the turn's synchronous
+// work room to finish inside its own step.
+export const STEP_DELAY_MS = 110;
 
 // 8-directional movement vectors, in a fixed deterministic order
 // (N, NE, E, SE, S, SW, W, NW).

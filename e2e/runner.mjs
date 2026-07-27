@@ -343,11 +343,11 @@ for (const [label, opts, expectTiles] of [
   );
   const elapsed = Date.now() - t0;
   const s = await snapshot(page);
-  const cadenceOk = elapsed >= 120 && elapsed <= 900; // 3 steps: first sync + 2x90ms + browser overhead
+  const cadenceOk = elapsed >= 120 && elapsed <= 900; // 3 steps: first sync + 2xSTEP_DELAY_MS + browser overhead
   record(
     'E4/autowalk',
     s.turn === 3 && cadenceOk,
-    `arrived in ${elapsed}ms over 3 turns (cadence ~90ms/step)`,
+    `arrived in ${elapsed}ms over 3 turns (cadence ~110ms/step)`,
   );
 
   // E5a: new command cancels a fresh walk

@@ -29,9 +29,18 @@ export function sheetKey(name) {
 // the cell above). (x, y, w, h) is the base standing frame; `anims` lists
 // the idle/walk cycles as COLUMN indices along the same row (frame rect =
 // x + col*w), straight from SPD's sprite classes — the sheets have always
-// shipped these frames, Phase 8 just plays them. fps values are SPD-ish:
-// slow blinking idles, brisk walks. The eye has no legs — its "walk" is a
-// faster float of the same wobble.
+// shipped these frames, Phase 8 just plays them.
+//
+// Idle cadence is SPD's, measured off a reference recording: their hero holds
+// one still frame for 1.5-2s at a time, then glances briefly. So a humanoid
+// idle is [0, 0, 0, 1] at 1fps — three seconds standing, one second with the
+// head turned — NOT an even two-frame flip (which reads as a permanent head
+// shake). The eye has no head to turn and no legs: it keeps a continuous
+// wobble, and its "walk" is a faster float of the same cycle.
+//
+// Walk cycles run brisk enough to read ACROSS a walk rather than within one
+// step: at ~110ms per tile a 20fps six-frame cycle spans about three tiles,
+// which is how SPD's run cycle reads too.
 export const ENTITY_SPRITES = Object.freeze({
   player: {
     sheet: 'warrior',
@@ -39,7 +48,10 @@ export const ENTITY_SPRITES = Object.freeze({
     y: 75,
     w: 12,
     h: 15,
-    anims: { idle: { frames: [0, 1], fps: 2 }, walk: { frames: [2, 3, 4, 5, 6, 7], fps: 12 } },
+    anims: {
+      idle: { frames: [0, 0, 0, 1], fps: 1 },
+      walk: { frames: [2, 3, 4, 5, 6, 7], fps: 20 },
+    },
   },
   goblin: {
     sheet: 'gnoll',
@@ -47,7 +59,7 @@ export const ENTITY_SPRITES = Object.freeze({
     y: 0,
     w: 12,
     h: 15,
-    anims: { idle: { frames: [0, 1], fps: 2 }, walk: { frames: [2, 3, 4, 5, 6], fps: 12 } },
+    anims: { idle: { frames: [0, 0, 0, 1], fps: 1 }, walk: { frames: [2, 3, 4, 5, 6], fps: 20 } },
   },
   skeleton: {
     sheet: 'skeleton',
@@ -55,7 +67,7 @@ export const ENTITY_SPRITES = Object.freeze({
     y: 0,
     w: 12,
     h: 15,
-    anims: { idle: { frames: [0, 1], fps: 2 }, walk: { frames: [2, 3, 4, 5], fps: 10 } },
+    anims: { idle: { frames: [0, 0, 0, 1], fps: 1 }, walk: { frames: [2, 3, 4, 5], fps: 18 } },
   },
   boss: {
     sheet: 'eye',
@@ -63,7 +75,7 @@ export const ENTITY_SPRITES = Object.freeze({
     y: 0,
     w: 16,
     h: 18,
-    anims: { idle: { frames: [0, 1, 2], fps: 4 }, walk: { frames: [0, 1, 2], fps: 8 } },
+    anims: { idle: { frames: [0, 1, 2], fps: 2 }, walk: { frames: [0, 1, 2], fps: 8 } },
   },
 });
 
@@ -101,6 +113,25 @@ export function colFrameName(kind, col) {
 // Phaser Animation key for a kind's cycle ('idle' | 'walk').
 export function animKey(kind, name) {
   return `anim:${kind}:${name}`;
+}
+
+// Where in its idle cycle an entity starts, 0..1. A room full of goblins that
+// all began their idle on the same frame would glance in unison, which reads
+// as a machine rather than a crowd — so each id gets its own phase. The golden
+// ratio spreads consecutive ids about as evenly as a sequence can, and it is
+// pure arithmetic on the id: no RNG draw (that would desync replays) and no
+// Math.random (banned under src/ by tests/architecture.test.js).
+export function idlePhase(id) {
+  return (id * 0.6180339887498949) % 1;
+}
+
+// Start (or keep) an entity's idle cycle at its own phase. `img` may be a plain
+// Image in ASCII fallback mode, which has no animation state — hence the guard.
+export function playIdle(img, kind, id) {
+  const anims = ENTITY_SPRITES[kind]?.anims;
+  if (!anims?.idle || !img.anims) return;
+  img.play(animKey(kind, 'idle'), true);
+  img.anims.setProgress(idlePhase(id));
 }
 
 // Feet sit this many pixels above the tile's bottom edge — nearer the tile's

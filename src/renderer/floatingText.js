@@ -32,11 +32,15 @@ export function spawnFloatingText(scene, tileX, tileY, text, color) {
     .setVisible(true)
     .setActive(true);
 
+  // Rise half a tile, not a whole one, and clear out faster. At auto-walk pace
+  // a full-tile 650ms drift left several labels in the air at once, each ending
+  // a tile away from the fight that produced it — which reads as damage being
+  // dealt between entities that aren't touching.
   scene.tweens.add({
     targets: label,
-    y: py - TILE_SIZE,
+    y: py - TILE_SIZE / 2,
     alpha: 0,
-    duration: 650,
+    duration: 450,
     ease: 'Quad.easeOut',
     onComplete: () => {
       label.setVisible(false).setActive(false);

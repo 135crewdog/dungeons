@@ -340,23 +340,45 @@ reversed; the renderer remains strictly observation-only (no gameplay in any twe
 or animation callback), but it now moves:
 
 - **Idle/walk cycles** from the frames the SPD sheets always shipped: each entity
-  spec carries `anims` (column indices along its row — warrior idle 0–1 / walk 2–7,
-  gnoll 0–1 / 2–6, skeleton 0–1 / 2–5, the legless eye wobbles 0–2 faster when
-  "walking"); `registerSpriteFrames` creates the looping Phaser Animations, entities
-  are Sprites playing idle from creation.
+  spec carries `anims` (column indices along its row — walk 2–7 warrior, 2–6 gnoll,
+  2–5 skeleton, the legless eye wobbles 0–2 faster when "walking");
+  `registerSpriteFrames` creates the looping Phaser Animations, entities are Sprites
+  playing idle from creation. **Idle is deliberately near-static** — humanoids run
+  `[0, 0, 0, 1]` at 1fps (three seconds standing, one second with the head turned),
+  matching SPD, where the hero measurably holds one frame for 1.5–2s at a time; an
+  even two-frame flip reads as a permanent head shake. Each entity enters its cycle
+  at its own phase (`idlePhase(id)`, golden-ratio spread off the entity id — no RNG
+  draw, no `Math.random`) so a room of goblins never glances in unison. Walk cycles
+  are brisk enough to read **across** a walk rather than within one step.
 - **Move tweens** (`src/renderer/motion.js`): the pure half, `motionIntents()`,
   reduces a turn's events to per-entity glides (facing.js model, Node-tested;
   consecutive moves chain — a Ring-of-Speed turn is one two-tile slide) and the
-  Phaser half rewinds the already-snapped sprite to its origin tile and glides it
-  home over `TWEEN_MOVE_MS` (80ms — **always < STEP_DELAY_MS** so auto-walk never
-  overlaps a glide). Policy: **one tween per entity, latest wins** (held-key turns
-  arrive every ~30ms); `syncEntities` skips position writes for mid-glide sprites;
-  gliders play their walk cycle and return to idle on arrival; floor changes clear
-  everything. **Attack lunges**: a 4px yoyo nudge toward the target per swing.
-- **Camera pan in lockstep**: `centerOnPlayer` pans (same duration/ease) instead of
-  snapping, with instant reframes on floor change/resize/first frame. **Clicks
-  unproject against the SETTLED camera center** (`screenToTile` no longer reads the
-  live camera matrix), so spam-clicking during a pan can never mistarget.
+  Phaser half glides the sprite over `TWEEN_MOVE_MS`. **`TWEEN_MOVE_MS ===
+STEP_DELAY_MS` (110ms) is load-bearing**: a glide fills its step edge to edge, so
+  consecutive steps run together as one continuous slide. A glide that ends early
+  leaves the world frozen in the gap — that stall, not the speed, was the camera
+  jitter in the Phase-8 build (80ms glide inside a ~100ms step, a dead stop ten
+  times a second). It must not over-run the step either, or the sprite can never
+  catch up. Turns arriving faster than a step (held-key walking at the ~30ms OS
+  repeat rate) shorten their glide to match. Policy: **one tween per entity, latest
+  wins**; a preempted glide **retargets from where the sprite is** rather than
+  rewinding, so motion stays continuous across the seam, and endpoints always come
+  from the entity's TILE, never from the live sprite position. Gliding sprites snap
+  to whole world pixels each frame — Phaser's `roundPixels` floors the camera scroll
+  to a world pixel, so an unsnapped sprite shimmers against it. `syncEntities` skips
+  position writes for mid-glide sprites; gliders play their walk cycle and return to
+  idle on arrival; floor changes clear everything, and a floor-change turn skips its
+  glide entirely (`playEvents(events, { skipMotion })`) since the step onto the
+  staircase belongs to sprites that no longer exist. **Attack lunges**: a 4px yoyo
+  nudge toward the target per swing, tracked like a move so a sync can't stomp it.
+- **The camera follows the player's sprite** (`startFollow`, lerp 1 — pinned dead
+  center, not a lagging chase), with instant reframes on floor change/resize/first
+  frame. It used to run its own pan tween alongside the sprite's; matching durations
+  were not enough, because the two preempted differently and disagreed by a pixel.
+  Following the sprite makes de-sync unrepresentable. **Clicks still unproject
+  against the SETTLED camera center** (`camCenter`, the tile the player already
+  occupies — `screenToTile` never reads the live camera matrix), so spam-clicking
+  mid-glide can never mistarget.
 - **Excluded, deliberately**: frame-based attack animations (the lunge sells the
   hit) and death animations (the sim deletes the entity and its sprite the same
   turn — a corpse-sprite pool is real new machinery; deferred).
@@ -606,8 +628,9 @@ and `tests/rings.test.js` (all four ring effects, including the Ring of Speed's
 turn-engine invariants and both Survival lethal sites), plus ring-speed auto-walk
 cases in `tests/autowalk.test.js`. The animation layer's pure half is covered by
 `tests/motion.test.js` (intent reduction, move chaining, the
-TWEEN_MOVE_MS < STEP_DELAY_MS contract), and the animation-cycle frame rects by
-the entitySprites suite.
+`TWEEN_MOVE_MS === STEP_DELAY_MS` contract and the fast-turn glide clamp,
+`idlePhase` spread, and the "idle is mostly still" shape of the cycles), and the
+animation-cycle frame rects by the entitySprites suite.
 
 An opt-in **browser end-to-end** campaign lives in `e2e/` (Playwright via
 `playwright-core`): `npm run build && npm run test:e2e` drives the real PWA through
