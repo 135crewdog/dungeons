@@ -61,22 +61,36 @@
         height: 100%;
         overflow: hidden;
         background: #05060a;
-        /* Taps map cleanly to tiles; no pull-to-refresh or double-tap zoom. */
-        touch-action: none;
         overscroll-behavior: none;
         -webkit-user-select: none;
         user-select: none;
       }
+      /* Gesture suppression belongs to the MAP, not the page. `touch-action:
+         none` here keeps taps mapping cleanly to tiles with no pull-to-refresh
+         or double-tap zoom while playing — but on html/body it also killed
+         pinch zoom over the DOM overlays (help, menu, leaderboard, death
+         screen), which is exactly the text a low-vision player needs to
+         magnify. WCAG 1.4.4: never block zoom on content. */
       #game {
         position: fixed;
         inset: 0;
         display: block;
+        touch-action: none;
       }
       /* The Phaser canvas is centered by the renderer; leftover space is
          neutral letterbox provided by the body background. */
       #game canvas {
         display: block;
         image-rendering: pixelated;
+        touch-action: none;
+      }
+      /* Overlay panels are ordinary content: pinch to zoom, drag to scroll,
+         with only the 300ms tap delay suppressed. */
+      .menu-panel,
+      .help-panel,
+      .lb-panel,
+      .go-panel {
+        touch-action: manipulation;
       }
 
       /* HUD / log / game-over are DOM overlays anchored to screen edges so they
