@@ -10,7 +10,7 @@ import {
   pathFinished,
   clearPath,
 } from '../src/core/turnEngine.js';
-import { getPlayer, isWalkable, isVisible, idx, tileAt } from '../src/core/query.js';
+import { getPlayer, isWalkable, isVisible, tileAt } from '../src/core/query.js';
 import { TILE } from '../src/core/constants.js';
 import { POLICIES } from '../scripts/balance/policies.js';
 
@@ -202,10 +202,10 @@ function findTripSeed() {
     }
     if (!off) continue;
     const back = { dx: -off.dx, dy: -off.dy };
-    const ev1 = processCommand(state, { type: 'move', ...off });
+    processCommand(state, { type: 'move', ...off });
     if (state.status !== 'playing') continue;
     const offRec = { c: codeOf(off), t: state.turn, f: state.floor };
-    const ev2 = processCommand(state, { type: 'move', ...back });
+    processCommand(state, { type: 'move', ...back });
     if (state.floor !== 1 || state.status !== 'playing') continue; // e.g. bumped an enemy instead of stepping back
     cmds.push(offRec);
     cmds.push({ c: codeOf(back), t: state.turn, f: state.floor });
@@ -270,7 +270,6 @@ function planPathToEntity(state, target) {
 function findSkillSeed() {
   outer: for (let seed = 1; seed <= 2000; seed++) {
     const state = createGame(seed);
-    const p = getPlayer(state);
     const room0 = state.map.rooms[0];
     const chest = state.items.find(
       (i) =>
@@ -311,7 +310,12 @@ const fixtures = {
   fight: findFightSeed(),
   skill: findSkillSeed(),
 };
-writeFileSync(new URL('./fixtures.json', import.meta.url), JSON.stringify(fixtures, null, 2));
+// Trailing newline so the regenerated file stays Prettier-clean — format:check
+// covers JSON now, and a fixture regen shouldn't fail the quality gate.
+writeFileSync(
+  new URL('./fixtures.json', import.meta.url),
+  `${JSON.stringify(fixtures, null, 2)}\n`,
+);
 console.log(
   'S_MOVE seed',
   fixtures.move.seed,

@@ -29,8 +29,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm run build
+      # The same gate a PR faces — a direct push to main used to reach
+      # production having run only the unit tests, with no lint, no formatting,
+      # and no bundle budget. `check` ends in the build that is published.
+      - run: npm run check
       - uses: actions/configure-pages@v5
         with:
           # Enable Pages and set its source to GitHub Actions automatically.

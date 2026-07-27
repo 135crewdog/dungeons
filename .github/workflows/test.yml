@@ -1,13 +1,22 @@
 name: Tests
 
-# Runs lint, formatting, and the unit suite on every pull request so a broken PR
-# is caught before merge — deploy.yml only tests on push to main, i.e. after the
-# fact. The browser E2E campaign (npm run test:e2e) is intentionally not run here;
-# it needs a built app and a Chromium binary and is meant for local/on-demand use.
+# The full quality gate on every pull request: lint, formatting, unit tests,
+# build, bundle budget, coverage, and the real-browser campaign.
+#
+# The campaign used to be local-only, which left Phaser, sprite/camera motion,
+# pixel→tile conversion, browser input, the service worker, and offline boot
+# with no automated coverage at all — exactly the highest-risk areas after the
+# rendering and animation work. Chromium is installed with playwright-core's
+# own CLI, so this needs no extra dependency.
 
 on:
   pull_request:
   workflow_dispatch:
+
+# A newer push supersedes an in-flight run on the same ref.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -19,6 +28,45 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm test
+
+      # lint + format:check + unit tests + build + bundle budget
+      - run: npm run check
+
+      - run: npm run test:coverage
+
+      # Cache the browser by Playwright version so most runs skip the download.
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('./node_modules/playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright-core install --with-deps chromium
+      - name: Install Chromium system dependencies
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright-core install-deps chromium
+
+      # `check` already built dist/, which the campaign serves via vite preview.
+      - run: npm run test:e2e
+
+      # Screenshots and results.json make a red campaign diagnosable without a
+      # local repro.
+      - name: Upload E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: e2e/.artifacts/
+          retention-days: 7
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7

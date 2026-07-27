@@ -3,8 +3,10 @@
 // leaderboard: catch-all abort (with tripwire), lb-origin stub, SW blocked.
 //
 // Requires a prior `npm run build` (this drives the preview build, not dev).
-// The Chromium binary defaults to the Claude Code container path; override with
-// CHROMIUM_PATH for other environments.
+// The Chromium binary is resolved from Playwright's own registry, so it works
+// against whatever `npx playwright-core install chromium` put in place (CI's
+// cache, or PLAYWRIGHT_BROWSERS_PATH in this container). Set CHROMIUM_PATH to
+// override with a specific binary.
 import { chromium } from 'playwright-core';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -12,8 +14,19 @@ import { fileURLToPath } from 'node:url';
 
 const BASE = 'http://127.0.0.1:4173';
 const LB_ORIGIN = 'https://dungeons-leaderboard.c10darren-ward.workers.dev';
-const CHROMIUM_PATH =
-  process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+// executablePath() throws if no browser is installed — say so usefully rather
+// than failing later with an opaque launch error.
+function resolveChromium() {
+  if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
+  try {
+    return chromium.executablePath();
+  } catch {
+    throw new Error(
+      'no Chromium found — run `npx playwright-core install chromium`, or set CHROMIUM_PATH',
+    );
+  }
+}
+const CHROMIUM_PATH = resolveChromium();
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SHOTS = fileURLToPath(new URL('./.artifacts/', import.meta.url));
 mkdirSync(SHOTS, { recursive: true });
@@ -176,10 +189,10 @@ const browser = await chromium.launch({
 });
 
 // ---------- E12: pixel->tile calibration at 3 display configs ----------
-for (const [label, opts, expectTiles] of [
-  ['1280x720@1x', { dpr: 1 }, 2],
-  ['777x505@1x', { dpr: 1, viewport: { width: 777, height: 505 } }, 2],
-  ['1280x720@2x', { dpr: 2 }, 2],
+for (const [label, opts] of [
+  ['1280x720@1x', { dpr: 1 }],
+  ['777x505@1x', { dpr: 1, viewport: { width: 777, height: 505 } }],
+  ['1280x720@2x', { dpr: 2 }],
 ]) {
   const { ctx, escaped } = await newGameContext(browser, opts);
   const page = await newGamePage(ctx);
@@ -237,7 +250,9 @@ for (const [label, opts, expectTiles] of [
     if (!c) return 'none';
     try {
       if (c.getContext('2d')) return 'canvas2d';
-    } catch {}
+    } catch {
+      // A WebGL canvas throws on a 2d context request — that IS the answer.
+    }
     return 'webgl';
   });
   const bootMatches = JSON.stringify(s) === JSON.stringify(fixtures.move.boot);
@@ -330,7 +345,7 @@ for (const [label, opts, expectTiles] of [
   const { ctx } = await newGameContext(browser);
   const page = await newGamePage(ctx);
   await gotoSeed(page, fixtures.move.seed);
-  const { spawn, line, clickTarget } = fixtures.move;
+  const { line, clickTarget } = fixtures.move;
   const t0 = Date.now();
   await clickTile(page, clickTarget);
   await page.waitForFunction(

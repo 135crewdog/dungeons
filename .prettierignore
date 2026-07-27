@@ -3,3 +3,9 @@ dev-dist
 coverage
 node_modules
 package-lock.json
+
+# E2E run artifacts (screenshots, results.json) — generated per run.
+e2e/.artifacts
+
+# The FSF's license document, verbatim. Never reformat it.
+LICENSE
