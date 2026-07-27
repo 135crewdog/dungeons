@@ -21,7 +21,14 @@ import {
   clearPath,
 } from '../core/turnEngine.js';
 import { STEP_DELAY_MS } from '../core/constants.js';
-import { getPlayer, enemiesSorted, isVisible, entityAt, isAdjacent } from '../core/query.js';
+import {
+  getPlayer,
+  enemiesSorted,
+  isVisible,
+  entityAt,
+  isAdjacent,
+  meleeReachable,
+} from '../core/query.js';
 import { canStep } from '../core/movement.js';
 
 export function createController(state, onTurn, schedule = defaultSchedule) {
@@ -147,7 +154,7 @@ export function createController(state, onTurn, schedule = defaultSchedule) {
     // path — either way the pursuit ends and the next click is the next swing.)
     if (state.status !== 'playing') return stopAutoWalk();
     if (player.x !== targetX || player.y !== targetY) return stopAutoWalk(); // blocked / bumped / descended
-    const atMelee = isAdjacent(player.x, player.y, target.x, target.y);
+    const atMelee = meleeReachable(state.map, player.x, player.y, target.x, target.y);
     if (player.hp < hpBefore && !atMelee) return stopAutoWalk(); // took damage while crossing
     for (const id of visibleEnemyIds()) {
       if (!baselineSeen.has(id)) return stopAutoWalk(); // a new enemy entered view

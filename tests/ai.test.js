@@ -182,7 +182,8 @@ describe('skeleton cadence (moveEvery 2)', () => {
     const goblin = createEnemy(ENEMY_TYPES.goblin, 0, 0, 1);
     const skeleton = createEnemy(ENEMY_TYPES.skeleton, 0, 0, 1);
     expect(skeleton.attackDie).toBe(goblin.attackDie);
-    expect(ENEMY_TYPES.skeleton.maxHp).toBe(3);
+    expect(ENEMY_TYPES.skeleton.maxHp).toBe(4);
+    expect(ENEMY_TYPES.skeleton.maxHp).toBeLessThan(ENEMY_TYPES.goblin.maxHp);
   });
 
   it('giving up the chase resets the cooldown so re-aggro steps immediately', () => {

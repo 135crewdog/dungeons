@@ -9,7 +9,7 @@
 import {
   getPlayer,
   isVisible,
-  isAdjacent,
+  meleeReachable,
   isWalkable,
   isStairsTile,
   hasItemAt,
@@ -57,8 +57,11 @@ export function enemyTurn(state, enemyId, occupied = buildOccupancy(state)) {
   }
   if (!enemy.aggro) return events;
 
-  // An aggroed enemy in melee range strikes, sight or not.
-  if (isAdjacent(enemy.x, enemy.y, player.x, player.y)) {
+  // An aggroed enemy in melee range strikes, sight or not. Melee reach is the
+  // same rule the player's bump attack obeys: adjacent, and not reaching
+  // diagonally past a wall corner. An enemy pinned by a corner falls through to
+  // the movement below and A* walks it around, exactly as the player must.
+  if (meleeReachable(state.map, enemy.x, enemy.y, player.x, player.y)) {
     return resolveAttack(state, enemy.id, player.id);
   }
 

@@ -178,7 +178,8 @@ that sit exactly one wall apart are linked by a single door. Rooms are also plac
   movement key **repeats** at the OS key-repeat rate (each repeat is one discrete,
   synchronous turn) — intended hold-to-walk, classic-roguelike behavior, not a bug.
 - **Diagonals forbid corner-cutting:** a diagonal step is illegal unless both
-  orthogonal tiles between it and the mover are passable. Same rule for player and AI.
+  orthogonal tiles between it and the mover are passable. Same rule for player and AI,
+  and the same rule for **melee reach** — see Combat.
 - **Enemies route around stairs and items.** An enemy can't use stairs or collect
   potions/chests, so it treats those tiles as obstacles and paths around them — stepping
   onto one only when boxed in (the sole route to the player runs over it), so a player can't
@@ -196,8 +197,21 @@ room, the entire room is marked **explored**.
 ## Combat
 
 Moving adjacent to an enemy attacks it **immediately in that same turn** (no separate
-attack turn; on a kill the player stays put). On its turn an enemy attacks if adjacent,
-else moves toward the player. **Enemies aggro on sight** — they hold until the player
+attack turn; on a kill the player stays put). On its turn an enemy attacks if in melee
+reach, else moves toward the player.
+
+**Melee reach obeys the corner rule** (`meleeReachable` in `core/query.js`): adjacent
+**and** not reaching diagonally past a wall corner — the same `diagonalAllowed` test a
+diagonal step must pass, so both sides of a fight share one definition of "close enough
+to swing". The player's bump attack always obeyed it (it routes through `tryMove` →
+`canStep`); enemies used bare Chebyshev adjacency until 0.9.2, which let one standing
+kitty-corner through a wall hit a player who could not hit back. An enemy pinned by a
+corner paths around it instead. Closing that gap was a **significant** difficulty change
+— the thorough bot's floor-10 clear rate went 30% → 50%, so those free corner hits were
+carrying real weight in the curve — and 0.9.3 re-tuned against it by raising base enemy
+HP to 7/4 (see the depth-scaling paragraph), landing floor-10 clear back at ~33%.
+
+**Enemies aggro on sight** — they hold until the player
 enters their line of sight, then give chase. A chasing enemy that **loses sight** of the
 player heads for the tile it last saw them on; if it arrives empty-handed (or stays
 blind for several turns) it **gives up** and holds position, re-aggroing only on a fresh
@@ -218,8 +232,8 @@ roll rides on the attack event/log data but is not narrated; the renderer floats
 player stats that start at 0 and stack via treasure chests. The player rolls a
 **d8** for damage. Two entities never share a tile.
 
-**Goblin is the baseline enemy** (6 HP, d4 damage die, full speed — the floor-1
-reference). Skeletons are "about half a goblin": **3 HP** and **half movement speed**
+**Goblin is the baseline enemy** (7 HP, d4 damage die, full speed — the floor-1
+reference). Skeletons are "about half a goblin": **4 HP** and **half movement speed**
 — one tile every 2 turns (first step after aggro is immediate) — but they roll the
 same damage die and still attack **every** turn when adjacent. A **boss** (`B`)
 guards the down-stairs room on **every 5th floor**, full speed, same to-hit rule and
@@ -340,23 +354,45 @@ reversed; the renderer remains strictly observation-only (no gameplay in any twe
 or animation callback), but it now moves:
 
 - **Idle/walk cycles** from the frames the SPD sheets always shipped: each entity
-  spec carries `anims` (column indices along its row — warrior idle 0–1 / walk 2–7,
-  gnoll 0–1 / 2–6, skeleton 0–1 / 2–5, the legless eye wobbles 0–2 faster when
-  "walking"); `registerSpriteFrames` creates the looping Phaser Animations, entities
-  are Sprites playing idle from creation.
+  spec carries `anims` (column indices along its row — walk 2–7 warrior, 2–6 gnoll,
+  2–5 skeleton, the legless eye wobbles 0–2 faster when "walking");
+  `registerSpriteFrames` creates the looping Phaser Animations, entities are Sprites
+  playing idle from creation. **Idle is deliberately near-static** — humanoids run
+  `[0, 0, 0, 1]` at 1fps (three seconds standing, one second with the head turned),
+  matching SPD, where the hero measurably holds one frame for 1.5–2s at a time; an
+  even two-frame flip reads as a permanent head shake. Each entity enters its cycle
+  at its own phase (`idlePhase(id)`, golden-ratio spread off the entity id — no RNG
+  draw, no `Math.random`) so a room of goblins never glances in unison. Walk cycles
+  are brisk enough to read **across** a walk rather than within one step.
 - **Move tweens** (`src/renderer/motion.js`): the pure half, `motionIntents()`,
   reduces a turn's events to per-entity glides (facing.js model, Node-tested;
   consecutive moves chain — a Ring-of-Speed turn is one two-tile slide) and the
-  Phaser half rewinds the already-snapped sprite to its origin tile and glides it
-  home over `TWEEN_MOVE_MS` (80ms — **always < STEP_DELAY_MS** so auto-walk never
-  overlaps a glide). Policy: **one tween per entity, latest wins** (held-key turns
-  arrive every ~30ms); `syncEntities` skips position writes for mid-glide sprites;
-  gliders play their walk cycle and return to idle on arrival; floor changes clear
-  everything. **Attack lunges**: a 4px yoyo nudge toward the target per swing.
-- **Camera pan in lockstep**: `centerOnPlayer` pans (same duration/ease) instead of
-  snapping, with instant reframes on floor change/resize/first frame. **Clicks
-  unproject against the SETTLED camera center** (`screenToTile` no longer reads the
-  live camera matrix), so spam-clicking during a pan can never mistarget.
+  Phaser half glides the sprite over `TWEEN_MOVE_MS`. **`TWEEN_MOVE_MS ===
+STEP_DELAY_MS` (110ms) is load-bearing**: a glide fills its step edge to edge, so
+  consecutive steps run together as one continuous slide. A glide that ends early
+  leaves the world frozen in the gap — that stall, not the speed, was the camera
+  jitter in the Phase-8 build (80ms glide inside a ~100ms step, a dead stop ten
+  times a second). It must not over-run the step either, or the sprite can never
+  catch up. Turns arriving faster than a step (held-key walking at the ~30ms OS
+  repeat rate) shorten their glide to match. Policy: **one tween per entity, latest
+  wins**; a preempted glide **retargets from where the sprite is** rather than
+  rewinding, so motion stays continuous across the seam, and endpoints always come
+  from the entity's TILE, never from the live sprite position. Gliding sprites snap
+  to whole world pixels each frame — Phaser's `roundPixels` floors the camera scroll
+  to a world pixel, so an unsnapped sprite shimmers against it. `syncEntities` skips
+  position writes for mid-glide sprites; gliders play their walk cycle and return to
+  idle on arrival; floor changes clear everything, and a floor-change turn skips its
+  glide entirely (`playEvents(events, { skipMotion })`) since the step onto the
+  staircase belongs to sprites that no longer exist. **Attack lunges**: a 4px yoyo
+  nudge toward the target per swing, tracked like a move so a sync can't stomp it.
+- **The camera follows the player's sprite** (`startFollow`, lerp 1 — pinned dead
+  center, not a lagging chase), with instant reframes on floor change/resize/first
+  frame. It used to run its own pan tween alongside the sprite's; matching durations
+  were not enough, because the two preempted differently and disagreed by a pixel.
+  Following the sprite makes de-sync unrepresentable. **Clicks still unproject
+  against the SETTLED camera center** (`camCenter`, the tile the player already
+  occupies — `screenToTile` never reads the live camera matrix), so spam-clicking
+  mid-glide can never mistarget.
 - **Excluded, deliberately**: frame-based attack animations (the lunge sells the
   hit) and death animations (the sim deletes the entity and its sprite the same
   turn — a corpse-sprite pool is real new machinery; deferred).
@@ -490,10 +526,11 @@ the real engine with two bot policies (thorough / stair-rusher) over hundreds of
 seeded runs. Changes: goblin 7 HP · skeleton 4 HP · **enemy count depth scaling**
 (+1 per 3 floors, cap 12) · **depth-weighted spawn mix** (goblin share 50% +3%/floor,
 cap 80%) · chest table 30/25/30/15 with `CHEST_TABLE` thresholds · health chest +4 ·
-boss 26 HP base, +12/tier, exempt from the flat damage drip. _(The HP/chest numbers in
-this changelog are the 3d-era values and were re-tuned again in 3f; the Combat section
-above — goblin 6 HP, skeleton 3 HP, boss 24 HP base, chest table 25/20/25/20/10 — is
-authoritative.)_
+boss 26 HP base, +12/tier, exempt from the flat damage drip. _(These are the 3d-era
+values; 3f re-tuned them and 0.9.3 re-tuned again. The Combat section above — goblin
+7 HP, skeleton 4 HP, boss 24 HP base, chest table 25/20/25/20/10 — is authoritative.
+The 7/4 HP pair happens to be back where 3d put it: 3f cut it to 6/3, and 0.9.3
+restored it to pay off the corner-fix's difficulty debt.)_
 
 Phase 3e (complete, superseded by 3f): **player damage die** — the player rolled
 d4+2 (+strength) per landed hit instead of a flat 4, making combat dice on both
@@ -572,6 +609,33 @@ attack lunges · idle/walk cycles from the frames the vendored sheets always
 shipped (no new assets, no licensing change). Full spec in Visual Style.
 Frame-based attack/death animations and water/grass/decor stay deferred.
 
+Post-Phase-8 playtest fixes (**0.9.1**, renderer only): the Phase-8 build's
+movement visibly stuttered — measured off 60fps phone capture, each step
+delivered its tile over five frames plus **one frame of dead stop**, because the
+80ms glide sat inside a ~100ms step. A glide now spans its step exactly
+(`TWEEN_MOVE_MS === STEP_DELAY_MS`, both 110ms, matching SPD's measured pace),
+faster turns shorten their glide to match, preempted glides retarget instead of
+rewinding, glide endpoints come from the entity's tile rather than the live
+sprite, gliding sprites snap to whole world pixels (Phaser floors camera scroll
+to a world pixel, so an unsnapped sprite shimmers against it), and the camera
+**follows the player's sprite** instead of running a parallel pan that could
+disagree with it. Idle cycles went SPD-calm and per-entity de-phased (a 500ms
+head-flip loop read as a permanent head shake). Also: floor-change turns skip
+their stale glide, lunges are tracked like moves, floating numbers drift half as
+far, and `SpriteTileGrid.sync` memoizes per cell instead of rewriting all 6336
+terrain Images every turn. **0.9.2**: melee reach obeys the corner rule for
+enemies too (see Combat) — a correctness fix with a large balance consequence.
+**0.9.3**: the re-tune for it. 0.9.2 flattened the whole survival curve, not just
+its tail (thorough bot floor-10 clear 30% → 50%, floor-1 deaths 24% → 14% of runs),
+so the fix's difficulty debt was paid back with **base enemy HP 6/3 → 7/4** — chosen
+by sweeping every flat and depth-scaled lever through `npm run balance` and keeping
+the one that best restored the 0.9.0 curve SHAPE, not merely its headline number.
+Floor-10 clear is 34/36/30% on three independent 200-run seed blocks (mean 33%,
+0.9.0 was 28%) and floor-1 deaths are back to ~18%, which is the Phase-3f target.
+Skeleton kills stay below their 0.9.0 share: a half-speed enemy loses the most when
+it has to walk around a corner it used to reach through, and that is the honest
+residual of the fix rather than something to tune away.
+
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,
 auto-worn pickups** — flat flags on the player, no slots, no managing — not a
@@ -606,8 +670,9 @@ and `tests/rings.test.js` (all four ring effects, including the Ring of Speed's
 turn-engine invariants and both Survival lethal sites), plus ring-speed auto-walk
 cases in `tests/autowalk.test.js`. The animation layer's pure half is covered by
 `tests/motion.test.js` (intent reduction, move chaining, the
-TWEEN_MOVE_MS < STEP_DELAY_MS contract), and the animation-cycle frame rects by
-the entitySprites suite.
+`TWEEN_MOVE_MS === STEP_DELAY_MS` contract and the fast-turn glide clamp,
+`idlePhase` spread, and the "idle is mostly still" shape of the cycles), and the
+animation-cycle frame rects by the entitySprites suite.
 
 An opt-in **browser end-to-end** campaign lives in `e2e/` (Playwright via
 `playwright-core`): `npm run build && npm run test:e2e` drives the real PWA through

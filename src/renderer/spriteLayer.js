@@ -24,6 +24,12 @@ export class SpriteTileGrid {
     this.map = null;
     this.ground = null;
     this.walls = null;
+    // Last-applied (frame, lighting) per cell per layer — see apply(). A floor
+    // is ~3200 cells, so a full repaint is 6400 Phaser writes; almost none of
+    // them differ from one turn to the next, and at auto-walk pace that work
+    // competes with the move glide for the frame budget.
+    this.groundSig = null;
+    this.wallsSig = null;
   }
 
   build(map) {
@@ -31,6 +37,10 @@ export class SpriteTileGrid {
     const n = map.width * map.height;
     this.ground = new Array(n);
     this.walls = new Array(n);
+    // 0 means "hidden", which is exactly how makeImage leaves each Image, so
+    // the zero-filled cache starts out truthful.
+    this.groundSig = new Int32Array(n);
+    this.wallsSig = new Int32Array(n);
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const i = idx(map, x, y);
@@ -55,6 +65,8 @@ export class SpriteTileGrid {
     for (const img of this.walls) img.destroy();
     this.ground = null;
     this.walls = null;
+    this.groundSig = null;
+    this.wallsSig = null;
   }
 
   // Repaint every cell's two layers from current state: lit if visible,
@@ -89,24 +101,43 @@ export class SpriteTileGrid {
         if (t === TILE.WALL) anchored = wallCapAnchored(map, explored, x, y);
         else if (overhang) anchored = wallCapAnchored(map, explored, x, y + 1);
         const gf = t === TILE.WALL && !anchored ? NO_FRAME : groundFrame(map, x, y, salt, isOpen);
-        this.apply(this.ground[i], gf, visible, explored, i);
+        this.apply(this.ground[i], gf, visible, explored, i, this.groundSig, i);
         // Overhang art on a floor/stairs cell is the top of the wall BELOW
         // it, so it lights by that wall's visibility — a remembered wall
         // keeps its cap even while the floor strip above it is unexplored,
         // and never leaks the existence of unseen walls.
         const wf = anchored ? wf0 : NO_FRAME;
-        this.apply(this.walls[i], wf, visible, explored, overhang ? i + map.width : i);
+        this.apply(
+          this.walls[i],
+          wf,
+          visible,
+          explored,
+          overhang ? i + map.width : i,
+          this.wallsSig,
+          i,
+        );
       }
     }
   }
 
-  apply(img, frame, visible, explored, visIdx) {
-    if (frame === NO_FRAME || (!this.sightAll && !visible[visIdx] && !explored[visIdx])) {
+  // Draw one cell's layer, skipping the Phaser calls when nothing about it
+  // changed. `sig`/`si` address this layer's memo slot; the signature packs
+  // everything apply() can produce — hidden, or a frame plus whether it is lit
+  // or dimmed — so an unchanged signature provably means unchanged output.
+  // The Ring of Sight needs no special handling: it only ever moves a cell
+  // between dimmed and lit, which the signature already encodes.
+  apply(img, frame, visible, explored, visIdx, sig, si) {
+    const hidden = frame === NO_FRAME || (!this.sightAll && !visible[visIdx] && !explored[visIdx]);
+    const lit = this.sightAll || visible[visIdx];
+    const next = hidden ? 0 : 1 + frame * 2 + (lit ? 1 : 0);
+    if (sig[si] === next) return;
+    sig[si] = next;
+    if (hidden) {
       img.setVisible(false);
       return;
     }
     img.setFrame(frame);
-    if (this.sightAll || visible[visIdx]) img.clearTint();
+    if (lit) img.clearTint();
     else img.setTint(SPRITE_DIM);
     img.setVisible(true);
   }

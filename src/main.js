@@ -143,11 +143,14 @@ function handleRestart() {
 const controller = createController(state, (events) => {
   const scene = game.registry.get('scene');
   if (scene) {
-    // Changing floors swaps in a different map, so rebuild the tile/entity visuals.
-    if (events.some((e) => e.type === EV.DESCEND || e.type === EV.ASCEND)) {
+    // Changing floors swaps in a different map, so rebuild the tile/entity
+    // visuals — and skip the turn's move glide, since the step onto the
+    // staircase happened on a floor whose sprites are already gone.
+    const changedFloor = events.some((e) => e.type === EV.DESCEND || e.type === EV.ASCEND);
+    if (changedFloor) {
       scene.rebuildFloor();
     } else scene.render();
-    scene.playEvents(events);
+    scene.playEvents(events, { skipMotion: changedFloor });
   }
   refreshUi();
   if (state.status === 'dead') gameOver.show(state, handleRestart);

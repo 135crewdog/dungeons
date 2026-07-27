@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { getPlayer, entitiesSorted, isExplored, isRevealed } from '../core/query.js';
 import { EV } from '../core/events.js';
+import { TILE_SIZE } from '../core/constants.js';
 import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
 import { SpriteTileGrid, TILESHEET_KEY } from './spriteLayer.js';
 import { computeZoom, tileToWorld, tileCenterWorld, worldToTile } from './camera.js';
@@ -17,14 +18,14 @@ import {
 } from './tileStyle.js';
 import { spawnFloatingText } from './floatingText.js';
 import { applyEventFacing } from './facing.js';
-import { createMotion, TWEEN_MOVE_MS } from './motion.js';
+import { createMotion } from './motion.js';
 import {
   SPRITE_SHEETS,
   ENTITY_SPRITES,
   ITEM_SPRITES,
   RING_SPRITES,
   ringFrameName,
-  animKey,
+  playIdle,
   sheetKey,
   spriteOffset,
   registerSpriteFrames,
@@ -99,9 +100,12 @@ export class DungeonScene extends Phaser.Scene {
     // Movement tweens / attack lunges (Phase 8); see motion.js.
     this.motion = createMotion(this);
     // Where the camera is HEADED (its settled center, in world px). Clicks
-    // unproject against this, never the in-flight pan — see screenToTile.
+    // unproject against this, never the in-flight glide — see screenToTile.
     this.camCenter = null;
-    this.camTween = null;
+    // The sprite the camera is currently locked onto (see followPlayer). The
+    // player's sprite is destroyed and recreated on every floor change, so the
+    // follow has to be re-pointed at the new one.
+    this.camFollowing = null;
 
     this.cameras.main.setBackgroundColor(BG_COLOR);
     this.cameras.main.setRoundPixels(true);
@@ -166,6 +170,7 @@ export class DungeonScene extends Phaser.Scene {
     // in-flight tweens die with their sprites, and the camera snaps.
     this.facing.clear();
     this.motion.clear();
+    this.camFollowing = null;
     this.forceCamSnap = true;
     this.render();
   }
@@ -178,56 +183,74 @@ export class DungeonScene extends Phaser.Scene {
     this.centerOnPlayer();
   }
 
-  // Recenter on the player: a short pan (matching the move-tween duration)
-  // when the center merely moved a step, an instant snap on floor changes,
-  // resizes, and first frame. `camCenter` always holds the SETTLED center.
+  // Keep the player centered. The camera FOLLOWS the player's sprite rather
+  // than running a pan tween of its own: two tweens with matching durations
+  // still drifted apart under preemption (the pan resumed from the camera's
+  // rounded midPoint, the sprite was rewound a whole tile), and every
+  // disagreement showed up as the world shivering by a pixel under a
+  // stationary player. Following the sprite makes de-sync unrepresentable —
+  // Phaser's follow runs in preRender, after the tween manager, so the camera
+  // reads the sprite's final position for the frame it is drawn in.
+  //
+  // `camCenter` still holds the SETTLED center — the tile the player already
+  // occupies in the simulation — because that, not the in-flight camera, is
+  // what clicks unproject against (see screenToTile).
   centerOnPlayer(snap = false) {
     const p = getPlayer(this.state);
     if (!p) return;
     const c = tileCenterWorld(p.x, p.y);
     const prev = this.camCenter;
-    if (prev && prev.x === c.x && prev.y === c.y && !snap) return;
     if (this.forceCamSnap) {
       snap = true;
       this.forceCamSnap = false;
     }
-    if (this.camTween) {
-      this.camTween.remove();
-      this.camTween = null;
-    }
     this.camCenter = { x: c.x, y: c.y };
-    if (snap || !prev) {
+    const img = this.entityImages.get(p.id);
+    // Floor change, resize, first frame: reframe instantly, with no glide to
+    // follow. Dropping the follow first stops Phaser overwriting the snap.
+    if (snap || !prev || !img) {
+      this.cameras.main.stopFollow();
       this.cameras.main.centerOn(c.x, c.y);
+      this.camFollowing = null;
+      if (img) this.followPlayer(img);
       return;
     }
-    // Pan from wherever the camera currently looks (mid-pan preemption keeps
-    // the motion continuous), in lockstep with the player's move tween.
-    const live = { x: this.cameras.main.midPoint.x, y: this.cameras.main.midPoint.y };
-    this.camTween = this.tweens.add({
-      targets: live,
-      x: c.x,
-      y: c.y,
-      duration: TWEEN_MOVE_MS,
-      ease: 'Linear',
-      onUpdate: () => this.cameras.main.centerOn(live.x, live.y),
-      onComplete: () => {
-        this.camTween = null;
-      },
-    });
+    if (this.camFollowing !== img) this.followPlayer(img);
+  }
+
+  // Lock the camera onto a sprite. Lerp 1 means "exactly where the sprite is",
+  // not a lagging chase — the player stays pinned dead center.
+  //
+  // Sprite origins are top-left and sub-tile frames carry their own offset
+  // (spriteOffset), so following the raw sprite would frame the player a few
+  // pixels off. The follow offset cancels both, putting the TILE's center
+  // mid-screen exactly as the old pan did.
+  followPlayer(img) {
+    const spec = this.entitySprites ? ENTITY_SPRITES.player : null;
+    const off = spec ? spriteOffset(spec) : { dx: 0, dy: 0 };
+    const cam = this.cameras.main;
+    cam.startFollow(img, true, 1, 1);
+    cam.setFollowOffset(off.dx - TILE_SIZE / 2, off.dy - TILE_SIZE / 2);
+    this.camFollowing = img;
   }
 
   // Play transient effects from a turn's event list (floating numbers) and
   // turn sprites toward their movement/attack direction. Facing must apply
   // here, not on the next sync: the composition root renders durable state
   // BEFORE playing the turn's events.
-  playEvents(events) {
+  // `skipMotion` suppresses the glides for a turn whose sprites do not carry
+  // over: a descend/ascend turn still reports the MOVE that stepped onto the
+  // staircase, but by the time this runs the floor has been rebuilt and that
+  // move belongs to a sprite that no longer exists. Gliding it would slide the
+  // arriving player in from a tile that is not even on this map.
+  playEvents(events, { skipMotion = false } = {}) {
     applyEventFacing(this.facing, events, (id) => this.state.entities.byId.get(id)?.x);
     if (this.entitySprites) {
       for (const [id, f] of this.facing) this.entityImages.get(id)?.setFlipX(f === -1);
     }
     // Slide movers from their origin tile to where render() already put
     // them; lunge attackers at their targets.
-    this.motion.play(events);
+    if (!skipMotion) this.motion.play(events);
     for (const ev of events) {
       if (ev.type === EV.ATTACK) {
         if (ev.hit) spawnFloatingText(this, ev.x, ev.y, `-${ev.damage}`, FLOAT_COLOR.damage);
@@ -325,7 +348,9 @@ export class DungeonScene extends Phaser.Scene {
         img = spec
           ? this.add.sprite(0, 0, sheetKey(spec.sheet), e.kind).setOrigin(0, 0)
           : this.add.image(0, 0, glyphKey(entityGlyph(e))).setOrigin(0, 0);
-        if (spec?.anims?.idle) img.play(animKey(e.kind, 'idle'));
+        // Each entity enters its idle cycle at its own phase, so a room full
+        // of goblins doesn't glance in unison (see idlePhase).
+        if (spec) playIdle(img, e.kind, e.id);
         this.entityLayer.add(img);
         this.entityImages.set(e.id, img);
       }
