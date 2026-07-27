@@ -46,6 +46,33 @@ npx wrangler deploy
 `LEADERBOARD_URL` in `src/net/config.js` and commit. That's it — until then
 the game runs normally with the leaderboard showing "not configured".
 
+## Updating an already-deployed worker
+
+Worker changes are **not** picked up by the game's GitHub Pages deploy — the
+backend is deployed by hand. After merging a change under `server/`:
+
+```sh
+# 1. new indexes / schema (idempotent, safe to re-run on a live database)
+npx wrangler d1 execute dungeons-leaderboard --remote --file=./schema.sql
+# 2. the worker itself
+npx wrangler deploy
+```
+
+Since **v0.9.5** that checklist matters for two reasons:
+
+- `schema.sql` adds `idx_scores_dupe`, which backs the duplicate check the
+  worker now runs before every insert. Without the index the check still works,
+  it just scans.
+- `ALLOWED_ORIGIN` must be set **deliberately**. A missing or empty value no
+  longer falls back to `*` — the worker answers with no CORS headers at all, so
+  browsers block it. `wrangler.toml` ships `"*"` (fine: the API uses no cookies
+  or credentials), and you can narrow it to a comma-separated origin list
+  whenever you like, e.g. `ALLOWED_ORIGIN = "https://example.github.io"`.
+
+If you paste into the dashboard editor instead of using wrangler, use
+`worker.dashboard.js` — and regenerate it first with `npm run build:dashboard`,
+since it is a generated flattening of `scores.js` + `worker.js`.
+
 ## Local development
 
 ```sh

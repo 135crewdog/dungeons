@@ -11,3 +11,9 @@ CREATE TABLE IF NOT EXISTS scores (
 );
 
 CREATE INDEX IF NOT EXISTS idx_scores_created ON scores (created_at);
+
+-- Backs the duplicate check the worker runs before every insert (the offline
+-- queue can re-send a score whose response was lost). Safe to apply to an
+-- existing database — see README.md.
+CREATE INDEX IF NOT EXISTS idx_scores_dupe
+  ON scores (seed, initials, floor, turns, created_at);
