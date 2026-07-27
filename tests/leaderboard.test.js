@@ -20,16 +20,29 @@ function okJson(body = {}) {
   return { ok: true, json: async () => body };
 }
 
-function makeClient({ fetchFn, url = 'https://lb.example' } = {}) {
+// A failed HTTP response. `headers` is Headers-shaped (only .get is used).
+function httpFail(status, headers = {}) {
+  return { ok: false, status, headers: { get: (k) => headers[k.toLowerCase()] ?? null } };
+}
+
+function makeClient({ fetchFn, url = 'https://lb.example', now, timeoutMs } = {}) {
   const storage = fakeStorage();
   const client = createLeaderboardClient({
     url,
     storage,
     fetchFn: fetchFn || (async () => okJson()),
-    now: () => 1_000_000,
+    now: now || (() => 1_000_000),
+    timeoutMs,
   });
   return { client, storage };
 }
+
+// The queue is stored versioned; tests read it through this so the envelope
+// stays an implementation detail.
+const queueOf = (storage) => {
+  const raw = JSON.parse(storage.getItem('lb.queue'));
+  return Array.isArray(raw) ? raw : raw.items;
+};
 
 const PAYLOAD = { initials: 'ABC', floor: 5, version: '0.5.0', seed: '42', turns: 300 };
 
@@ -103,11 +116,20 @@ describe('client', () => {
     expect(JSON.parse(calls[0].opts.body)).toEqual(PAYLOAD);
   });
 
-  it('queues a failed submit and reports it', async () => {
-    const { client, storage } = makeClient({ fetchFn: async () => ({ ok: false, status: 500 }) });
+  it('queues a retryable failed submit and reports it', async () => {
+    const { client, storage } = makeClient({ fetchFn: async () => httpFail(500) });
     const res = await client.submit(PAYLOAD);
-    expect(res).toEqual({ ok: false, queued: true });
-    expect(JSON.parse(storage.getItem('lb.queue'))).toEqual([PAYLOAD]);
+    expect(res).toEqual({ ok: false, queued: true, reason: 'http-500' });
+    expect(queueOf(storage)).toEqual([PAYLOAD]);
+  });
+
+  it('does NOT queue a permanent rejection', async () => {
+    // A 400 means this payload will never be accepted. Queueing it used to
+    // park it at the head of the queue forever, blocking every later score.
+    const { client, storage } = makeClient({ fetchFn: async () => httpFail(400) });
+    const res = await client.submit(PAYLOAD);
+    expect(res).toEqual({ ok: false, queued: false, reason: 'http-400' });
+    expect(storage.getItem('lb.queue')).toBe(null);
   });
 
   it('caps the offline queue at 10, dropping the oldest', async () => {
@@ -117,7 +139,7 @@ describe('client', () => {
       },
     });
     for (let i = 1; i <= 12; i++) await client.submit({ ...PAYLOAD, turns: i });
-    const queue = JSON.parse(storage.getItem('lb.queue'));
+    const queue = queueOf(storage);
     expect(queue).toHaveLength(10);
     expect(queue[0].turns).toBe(3);
     expect(queue[9].turns).toBe(12);
@@ -140,10 +162,17 @@ describe('client', () => {
     );
     await client.flushQueue();
     expect(sent.map((p) => p.turns)).toEqual([1, 2]);
-    expect(JSON.parse(storage.getItem('lb.queue'))).toEqual([]);
+    expect(queueOf(storage)).toEqual([]);
   });
 
-  it('flushQueue re-queues the remainder from the first failure on', async () => {
+  it('reads a pre-versioning queue written by an older client', () => {
+    // Raw-array form, as shipped before the envelope existed.
+    const { storage } = makeClient({});
+    storage.setItem('lb.queue', JSON.stringify([PAYLOAD]));
+    expect(queueOf(storage)).toEqual([PAYLOAD]);
+  });
+
+  it('flushQueue re-queues the remainder from the first RETRYABLE failure on', async () => {
     let calls = 0;
     const { client, storage } = makeClient({
       fetchFn: async () => {
@@ -155,7 +184,91 @@ describe('client', () => {
     const items = [1, 2, 3].map((turns) => ({ ...PAYLOAD, turns }));
     storage.setItem('lb.queue', JSON.stringify(items));
     await client.flushQueue();
-    expect(JSON.parse(storage.getItem('lb.queue')).map((p) => p.turns)).toEqual([2, 3]);
+    expect(queueOf(storage).map((p) => p.turns)).toEqual([2, 3]);
+  });
+
+  it('drops a permanently-rejected entry and keeps draining the rest', async () => {
+    // The poisoned-queue case: entry 2 can never be accepted. It must be
+    // discarded, not parked at the head blocking entries 3 and 4 forever.
+    const sent = [];
+    const { client, storage } = makeClient({
+      fetchFn: async (_url, opts) => {
+        const payload = JSON.parse(opts.body);
+        if (payload.turns === 2) return httpFail(400);
+        sent.push(payload.turns);
+        return okJson();
+      },
+    });
+    storage.setItem(
+      'lb.queue',
+      JSON.stringify([1, 2, 3, 4].map((turns) => ({ ...PAYLOAD, turns }))),
+    );
+
+    const res = await client.flushQueue();
+
+    expect(sent).toEqual([1, 3, 4]);
+    expect(res).toMatchObject({ sent: 3, dropped: 1, kept: 0 });
+    expect(queueOf(storage)).toEqual([]);
+  });
+
+  it('serializes concurrent flushes so nothing is submitted twice', async () => {
+    // Boot calls flushQueue and so does every `online` event; two drains of the
+    // same queue used to be able to interleave.
+    const sent = [];
+    const { client, storage } = makeClient({
+      fetchFn: async (_url, opts) => {
+        sent.push(JSON.parse(opts.body).turns);
+        await new Promise((r) => setTimeout(r, 5));
+        return okJson();
+      },
+    });
+    storage.setItem('lb.queue', JSON.stringify([1, 2].map((turns) => ({ ...PAYLOAD, turns }))));
+
+    const [a, b] = await Promise.all([client.flushQueue(), client.flushQueue()]);
+
+    expect(sent).toEqual([1, 2]); // each entry sent exactly once
+    expect(a).toBe(b); // both callers shared the one in-flight drain
+    expect(queueOf(storage)).toEqual([]);
+  });
+
+  it('defers a flush while a Retry-After backoff is in force', async () => {
+    let clock = 1_000_000;
+    let posts = 0;
+    const { client, storage } = makeClient({
+      now: () => clock,
+      fetchFn: async () => {
+        posts += 1;
+        return httpFail(429, { 'retry-after': '30' });
+      },
+    });
+    storage.setItem('lb.queue', JSON.stringify([PAYLOAD]));
+
+    await client.flushQueue();
+    expect(posts).toBe(1);
+
+    // Still inside the 30s window: no request goes out.
+    clock += 10_000;
+    expect(await client.flushQueue()).toMatchObject({ deferred: true });
+    expect(posts).toBe(1);
+
+    // Past it: the queue is tried again.
+    clock += 25_000;
+    await client.flushQueue();
+    expect(posts).toBe(2);
+    expect(queueOf(storage)).toEqual([PAYLOAD]); // still queued, still retryable
+  });
+
+  it('times out a hanging request instead of pending forever', async () => {
+    const { client, storage } = makeClient({
+      timeoutMs: 5,
+      fetchFn: () => new Promise(() => {}), // never settles
+    });
+    const res = await client.submit(PAYLOAD);
+    expect(res).toEqual({ ok: false, queued: true, reason: 'timeout' });
+    expect(queueOf(storage)).toEqual([PAYLOAD]);
+
+    const { client: reader } = makeClient({ timeoutMs: 5, fetchFn: () => new Promise(() => {}) });
+    expect(await reader.fetchScores()).toEqual({ ok: false, reason: 'timeout' });
   });
 
   it('fetchScores returns rows plus the server clock, and fails soft', async () => {
