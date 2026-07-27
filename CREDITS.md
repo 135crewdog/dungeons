@@ -1,5 +1,21 @@
 # Credits
 
+## Copyright and license
+
+Dungeons — a browser-based roguelike dungeon crawler.
+Copyright (C) 2026 135crewdog.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. It is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See [`LICENSE`](LICENSE) for the full text.
+
+The license covers everything distributed here: the original source, the
+vendored Shattered Pixel Dungeon artwork below (which is GPLv3 already, and is
+why the project is GPLv3), and the app icons derived from it.
+
 ## Tile and sprite art
 
 The images under `public/assets/` (this section) are taken unmodified from
@@ -23,9 +39,11 @@ Shattered Pixel Dungeon (code and assets) is licensed under the
 **GNU General Public License v3.0** (or, at your option, any later version):
 https://www.gnu.org/licenses/gpl-3.0.html
 
-Accordingly, this project's distribution — which bundles that artwork — is made
-available under GPL-compatible terms; the complete corresponding source for this
-game is this repository. The wall/door autotiling scheme implemented in
+Accordingly, this project — which bundles that artwork — is licensed as a whole
+under the **GNU General Public License, version 3 or (at your option) any later
+version**. The full license text is in [`LICENSE`](LICENSE), and the complete
+corresponding source for the distributed game is this repository. The wall/door
+autotiling scheme implemented in
 `src/renderer/autotile.js` is a JavaScript reimplementation of the tile-stitching
 logic described by Shattered Pixel Dungeon's `DungeonTileSheet`, and the entity/item
 frame rectangles in `src/renderer/entitySprites.js` correspond to frames defined by
