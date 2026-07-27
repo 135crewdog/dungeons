@@ -43,49 +43,49 @@
           "kind": "skeleton",
           "x": 31,
           "y": 17,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 3,
           "kind": "skeleton",
           "x": 65,
           "y": 17,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 4,
           "kind": "skeleton",
           "x": 28,
           "y": 32,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 5,
           "kind": "skeleton",
           "x": 31,
           "y": 15,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 6,
           "kind": "skeleton",
           "x": 28,
           "y": 10,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 7,
           "kind": "skeleton",
           "x": 20,
           "y": 9,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 8,
           "kind": "skeleton",
           "x": 49,
           "y": 11,
-          "hp": 3
+          "hp": 4
         }
       ],
       "items": [
@@ -922,14 +922,14 @@
           "kind": "skeleton",
           "x": 65,
           "y": 15,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 4,
           "kind": "skeleton",
           "x": 31,
           "y": 29,
-          "hp": 3
+          "hp": 4
         }
       ],
       "items": [],
@@ -1048,49 +1048,49 @@
           "kind": "skeleton",
           "x": 31,
           "y": 17,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 3,
           "kind": "skeleton",
           "x": 65,
           "y": 17,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 4,
           "kind": "skeleton",
           "x": 30,
           "y": 31,
-          "hp": 2
+          "hp": 3
         },
         {
           "id": 5,
           "kind": "skeleton",
           "x": 31,
           "y": 15,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 6,
           "kind": "skeleton",
           "x": 28,
           "y": 10,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 7,
           "kind": "skeleton",
           "x": 20,
           "y": 9,
-          "hp": 3
+          "hp": 4
         },
         {
           "id": 8,
           "kind": "skeleton",
           "x": 49,
           "y": 11,
-          "hp": 3
+          "hp": 4
         }
       ],
       "items": [

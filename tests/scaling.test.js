@@ -8,10 +8,10 @@ import { ENEMY_TYPES } from '../src/core/constants.js';
 describe('depth scaling — regular enemies', () => {
   it('floor 1 is the unscaled baseline: d4 and base HP', () => {
     const g = createEnemy(ENEMY_TYPES.goblin, 0, 0, 1);
-    expect(g.maxHp).toBe(6);
+    expect(g.maxHp).toBe(7);
     expect(g.attackDie).toBe(4);
     const s = createEnemy(ENEMY_TYPES.skeleton, 0, 0); // default floor
-    expect(s.maxHp).toBe(3);
+    expect(s.maxHp).toBe(4);
     expect(s.attackDie).toBe(4);
   });
 
@@ -24,11 +24,11 @@ describe('depth scaling — regular enemies', () => {
     expect(dieAt(40)).toBe(10); // clamped at the last rung
 
     const g7 = createEnemy(ENEMY_TYPES.goblin, 0, 0, 7);
-    expect(g7.maxHp).toBe(6 + 3); // floors 3,5,7
+    expect(g7.maxHp).toBe(7 + 3); // floors 3,5,7
     expect(g7.hp).toBe(g7.maxHp);
     expect(g7.attackDie).toBe(6);
     const s7 = createEnemy(ENEMY_TYPES.skeleton, 0, 0, 7);
-    expect(s7.maxHp).toBe(3 + 3);
+    expect(s7.maxHp).toBe(4 + 3);
     expect(s7.attackDie).toBe(g7.attackDie); // same rung, same die
   });
 });
@@ -100,7 +100,7 @@ describe('depth scaling — full game integration', () => {
     const boss = enemies.find((e) => e.kind === 'boss');
     expect(boss).toMatchObject({ maxHp: 36, attackDie: 12 });
     for (const e of enemies.filter((e) => e.kind !== 'boss')) {
-      expect(e.maxHp).toBe((e.kind === 'goblin' ? 6 : 3) + 4); // floors 3,5,7,9
+      expect(e.maxHp).toBe((e.kind === 'goblin' ? 7 : 4) + 4); // floors 3,5,7,9
       expect(e.attackDie).toBe(8); // floors 9-12 rung
     }
   });

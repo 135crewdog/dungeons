@@ -38,9 +38,14 @@ export const PLAYER_ATTACK_DIE = 8;
 // slowed) — but roll the same damage die. The die itself comes from the depth
 // ladder below and is stamped at spawn. `glyph` is a presentation hint; the
 // renderer's tileStyle owns the final glyph/color.
+//
+// The 7/4 HP pair is simulator-tuned (npm run balance) and restores the curve
+// 0.9.2 flattened when enemies lost their free corner attacks: it is the single
+// smallest lever that puts the thorough bot's floor-10 clear rate back at ~33%
+// without distorting the shape of the survival curve.
 export const ENEMY_TYPES = Object.freeze({
-  goblin: { kind: 'goblin', glyph: 'g', maxHp: 6, moveEvery: 1 },
-  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 3, moveEvery: 2 },
+  goblin: { kind: 'goblin', glyph: 'g', maxHp: 7, moveEvery: 1 },
+  skeleton: { kind: 'skeleton', glyph: 's', maxHp: 4, moveEvery: 2 },
   // The level boss: one guards the down-stairs on every BOSS_FLOOR_INTERVAL-th
   // floor (never the random pool). maxHp is the tier-1 (floor 5) value; its
   // damage die comes from BOSS_DICE. Simulator-tuned (npm run balance): a hard

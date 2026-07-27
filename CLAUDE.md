@@ -206,9 +206,10 @@ diagonal step must pass, so both sides of a fight share one definition of "close
 to swing". The player's bump attack always obeyed it (it routes through `tryMove` →
 `canStep`); enemies used bare Chebyshev adjacency until 0.9.2, which let one standing
 kitty-corner through a wall hit a player who could not hit back. An enemy pinned by a
-corner paths around it instead. Closing that gap is a **significant** difficulty change
-— the thorough bot's floor-10 clear rate went 30% → 50% — so those free corner hits were
-carrying real weight in the curve; a re-tune is an open question.
+corner paths around it instead. Closing that gap was a **significant** difficulty change
+— the thorough bot's floor-10 clear rate went 30% → 50%, so those free corner hits were
+carrying real weight in the curve — and 0.9.3 re-tuned against it by raising base enemy
+HP to 7/4 (see the depth-scaling paragraph), landing floor-10 clear back at ~33%.
 
 **Enemies aggro on sight** — they hold until the player
 enters their line of sight, then give chase. A chasing enemy that **loses sight** of the
@@ -231,8 +232,8 @@ roll rides on the attack event/log data but is not narrated; the renderer floats
 player stats that start at 0 and stack via treasure chests. The player rolls a
 **d8** for damage. Two entities never share a tile.
 
-**Goblin is the baseline enemy** (6 HP, d4 damage die, full speed — the floor-1
-reference). Skeletons are "about half a goblin": **3 HP** and **half movement speed**
+**Goblin is the baseline enemy** (7 HP, d4 damage die, full speed — the floor-1
+reference). Skeletons are "about half a goblin": **4 HP** and **half movement speed**
 — one tile every 2 turns (first step after aggro is immediate) — but they roll the
 same damage die and still attack **every** turn when adjacent. A **boss** (`B`)
 guards the down-stairs room on **every 5th floor**, full speed, same to-hit rule and
@@ -525,10 +526,11 @@ the real engine with two bot policies (thorough / stair-rusher) over hundreds of
 seeded runs. Changes: goblin 7 HP · skeleton 4 HP · **enemy count depth scaling**
 (+1 per 3 floors, cap 12) · **depth-weighted spawn mix** (goblin share 50% +3%/floor,
 cap 80%) · chest table 30/25/30/15 with `CHEST_TABLE` thresholds · health chest +4 ·
-boss 26 HP base, +12/tier, exempt from the flat damage drip. _(The HP/chest numbers in
-this changelog are the 3d-era values and were re-tuned again in 3f; the Combat section
-above — goblin 6 HP, skeleton 3 HP, boss 24 HP base, chest table 25/20/25/20/10 — is
-authoritative.)_
+boss 26 HP base, +12/tier, exempt from the flat damage drip. _(These are the 3d-era
+values; 3f re-tuned them and 0.9.3 re-tuned again. The Combat section above — goblin
+7 HP, skeleton 4 HP, boss 24 HP base, chest table 25/20/25/20/10 — is authoritative.
+The 7/4 HP pair happens to be back where 3d put it: 3f cut it to 6/3, and 0.9.3
+restored it to pay off the corner-fix's difficulty debt.)_
 
 Phase 3e (complete, superseded by 3f): **player damage die** — the player rolled
 d4+2 (+strength) per landed hit instead of a flat 4, making combat dice on both
@@ -623,6 +625,16 @@ their stale glide, lunges are tracked like moves, floating numbers drift half as
 far, and `SpriteTileGrid.sync` memoizes per cell instead of rewriting all 6336
 terrain Images every turn. **0.9.2**: melee reach obeys the corner rule for
 enemies too (see Combat) — a correctness fix with a large balance consequence.
+**0.9.3**: the re-tune for it. 0.9.2 flattened the whole survival curve, not just
+its tail (thorough bot floor-10 clear 30% → 50%, floor-1 deaths 24% → 14% of runs),
+so the fix's difficulty debt was paid back with **base enemy HP 6/3 → 7/4** — chosen
+by sweeping every flat and depth-scaled lever through `npm run balance` and keeping
+the one that best restored the 0.9.0 curve SHAPE, not merely its headline number.
+Floor-10 clear is 34/36/30% on three independent 200-run seed blocks (mean 33%,
+0.9.0 was 28%) and floor-1 deaths are back to ~18%, which is the Phase-3f target.
+Skeleton kills stay below their 0.9.0 share: a half-speed enemy loses the most when
+it has to walk around a corner it used to reach through, and that is the honest
+residual of the fix rather than something to tune away.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,
