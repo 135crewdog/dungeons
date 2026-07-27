@@ -2,9 +2,12 @@
 
 A real-browser campaign that drives the built PWA with Playwright and checks the
 things unit tests can't: rendering, input→sim→renderer round-trips, floor
-persistence, overlay layering, the death/leaderboard flow, and PWA offline boot.
-It is **not** part of `npm test` (it needs a browser and a built app) — run it on
-demand.
+persistence, overlay layering, the death/leaderboard flow, the mobile gesture
+policy, and PWA offline boot.
+
+It is **not** part of `npm test` (it needs a browser and a built app), but it is
+no longer optional: since 0.9.5 it runs on **every pull request**, and
+`npm run check:full` is the same gate locally.
 
 ## Running
 
@@ -18,10 +21,17 @@ serving the build, it reuses it.
 
 ### Browser
 
-Playwright's own Chromium isn't downloaded (`playwright-core` only). The runner
-defaults to the Chromium that ships in the Claude Code container
-(`/opt/pw-browsers/chromium-1194/chrome-linux/chrome`). Elsewhere, point it at a
-Chromium/Chrome binary:
+The runner resolves Chromium through Playwright's own registry
+(`chromium.executablePath()`), which honors `PLAYWRIGHT_BROWSERS_PATH` and the
+usual `~/.cache/ms-playwright` location. If you don't have one, install it with
+the CLI that ships inside `playwright-core` — no extra dependency:
+
+```bash
+npx playwright-core install chromium
+```
+
+CI does exactly this, cached by Playwright version. To use a specific
+Chromium/Chrome binary instead, point `CHROMIUM_PATH` at it:
 
 ```bash
 CHROMIUM_PATH=/path/to/chrome npm run test:e2e

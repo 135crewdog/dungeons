@@ -81,8 +81,9 @@ game itself stays a static GitHub Pages deploy. API: `POST /scores` validates
 `{ initials, floor, turns, seed, version }` (initials exactly 3 chars A–Z0-9, uppercased
 server-side) and stamps a **server** timestamp; `GET /scores` returns the top 50 of the
 last 30 days ordered **floor DESC, turns ASC, created_at ASC**, plus the server clock so
-row ages ("3d ago") never trust the device clock. CORS is `*` (no credentials);
-body-size cap and a best-effort per-IP rate limit blunt abuse. The board is
+row ages ("3d ago") never trust the device clock. The API uses no cookies or
+credentials, and ships configured with `ALLOWED_ORIGIN = "*"` (see the hardening
+paragraph below for what that variable now does). The board is
 **deliberately an honor system** — a settled decision, not a gap awaiting a fix: the
 client asserts its own floor/turns and the server takes them on trust, and the
 leaderboard overlay and README say so in as many words rather than implying a
@@ -541,7 +542,13 @@ src/
 public/
   assets/environment/  // vendored SPD tilesheet(s) — GPLv3, see CREDITS.md
   assets/sprites/      // vendored SPD creature/item sheets — same licensing
+  icons/               // PWA icons, generated from the boss sprite
 server/       // Cloudflare Worker + D1 leaderboard backend (deployed separately)
+scripts/      // headless tools: balance simulator, dashboard-worker generator,
+              // bundle budget, icon generator
+tests/        // Vitest suites (node by default; jsdom per-file for ui/input)
+e2e/          // browser campaign + its fixtures (see e2e/README.md)
+docs/audits/  // dated, commit-pinned historical audit snapshots
 ```
 
 The simulation layer is `core/`, `world/`, `entities/`, `systems/`. The renderer layer

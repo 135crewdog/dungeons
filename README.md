@@ -164,5 +164,8 @@ one audited — not a statement about current `main`.
 ## Tech
 
 Phaser 3 · Vite · Vitest · vite-plugin-pwa (Workbox). Plain JavaScript, ES modules.
-The leaderboard backend is a tiny Cloudflare Worker + D1 database in `server/`
-(see `server/README.md`); the game itself deploys as static files.
+Quality tooling: ESLint + Prettier, `@vitest/coverage-v8`, jsdom for the DOM
+overlays, and playwright-core for the browser campaign — all wired into the one
+`npm run check` gate that CI runs. The leaderboard backend is a tiny Cloudflare
+Worker + D1 database in `server/` (see `server/README.md`); the game itself
+deploys as static files.
