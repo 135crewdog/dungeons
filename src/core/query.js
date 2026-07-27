@@ -113,3 +113,16 @@ export function diagonalAllowed(passable, x, y, dx, dy) {
   if (dx === 0 || dy === 0) return true;
   return passable(x + dx, y) && passable(x, y + dy);
 }
+
+// Can (ax, ay) swing at (bx, by)? Adjacent AND not reaching past a wall corner.
+//
+// The corner rule is the same one canStep applies to a diagonal move, and both
+// sides of a fight have to share it: the player's bump attack goes through
+// tryMove -> canStep, so a diagonal wall corner has always blocked the player's
+// swing. Adjacency alone did not, which let an enemy standing kitty-corner
+// through a wall hit a player who could not hit back — and, on screen, looked
+// like damage being exchanged between two entities that are not touching.
+export function meleeReachable(map, ax, ay, bx, by) {
+  if (!isAdjacent(ax, ay, bx, by)) return false;
+  return diagonalAllowed((x, y) => isWalkable(map, x, y), ax, ay, bx - ax, by - ay);
+}

@@ -178,7 +178,8 @@ that sit exactly one wall apart are linked by a single door. Rooms are also plac
   movement key **repeats** at the OS key-repeat rate (each repeat is one discrete,
   synchronous turn) — intended hold-to-walk, classic-roguelike behavior, not a bug.
 - **Diagonals forbid corner-cutting:** a diagonal step is illegal unless both
-  orthogonal tiles between it and the mover are passable. Same rule for player and AI.
+  orthogonal tiles between it and the mover are passable. Same rule for player and AI,
+  and the same rule for **melee reach** — see Combat.
 - **Enemies route around stairs and items.** An enemy can't use stairs or collect
   potions/chests, so it treats those tiles as obstacles and paths around them — stepping
   onto one only when boxed in (the sole route to the player runs over it), so a player can't
@@ -196,8 +197,20 @@ room, the entire room is marked **explored**.
 ## Combat
 
 Moving adjacent to an enemy attacks it **immediately in that same turn** (no separate
-attack turn; on a kill the player stays put). On its turn an enemy attacks if adjacent,
-else moves toward the player. **Enemies aggro on sight** — they hold until the player
+attack turn; on a kill the player stays put). On its turn an enemy attacks if in melee
+reach, else moves toward the player.
+
+**Melee reach obeys the corner rule** (`meleeReachable` in `core/query.js`): adjacent
+**and** not reaching diagonally past a wall corner — the same `diagonalAllowed` test a
+diagonal step must pass, so both sides of a fight share one definition of "close enough
+to swing". The player's bump attack always obeyed it (it routes through `tryMove` →
+`canStep`); enemies used bare Chebyshev adjacency until 0.9.2, which let one standing
+kitty-corner through a wall hit a player who could not hit back. An enemy pinned by a
+corner paths around it instead. Closing that gap is a **significant** difficulty change
+— the thorough bot's floor-10 clear rate went 30% → 50% — so those free corner hits were
+carrying real weight in the curve; a re-tune is an open question.
+
+**Enemies aggro on sight** — they hold until the player
 enters their line of sight, then give chase. A chasing enemy that **loses sight** of the
 player heads for the tile it last saw them on; if it arrives empty-handed (or stays
 blind for several turns) it **gives up** and holds position, re-aggroing only on a fresh
@@ -593,6 +606,23 @@ glide) · camera panning in lockstep with settled-center click unprojection ·
 attack lunges · idle/walk cycles from the frames the vendored sheets always
 shipped (no new assets, no licensing change). Full spec in Visual Style.
 Frame-based attack/death animations and water/grass/decor stay deferred.
+
+Post-Phase-8 playtest fixes (**0.9.1**, renderer only): the Phase-8 build's
+movement visibly stuttered — measured off 60fps phone capture, each step
+delivered its tile over five frames plus **one frame of dead stop**, because the
+80ms glide sat inside a ~100ms step. A glide now spans its step exactly
+(`TWEEN_MOVE_MS === STEP_DELAY_MS`, both 110ms, matching SPD's measured pace),
+faster turns shorten their glide to match, preempted glides retarget instead of
+rewinding, glide endpoints come from the entity's tile rather than the live
+sprite, gliding sprites snap to whole world pixels (Phaser floors camera scroll
+to a world pixel, so an unsnapped sprite shimmers against it), and the camera
+**follows the player's sprite** instead of running a parallel pan that could
+disagree with it. Idle cycles went SPD-calm and per-entity de-phased (a 500ms
+head-flip loop read as a permanent head shake). Also: floor-change turns skip
+their stale glide, lunges are tracked like moves, floating numbers drift half as
+far, and `SpriteTileGrid.sync` memoizes per cell instead of rewriting all 6336
+terrain Images every turn. **0.9.2**: melee reach obeys the corner rule for
+enemies too (see Combat) — a correctness fix with a large balance consequence.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,

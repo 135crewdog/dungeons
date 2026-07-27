@@ -276,12 +276,12 @@
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad9",
         "t": 34,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad8",
         "t": 35,
         "f": 1
       },
@@ -296,37 +296,37 @@
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 38,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 39,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 40,
         "f": 1
       },
       {
-        "c": "Numpad7",
+        "c": "Numpad8",
         "t": 41,
         "f": 1
       },
       {
-        "c": "Numpad7",
+        "c": "Numpad6",
         "t": 42,
         "f": 1
       },
       {
-        "c": "Numpad7",
+        "c": "Numpad4",
         "t": 43,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad1",
         "t": 44,
         "f": 1
       },
@@ -336,32 +336,32 @@
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad7",
         "t": 46,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad7",
         "t": 47,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad4",
         "t": 48,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad4",
         "t": 49,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad4",
         "t": 50,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad4",
         "t": 51,
         "f": 1
       },
@@ -371,7 +371,7 @@
         "f": 1
       },
       {
-        "c": "Numpad1",
+        "c": "Numpad4",
         "t": 53,
         "f": 1
       },
@@ -381,22 +381,22 @@
         "f": 1
       },
       {
-        "c": "Numpad7",
+        "c": "Numpad4",
         "t": 55,
         "f": 1
       },
       {
-        "c": "Numpad7",
+        "c": "Numpad4",
         "t": 56,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad7",
         "t": 57,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad7",
         "t": 58,
         "f": 1
       },
@@ -436,12 +436,12 @@
         "f": 1
       },
       {
-        "c": "Numpad7",
+        "c": "Numpad4",
         "t": 66,
         "f": 1
       },
       {
-        "c": "Numpad7",
+        "c": "Numpad4",
         "t": 67,
         "f": 1
       },
@@ -456,127 +456,127 @@
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad2",
         "t": 70,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad2",
         "t": 71,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad2",
         "t": 72,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad2",
         "t": 73,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad2",
         "t": 74,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad2",
         "t": 75,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad2",
         "t": 76,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad2",
         "t": 77,
         "f": 1
       },
       {
-        "c": "Numpad4",
+        "c": "Numpad8",
         "t": 78,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 79,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 80,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 81,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 82,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 83,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 84,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad8",
         "t": 85,
         "f": 1
       },
       {
-        "c": "Numpad2",
+        "c": "Numpad6",
         "t": 86,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 87,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 88,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 89,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 90,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 91,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 92,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 93,
         "f": 1
       },
       {
-        "c": "Numpad8",
+        "c": "Numpad6",
         "t": 94,
         "f": 1
       },
@@ -601,12 +601,12 @@
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad3",
         "t": 99,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad3",
         "t": 100,
         "f": 1
       },
@@ -646,12 +646,12 @@
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 108,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 109,
         "f": 1
       },
@@ -661,27 +661,27 @@
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad2",
         "t": 111,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad9",
         "t": 112,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad9",
         "t": 113,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad3",
         "t": 114,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad3",
         "t": 115,
         "f": 1
       },
@@ -701,7 +701,7 @@
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad6",
         "t": 119,
         "f": 1
       },
@@ -711,12 +711,12 @@
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 121,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 122,
         "f": 1
       },
@@ -781,17 +781,17 @@
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad9",
         "t": 135,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad9",
         "t": 136,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad9",
         "t": 137,
         "f": 1
       },
@@ -801,22 +801,22 @@
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad3",
         "t": 139,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad3",
         "t": 140,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad3",
         "t": 141,
         "f": 1
       },
       {
-        "c": "Numpad9",
+        "c": "Numpad6",
         "t": 142,
         "f": 1
       },
@@ -826,17 +826,17 @@
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 144,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 145,
         "f": 1
       },
       {
-        "c": "Numpad3",
+        "c": "Numpad6",
         "t": 146,
         "f": 1
       },
@@ -861,53 +861,28 @@
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad9",
         "t": 151,
         "f": 1
       },
       {
-        "c": "Numpad6",
+        "c": "Numpad3",
         "t": 152,
         "f": 1
       },
       {
-        "c": "Numpad6",
-        "t": 153,
-        "f": 1
-      },
-      {
-        "c": "Numpad6",
-        "t": 154,
-        "f": 1
-      },
-      {
-        "c": "Numpad6",
-        "t": 155,
-        "f": 1
-      },
-      {
-        "c": "Numpad9",
-        "t": 156,
-        "f": 1
-      },
-      {
         "c": "Numpad3",
-        "t": 157,
-        "f": 1
-      },
-      {
-        "c": "Numpad3",
-        "t": 157,
+        "t": 152,
         "f": 2
       },
       {
         "c": "Numpad6",
-        "t": 158,
+        "t": 153,
         "f": 2
       },
       {
         "c": "Numpad4",
-        "t": 158,
+        "t": 153,
         "f": 1
       }
     ],
@@ -920,15 +895,15 @@
       }
     },
     "floor1MapHash": 1152866694,
-    "arrivedFloor2Turn": 157,
+    "arrivedFloor2Turn": 152,
     "final": {
-      "turn": 158,
+      "turn": 153,
       "floor": 1,
       "status": "playing",
       "player": {
         "x": 67,
         "y": 13,
-        "hp": 2,
+        "hp": 13,
         "maxHp": 20,
         "strength": 0,
         "skill": 0,
@@ -940,7 +915,7 @@
           "kind": "player",
           "x": 67,
           "y": 13,
-          "hp": 2
+          "hp": 13
         },
         {
           "id": 3,
