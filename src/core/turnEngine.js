@@ -128,15 +128,16 @@ function executePlayerAction(state, command, events) {
 // it belongs to the player's command (see processCommand), and this function is
 // skipped entirely when the player takes the stairs.
 function advanceWorld(state, events) {
-  // Step 5 (computed early, see above): update field of view and visibility.
+  // Field of view first: it depends only on walls and the player's position, so
+  // computing it here makes it stable for the rest of the turn.
   updateVisibility(state);
   // Hidden keys glimmer as soon as the fresh FOV is in — before enemies act
   // and before pickups, so stepping straight onto a hidden key reveals then
   // collects it in this same turn.
   revealNearbyKeys(state, events);
-  // Step 3: each enemy acts in ascending id order.
+  // Enemies act in ascending id order.
   enemyPhase(state, events);
-  // Step 4: resolve item pickups (the player walking over an item).
+  // Item pickups last: the player walking over an item collects it.
   resolvePickups(state, events);
 }
 

@@ -123,6 +123,10 @@ function activateFloor(state, floorNumber, arrival, player) {
   state.path = null;
 
   const pos = arrival === 'up' ? state.map.stairsUp : state.map.stairsDown;
+  // A false here would mean the arrival floor has no free tile anywhere in the
+  // stair's reachable component — impossible with the generator's room sizes
+  // and entity caps. Attaching the player anyway is the honest last resort:
+  // a briefly-shared tile beats refusing to let them off the stairs.
   ensureArrivalClear(state, pos.x, pos.y);
   attachPlayer(state, player, pos.x, pos.y);
   updateVisibility(state);
@@ -155,18 +159,26 @@ function generateAndEnter(state, floorNumber, player) {
 // a tile. A deterministic breadth-first search (DIRS8 order, no RNG — replays
 // stay exact) rather than a single-ring scan: a stair fully ringed by idle
 // enemies still resolves by pushing the squatter one room-tile further out.
-// The search is bounded; if the whole reachable neighborhood is packed solid
-// (impossible from the generator: rooms are at least 4x4 and entities are
-// capped well below that) the squatter stays put as a last resort.
+//
+// The search covers the whole reachable component, so "no free tile" means the
+// floor is genuinely full — not merely that a cheap cap was hit. It used to
+// stop after 64 visited tiles and give up silently, leaving the squatter on the
+// arrival stair for the player to be attached on top of. That was unreachable
+// in practice, but a silently-invalid state is the wrong thing to leave lying
+// around: the return value now says whether it resolved, and the transition
+// invariants in tests/invariants.test.js assert across many seeds that it
+// always does.
+//
+// The common case is unchanged: one squatter with a free neighbor lands on the
+// identical tile it always did (the BFS order is the same), so cached floors
+// and replays are unaffected.
 function ensureArrivalClear(state, x, y) {
   const occ = entityAt(state, x, y);
-  if (!occ) return;
+  if (!occ) return true;
   const map = state.map;
-  const startKey = y * map.width + x;
-  const visited = new Set([startKey]);
+  const visited = new Set([y * map.width + x]);
   const queue = [{ x, y }];
-  const CAP = 64; // plenty for any room + doorways, still strictly bounded
-  while (queue.length > 0 && visited.size < CAP) {
+  while (queue.length > 0) {
     const cur = queue.shift();
     for (const { dx, dy } of DIRS8) {
       const nx = cur.x + dx;
@@ -178,9 +190,10 @@ function ensureArrivalClear(state, x, y) {
       if (!entityAt(state, nx, ny)) {
         occ.x = nx;
         occ.y = ny;
-        return;
+        return true;
       }
       queue.push({ x: nx, y: ny });
     }
   }
+  return false;
 }
