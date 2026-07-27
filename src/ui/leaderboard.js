@@ -22,10 +22,16 @@ export function createLeaderboard(parent, { fetchScores }) {
   label.textContent = 'Top runs — last 30 days';
   const body = document.createElement('div');
   body.className = 'lb-body';
+  // Scores are submitted by the client and taken on trust — say so rather than
+  // implying a verification that isn't there. Every row does carry its seed
+  // server-side, so a run could be replay-checked later.
+  const honor = document.createElement('div');
+  honor.className = 'lb-honor';
+  honor.textContent = 'Honor system — scores are self-reported and unverified.';
   // Live region on the stable container (status divs inside it get replaced),
   // so screen readers announce Loading… → rows/offline/empty transitions.
   body.setAttribute('aria-live', 'polite');
-  panel.append(label, body);
+  panel.append(label, body, honor);
   parent.appendChild(el);
 
   // Guards a stale fetch resolving after the overlay was closed and reopened.

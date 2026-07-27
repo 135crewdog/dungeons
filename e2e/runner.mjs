@@ -580,6 +580,62 @@ for (const [label, opts, expectTiles] of [
   await ctx2.close();
 }
 
+// ---------- E17: gesture policy — overlays stay zoomable (WCAG 1.4.4) ----------
+// The unit guard reads the stylesheet; this asserts what the engine actually
+// COMPUTES, on a phone-sized viewport, with an overlay open. `touch-action:
+// none` used to sit on html/body, which blocked pinch zoom over the very text
+// a low-vision player needs to magnify.
+{
+  const { ctx } = await newGameContext(browser, { viewport: { width: 390, height: 844 }, dpr: 2 });
+  const page = await newGamePage(ctx);
+  await gotoSeed(page, fixtures.move.seed);
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('#menu.show');
+  await page.click('#menu [data-act="help"]');
+  await page.waitForSelector('#help.show');
+
+  const computed = await page.evaluate(() => {
+    const ta = (sel) => {
+      const el = document.querySelector(sel);
+      return el ? getComputedStyle(el).touchAction : null;
+    };
+    const panel = document.querySelector('.help-panel');
+    // The legend is taller than a phone screen, so the panel must scroll
+    // inside itself rather than overflowing the viewport.
+    const scrollable = panel.scrollHeight > panel.clientHeight;
+    panel.scrollTop = 40;
+    return {
+      html: ta('html'),
+      body: ta('body'),
+      game: ta('#game'),
+      canvas: ta('#game canvas'),
+      panel: ta('.help-panel'),
+      scrollable,
+      scrolled: panel.scrollTop > 0,
+      pageScrollsSideways: document.documentElement.scrollWidth > window.innerWidth,
+    };
+  });
+  const viewportMeta = await page.getAttribute('meta[name="viewport"]', 'content');
+
+  const zoomable = computed.html !== 'none' && computed.body !== 'none';
+  const mapSuppressed = computed.game === 'none' && computed.canvas === 'none';
+  const metaOk = !/user-scalable\s*=\s*(no|0)|maximum-scale/i.test(viewportMeta);
+  await page.screenshot({ path: SHOTS + 'help-mobile.png' });
+  record(
+    'E17/gesture-policy',
+    zoomable &&
+      mapSuppressed &&
+      computed.panel !== 'none' &&
+      computed.scrollable &&
+      computed.scrolled &&
+      !computed.pageScrollsSideways,
+    `html=${computed.html} body=${computed.body} #game=${computed.game} canvas=${computed.canvas} ` +
+      `panel=${computed.panel} panelScrolls=${computed.scrollable}/${computed.scrolled} ` +
+      `meta="${viewportMeta}" metaZoomable=${metaOk}`,
+  );
+  await ctx.close();
+}
+
 // ---------- E10: death flow, initials, one-submission lock ----------
 {
   const { ctx, posts, escaped } = await newGameContext(browser);

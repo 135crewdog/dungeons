@@ -181,6 +181,7 @@ describe('Ring of Speed', () => {
     const events = processCommand(state, { type: 'move', dx: 1, dy: 0 });
     expect(state.floor).toBe(2);
     expect(events.filter((e) => e.type === EV.DESCEND)).toHaveLength(1);
+    expect(state.turn).toBe(1); // one command, one turn — even ending on stairs
   });
 
   it('a first step onto stairs forfeits the second step entirely', () => {
@@ -189,6 +190,7 @@ describe('Ring of Speed', () => {
     expect(state.floor).toBe(2);
     expect(events.filter((e) => e.type === EV.DESCEND)).toHaveLength(1);
     expect(playerMoves(events)).toHaveLength(1); // exactly one step happened
+    expect(state.turn).toBe(1); // the forfeited step doesn't cost a second turn
   });
 
   it('the in-between tile gets its own FOV pass on the way through', () => {

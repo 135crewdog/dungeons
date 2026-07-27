@@ -1,10 +1,37 @@
-import { readFileSync } from 'node:fs';
+import { copyFileSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // package.json is the single source of truth for the app version; it is
 // injected as the compile-time constant __APP_VERSION__ (see src/ui/version.js).
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+
+// The game is GPLv3 (it bundles Shattered Pixel Dungeon art — see CREDITS.md),
+// so the license and the attribution have to travel with the *distribution*,
+// not just sit in the repository. They are copied verbatim into the build
+// output; they stay out of the PWA precache on purpose (workbox's globPatterns
+// don't match them — offline play doesn't need them).
+const LEGAL_FILES = ['LICENSE', 'CREDITS.md'];
+
+function copyLegalFiles() {
+  let outDir = 'dist';
+  return {
+    name: 'copy-legal-files',
+    apply: 'build',
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    closeBundle() {
+      const root = fileURLToPath(new URL('./', import.meta.url));
+      const dest = path.resolve(root, outDir);
+      for (const file of LEGAL_FILES) {
+        copyFileSync(path.join(root, file), path.join(dest, file));
+      }
+    },
+  };
+}
 
 // Vite dev/build config. vite-plugin-pwa (Workbox) generates the manifest and a
 // service worker that precaches the built app for full offline play, and
@@ -16,6 +43,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   plugins: [
+    copyLegalFiles(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/apple-touch-icon.png', 'icons/favicon-64.png'],

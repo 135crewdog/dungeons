@@ -1,6 +1,11 @@
 // Message log overlay: a few lines of recent events, anchored to the bottom.
 // It formats the simulation's structured log entries into readable text. Read
 // only; never mutates state.
+//
+// Lines are built as elements with textContent, never interpolated into an
+// HTML string — the formatted text embeds log data (enemy names, ring names),
+// so markup rendering here would be a live injection point the moment any of
+// that data stops being internal.
 
 const MAX_LINES = 6;
 
@@ -69,15 +74,18 @@ export function createMessageLog(parent) {
   function update(state) {
     const recent = state.log.slice(-MAX_LINES);
     const n = recent.length;
-    el.innerHTML = recent
-      .map((entry, i) => {
-        const text = format(entry);
-        if (!text) return '';
-        // Older lines fade out toward the top.
-        const opacity = 0.4 + 0.6 * ((i + 1) / n);
-        return `<div class="line" style="opacity:${opacity.toFixed(2)}">${text}</div>`;
-      })
-      .join('');
+    const lines = [];
+    recent.forEach((entry, i) => {
+      const text = format(entry);
+      if (!text) return;
+      const line = document.createElement('div');
+      line.className = 'line';
+      // Older lines fade out toward the top.
+      line.style.opacity = (0.4 + 0.6 * ((i + 1) / n)).toFixed(2);
+      line.textContent = text;
+      lines.push(line);
+    });
+    el.replaceChildren(...lines);
   }
 
   return { update, el };

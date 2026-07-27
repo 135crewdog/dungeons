@@ -82,9 +82,12 @@ game itself stays a static GitHub Pages deploy. API: `POST /scores` validates
 server-side) and stamps a **server** timestamp; `GET /scores` returns the top 50 of the
 last 30 days ordered **floor DESC, turns ASC, created_at ASC**, plus the server clock so
 row ages ("3d ago") never trust the device clock. CORS is `*` (no credentials);
-body-size cap and a best-effort per-IP rate limit blunt abuse. Anti-cheat is
-honor-level, but every score carries its seed so a run could later be replay-verified
-with the headless engine.
+body-size cap and a best-effort per-IP rate limit blunt abuse. The board is
+**deliberately an honor system** — a settled decision, not a gap awaiting a fix: the
+client asserts its own floor/turns and the server takes them on trust, and the
+leaderboard overlay and README say so in as many words rather than implying a
+verification that isn't there. Every score still carries its seed, so a run could
+later be replay-verified with the headless engine if that ever becomes worth doing.
 
 The client lives in **`src/net/`** — the only code allowed to fetch or touch
 localStorage (the architecture test enforces that the sim never does either).
@@ -108,8 +111,9 @@ the real sheet art (five sections — Denizens / Loot / Rings / Dungeon — plus
 Controls tables) with playful one-liners; glyph notation no longer appears anywhere in
 the UI. The icons are CSS crops of the public sprite sheets, built by an `iconFor`
 factory that **the composition root injects** (`src/renderer/uiIcons.js` holds the
-pure specs; `ui/` never imports `renderer/`, so main.js is the bridge — same pattern
-feeds the HUD's key/ring chips via `iconHtml`). Without the injection the rows fall
+pure specs; `ui/` never imports `renderer/`, so main.js is the bridge — the HUD's
+key/ring chips take the **same `iconFor` seam**, which since 0.9.4 hands over an
+**Element**, never an HTML string). Without the injection the rows fall
 back to name-only text. The panel scrolls inside itself on short screens. It reads
 nothing and calls nothing back.
 
@@ -130,8 +134,13 @@ nothing and calls nothing back.
 6. Update HUD and message log.
 7. Wait for the next player input.
 
-Stepping onto a staircase ends the turn immediately after the player's move:
-the floor swaps and the enemy/pickup phases are skipped.
+**One successful player command consumes exactly one turn**, counted in
+`processCommand` the moment the action lands — before anything else. An invalid
+or blocked command consumes nothing. Stepping onto a staircase ends the turn
+immediately after the player's move: the floor swaps and the enemy/pickup phases
+are skipped, but the turn **still counts** (it was a real action, and `state.turn`
+is the leaderboard's tie-break — until 0.9.4 stair steps were free, which
+silently flattered every score that used stairs).
 
 **Ring of Speed** grants a second step per movement turn, inserted between
 steps 2 and 3 with its own FOV/reveal pass so the intermediate tile is
@@ -412,13 +421,20 @@ view) · **unexplored** (black) — plus the Ring of Sight's full-floor reveal,
 which renders everything fully lit through `query.isRevealed` without touching
 the sim's visibility arrays.
 
-## Asset Licensing
+## Licensing
 
-The vendored tilesheet is from **Shattered Pixel Dungeon** (Evan Debenham), based on
-**Pixel Dungeon** (Watabou), both **GPLv3** — there is no permissive carve-out for
-SPD's art. Distributing this game with that art means honoring GPLv3: keep the
-attribution in `CREDITS.md` (source repo, pinned commit, sha256) and keep this
-repository's source public. Any future vendored art must get the same treatment.
+The project is **GPL-3.0-or-later** (`LICENSE`, the verbatim FSF text; the copyright
+notice lives in `CREDITS.md` and the README, never inside the license document). That
+is forced, not chosen: the vendored tilesheet is from **Shattered Pixel Dungeon**
+(Evan Debenham), based on **Pixel Dungeon** (Watabou), both **GPLv3** — there is no
+permissive carve-out for SPD's art. Distributing this game with that art means
+honoring GPLv3: keep the attribution in `CREDITS.md` (source repo, pinned commit,
+sha256) and keep this repository's source public. Any future vendored art must get
+the same treatment. `LICENSE` and `CREDITS.md` are copied into `dist/` by a small
+plugin in `vite.config.js` — the obligation attaches to the **distribution**, so the
+deployed site has to carry them, not just the repo. Production **source maps are
+published deliberately** (the GPL already requires the source; public maps make a
+live stack trace debuggable).
 
 ## Canvas and Resolution
 
@@ -426,8 +442,14 @@ Tile size fixed at 16×16. The viewport scales by showing **more tiles** on larg
 screens, not larger tiles; the camera follows the player. **Integer scaling only**;
 leftover space is neutral letterbox (no stretching). HUD elements anchor to screen
 edges and adapt to any aspect ratio. Browser **pinch-zoom stays enabled** (WCAG
-1.4.4 — never set `user-scalable=no`/`maximum-scale=1`); `touch-action: none` on
-the page keeps play gestures from scrolling or double-tap-zooming mid-game.
+1.4.4 — never set `user-scalable=no`/`maximum-scale=1`). Gesture suppression is
+scoped to the **game surface**: `touch-action: none` lives on `#game` and its
+canvas, where it keeps play gestures from scrolling or double-tap-zooming
+mid-game, and the overlay panels use `touch-action: manipulation` so they can
+still be pinched and scrolled. Putting it on `html`/`body` — as the page did
+until 0.9.4 — blocks zoom over the DOM overlays, which is exactly the text a
+low-vision player needs to magnify; `tests/gesturePolicy.test.js` and the
+campaign's E17 both reject that regression.
 
 ## Language and Tooling
 
@@ -636,6 +658,22 @@ Skeleton kills stay below their 0.9.0 share: a half-speed enemy loses the most w
 it has to walk around a corner it used to reach through, and that is the honest
 residual of the fix rather than something to tune away.
 
+**0.9.4 — audit remediation, waves 1–2** (from the 2026-07-27 engineering audit of
+`194f4f0`, filed with every past audit under `docs/audits/` as a dated,
+commit-pinned **historical snapshot** — never edited to match later code). Four
+findings closed, all outside the balance envelope (the simulator is byte-identical):
+**stair steps consume a turn** like any other move (they were free, and `state.turn`
+is the leaderboard tie-break — see Turn Order) · the project is **licensed**
+GPL-3.0-or-later with `LICENSE`/`CREDITS.md` shipped in `dist/` (see Licensing) ·
+**pinch zoom restored** — `touch-action: none` moved off the page and onto the game
+surface, so the DOM overlays can be magnified and scrolled (WCAG 1.4.4; a static
+test now rejects a page-wide gesture block) · the **HUD and message log are built
+from DOM nodes** instead of interpolated HTML strings, closing the last dynamic
+markup sinks. Two standing decisions were recorded rather than deferred: the
+leaderboard is an **honor system** and says so, and production **source maps stay
+public**. Waves 3–5 of that audit (leaderboard client/server hardening, CI quality
+gates, spawn/invariant refactors) are still open.
+
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,
 auto-worn pickups** — flat flags on the player, no slots, no managing — not a
@@ -649,10 +687,19 @@ and FOV are tested without instantiating Phaser. Determinism is guarded by
 `tests/architecture.test.js`: no `Math.random()` anywhere under `src/`, no Phaser
 outside `renderer/`, `fetch`/`localStorage` only in `net/` + the composition root,
 and the renderer may import only read-only core (`constants`/`query`/`events`) and
-its own modules — the guards match static, dynamic, and `require` import forms. The
+its own modules — the guards match static, dynamic, and `require` import forms.
+The same file also guards the **DOM trust boundary**: the state-driven overlays
+(`hud.js`, `messageLog.js`) may not touch `innerHTML`/`outerHTML`/
+`insertAdjacentHTML` at all, and no `ui/` module (nor the composition root) may
+interpolate a value into an HTML sink — static markup shells with no data in them
+are fine. `tests/gesturePolicy.test.js` parses `index.html`'s stylesheet and
+rejects a page-wide gesture block (read declarations via `getPropertyValue`:
+jsdom keeps `touch-action` but exposes no camelCase accessor, so `style.touchAction`
+is `undefined` and the naive assertion passes vacuously). The
 **UI and input layers** are tested with the DOM factories under **jsdom** (opt-in
 per file via a `// @vitest-environment jsdom` docblock — `tests/ui-*.test.js`,
-`tests/input.test.js`), exercising them through their injected-dependency seams. The
+`tests/input.test.js`), exercising them through their injected-dependency seams,
+including hostile-string cases proving state and log text render as text. The
 leaderboard worker is plain `fetch(request, env)` JS, tested in Node with a fake D1
 (`tests/leaderboard-server.test.js`, which also guards the hand-inlined
 `worker.dashboard.js` copy against drift); the client tests inject fake
@@ -676,11 +723,13 @@ animation-cycle frame rects by the entitySprites suite.
 
 An opt-in **browser end-to-end** campaign lives in `e2e/` (Playwright via
 `playwright-core`): `npm run build && npm run test:e2e` drives the real PWA through
-16 scenarios — rendering, input→sim→renderer round-trips, floor persistence, overlay
-layering, the death/leaderboard flow, PWA offline boot, and a recorded-command
+17 scenarios — rendering, input→sim→renderer round-trips, floor persistence, overlay
+layering, the death/leaderboard flow, PWA offline boot, the mobile **gesture
+policy** (E17: computed `touch-action` and panel scrolling with Help open at
+390×844@2x), and a recorded-command
 **sim/browser parity** replay that deep-equals the headless engine (the fixture —
 and so the replay's length — is regenerated by `node e2e/discover.mjs` after any
-generation-affecting change). It spawns its
+generation-affecting change, including one that shifts turn numbering). It spawns its
 own preview server, stubs the production leaderboard (asserting zero requests
 escape), and is **not** part of `npm test` (needs a browser + build). See
 `e2e/README.md`.

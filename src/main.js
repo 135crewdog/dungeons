@@ -59,7 +59,9 @@ const game = createPhaserGame(parent, state);
 
 // Sprite icons for the DOM overlays (Help legend, HUD chips): a <span>
 // cropping the real sheet via CSS at 2x, pixelated — the same art the dungeon
-// draws. Only this composition root may bridge renderer data into ui/.
+// draws. Only this composition root may bridge renderer data into ui/. It
+// hands over elements, never HTML strings, so the overlays never have to parse
+// markup to show an icon.
 const ICON_SCALE = 2;
 function spriteIconEl(kind) {
   const spec = UI_ICONS[kind];
@@ -74,12 +76,7 @@ function spriteIconEl(kind) {
   s.style.backgroundSize = `${sheet.width * ICON_SCALE}px ${sheet.height * ICON_SCALE}px`;
   return s;
 }
-function spriteIconHtml(kind) {
-  const el = spriteIconEl(kind);
-  return el ? el.outerHTML : '';
-}
-
-const hud = createHud(document.body, { iconHtml: spriteIconHtml });
+const hud = createHud(document.body, { iconFor: spriteIconEl });
 const messageLog = createMessageLog(document.body);
 
 // Cross-device leaderboard client (disabled while LEADERBOARD_URL is empty).

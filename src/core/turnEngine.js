@@ -44,6 +44,14 @@ export function processCommand(state, command) {
   const acted = executePlayerAction(state, command, events);
   if (!acted) return events;
 
+  // One successful player command consumes exactly one turn — counted here,
+  // before the stair check, so a floor transition (which skips the departed
+  // floor's consequences below) still costs a turn like any other move. The
+  // count is the leaderboard's tie-break, so a "free" step would flatter the
+  // score. Ring-of-Speed's second step is part of the same command and never
+  // counts again.
+  state.turn++;
+
   if (resolveStairStep(state, player, fromX, fromY, events)) return events;
 
   // Ring of Speed: one extra step in the same direction, unless the command
@@ -116,9 +124,10 @@ function executePlayerAction(state, command, events) {
 // Everything after the player acts, in the briefing's order. FOV is recomputed
 // right after the player moves — it depends only on walls + player position, so
 // it is stable through the enemy phase, and it gives enemies correct
-// line-of-sight for aggro this same turn.
+// line-of-sight for aggro this same turn. The turn counter is NOT touched here:
+// it belongs to the player's command (see processCommand), and this function is
+// skipped entirely when the player takes the stairs.
 function advanceWorld(state, events) {
-  state.turn++;
   // Step 5 (computed early, see above): update field of view and visibility.
   updateVisibility(state);
   // Hidden keys glimmer as soon as the fresh FOV is in — before enemies act
