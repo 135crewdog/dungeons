@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { processCommand } from '../src/core/turnEngine.js';
+import { canStep } from '../src/core/movement.js';
 import { createGame, descend, ascend } from '../src/core/gameState.js';
 import { getPlayer } from '../src/core/query.js';
 import { createRng } from '../src/core/rng.js';
 import { createChest } from '../src/entities/items.js';
-import { TILE, PLAYER_MAX_HP } from '../src/core/constants.js';
+import { createEnemy } from '../src/entities/enemies.js';
+import { TILE, PLAYER_MAX_HP, ENEMY_TYPES, DIRS8 } from '../src/core/constants.js';
 import { idx } from '../src/core/query.js';
 
 // A small floor with the player at (2,2). `stairsAt`, `potion`, and `chest`
@@ -219,6 +221,29 @@ describe('stairs / descend', () => {
     expect(getPlayer(state)).toBe(player);
   });
 
+  it('descending consumes exactly one turn', () => {
+    const { state } = miniState({ stairsAt: { x: 3, y: 2 } });
+    processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    expect(state.floor).toBe(2);
+    expect(state.turn).toBe(1);
+  });
+
+  it('the departed floor’s enemies do not act on the transition turn', () => {
+    const { state, player } = miniState({ stairsAt: { x: 3, y: 2 } });
+    // An aggroed goblin standing right beside the player, on the floor being
+    // left behind. It would swing if the enemy phase ran.
+    const goblin = createEnemy(ENEMY_TYPES.goblin, 2, 3, 1);
+    goblin.id = 2;
+    goblin.aggro = true;
+    state.entities.byId.set(2, goblin);
+
+    processCommand(state, { type: 'move', dx: 1, dy: 0 });
+
+    expect(state.floor).toBe(2);
+    expect(player.hp).toBe(PLAYER_MAX_HP); // never struck
+    expect(state.turn).toBe(1); // still exactly one turn
+  });
+
   it('descend preserves the player and HP, resets fog and items, and changes the map', () => {
     const state = createGame(4242);
     const player = getPlayer(state);
@@ -293,5 +318,62 @@ describe('persistent floors (up + down stairs)', () => {
     const state = createGame(99);
     ascend(state);
     expect(state.floor).toBe(1);
+  });
+
+  // --- turn accounting across a transition ------------------------------------
+  // The player arrives on a stair, so an ascent has to be driven by stepping
+  // OFF the stair and back ON to it — only a real step onto a staircase
+  // triggers the transition.
+
+  const clearEnemies = (state) => {
+    for (const id of enemyIds(state)) state.entities.byId.delete(id);
+  };
+
+  // Step one tile onto plain floor and back. Returns the return command's
+  // events and the turns it consumed.
+  function stepOffAndBack(state) {
+    const p = getPlayer(state);
+    for (const { dx, dy } of DIRS8) {
+      if (state.map.tiles[idx(state.map, p.x + dx, p.y + dy)] !== TILE.FLOOR) continue;
+      if (!canStep(state, p, dx, dy)) continue;
+      processCommand(state, { type: 'move', dx, dy, single: true });
+      const before = state.turn;
+      const events = processCommand(state, { type: 'move', dx: -dx, dy: -dy, single: true });
+      return { events, turns: state.turn - before };
+    }
+    throw new Error('no free floor neighbor to step off to');
+  }
+
+  it('ascending consumes exactly one turn', () => {
+    const state = createGame(1234);
+    descend(state);
+    clearEnemies(state);
+    expect(state.floor).toBe(2);
+
+    const { turns } = stepOffAndBack(state);
+
+    expect(state.floor).toBe(1); // stepped back onto the up-stairs
+    expect(turns).toBe(1);
+  });
+
+  it('does not resolve arrival-floor pickups on the transition turn', () => {
+    const state = createGame(1234);
+    const floor1Stairs = { ...state.map.stairsDown };
+    descend(state);
+    clearEnemies(state);
+    // Plant a potion on the tile the player will land on when they come back
+    // up. Arriving is not the same as walking over it: the pickup phase belongs
+    // to the departed floor's turn, which a transition skips.
+    const cached = state.floors.get(1);
+    cached.items.push({ id: 777, type: 'potion', x: floor1Stairs.x, y: floor1Stairs.y, heal: 5 });
+    const hpBefore = getPlayer(state).hp;
+
+    const { events, turns } = stepOffAndBack(state);
+
+    expect(state.floor).toBe(1);
+    expect(turns).toBe(1);
+    expect(events.some((e) => e.type === 'pickup')).toBe(false);
+    expect(getPlayer(state).hp).toBe(hpBefore);
+    expect(state.items.some((it) => it.id === 777)).toBe(true);
   });
 });

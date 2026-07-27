@@ -130,8 +130,13 @@ nothing and calls nothing back.
 6. Update HUD and message log.
 7. Wait for the next player input.
 
-Stepping onto a staircase ends the turn immediately after the player's move:
-the floor swaps and the enemy/pickup phases are skipped.
+**One successful player command consumes exactly one turn**, counted in
+`processCommand` the moment the action lands — before anything else. An invalid
+or blocked command consumes nothing. Stepping onto a staircase ends the turn
+immediately after the player's move: the floor swaps and the enemy/pickup phases
+are skipped, but the turn **still counts** (it was a real action, and `state.turn`
+is the leaderboard's tie-break — until 0.9.4 stair steps were free, which
+silently flattered every score that used stairs).
 
 **Ring of Speed** grants a second step per movement turn, inserted between
 steps 2 and 3 with its own FOV/reveal pass so the intermediate tile is
