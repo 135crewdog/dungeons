@@ -89,14 +89,36 @@ leaderboard overlay and README say so in as many words rather than implying a
 verification that isn't there. Every score still carries its seed, so a run could
 later be replay-verified with the headless engine if that ever becomes worth doing.
 
+Server hardening (0.9.5): CORS **fails closed** — a missing `ALLOWED_ORIGIN` is a
+misconfiguration, not a wildcard, so it emits no CORS headers at all; the var takes
+`*` (what ships) or a comma-separated origin allowlist, echoed back with
+`Vary: Origin`. The per-IP rate-limit map is **bounded** (expired stamps pruned,
+key count capped) and 429s carry `Retry-After`. Body limits are measured in real
+**bytes**, `Content-Length` is checked before the body is read, and POST requires a
+JSON content type. D1 failures are caught and normalized into a JSON 500 with CORS
+and `no-store` (logging `CF-Ray`, never the payload) instead of escaping as an
+opaque crash. An identical `(initials, floor, turns, seed)` inside 10 minutes is
+refused **409** — mostly the offline queue re-sending a score whose response was
+lost. `server/worker.dashboard.js` is **generated** from `scores.js` + `worker.js`
+(`npm run build:dashboard`), guarded by both a byte-identity check and the
+behavioral parity battery. None of it is live until `npx wrangler deploy` is run by
+hand — see `server/README.md`.
+
 The client lives in **`src/net/`** — the only code allowed to fetch or touch
 localStorage (the architecture test enforces that the sim never does either).
 `src/net/config.js` holds `LEADERBOARD_URL`; **empty string = feature disabled** (the
 death screen hides the initials form, the leaderboard view says "not configured", and
 the game is otherwise unchanged). `createLeaderboardClient` takes injected
 fetch/storage/clock so it tests in plain Node. Offline-first: a failed submit queues in
-localStorage (`lb.queue`, cap 10, oldest dropped) and is flushed on boot and on the
-`online` event; the last-used initials are remembered (`lb.initials`) and prefilled.
+localStorage (`lb.queue`, cap 10, oldest dropped, stored under a version envelope) and
+is flushed on boot and on the `online` event; the last-used initials are remembered
+(`lb.initials`) and prefilled. Failures are **classified** (0.9.5): only _retryable_
+ones queue — network, timeout, 408/425/429, 5xx — while a permanent 4xx (including
+the server's duplicate 409) is reported and dropped, and the flush **skips past** a
+permanently-rejected entry instead of letting it block every later score forever.
+Both requests carry a **timeout** (raced in the client, so a fetch that ignores its
+signal still can't hang the death screen), `flushQueue` is **single-flight** (boot and
+every `online` event call it), and a `Retry-After` defers the next flush.
 
 UI: on death the "You died" panel offers arcade-style 3-character initials entry
 (sanitized while typing, **one submission per death** — the form locks after submit)
@@ -457,11 +479,25 @@ Plain JavaScript, ES modules throughout. No TypeScript. No barrel/`index.js` fil
 unless they solve a clear current problem. Only runtime deps are **Phaser** and
 **Vite**; **Vitest** and **vite-plugin-pwa** are dev/build tooling, with
 **ESLint** + **Prettier** as a correctness/format ratchet (`npm run lint`,
-`npm run format`) and **jsdom** + **playwright-core** for the UI and end-to-end
-tests. Prefer simple, readable code; favor composition; keep systems loosely
-coupled; avoid circular dependencies. Formatting is Prettier's (printWidth 100,
-single quotes) — run `npm run format` before committing; the PR CI runs
-`lint` + `format:check` + `test`.
+`npm run format`), **@vitest/coverage-v8** for coverage, and **jsdom** +
+**playwright-core** for the UI and end-to-end tests. Prefer simple, readable code;
+favor composition; keep systems loosely coupled; avoid circular dependencies.
+Formatting is Prettier's (printWidth 100, single quotes) — run `npm run format`
+before committing.
+
+**One quality gate** (0.9.5): `npm run check` = lint + `format:check` + unit tests +
+build + bundle budget; `npm run check:full` adds the browser campaign. Both CI
+workflows call them, so a direct push to `main` faces the same gate as a PR (it
+previously deployed having run only the unit tests). Lint is bare `eslint .` and
+`format:check` shares `format`'s glob — the two used to disagree, leaving `e2e/`,
+root configs, and every Markdown file unchecked. Coverage thresholds sit a few
+points under the measured level (~87% lines/branches) as a floor, not a target;
+only `main.js`, `phaserConfig.js`, and `GameScene.js` are excluded (they cannot run
+outside a browser), so the ~40% coverage of the scene-taking renderer modules stays
+visible rather than excluded away. `scripts/check-bundle.mjs` enforces gzip
+entry-chunk and precache ceilings (currently 89% of both) — Vite's own chunk warning
+is raised to 2000 kB because Phaser is expected to be large, which left nothing
+watching the real number.
 
 ## Versioning
 
@@ -671,8 +707,29 @@ test now rejects a page-wide gesture block) · the **HUD and message log are bui
 from DOM nodes** instead of interpolated HTML strings, closing the last dynamic
 markup sinks. Two standing decisions were recorded rather than deferred: the
 leaderboard is an **honor system** and says so, and production **source maps stay
-public**. Waves 3–5 of that audit (leaderboard client/server hardening, CI quality
-gates, spawn/invariant refactors) are still open.
+public**.
+
+**0.9.5 — audit remediation, waves 3–5**, closing that audit. Balance is
+byte-identical throughout (the acceptance test for the spawn refactor, not a
+nice-to-have). **Leaderboard client**: failures classified so a permanent
+rejection can't poison the offline queue, request timeouts, a single-flight
+flush, a versioned queue. **Server**: CORS fails closed, bounded rate-limit
+state with `Retry-After`, byte-accurate body limits, D1 errors normalized into
+JSON, duplicate submissions refused, and the dashboard worker generated rather
+than hand-inlined. **CI**: one `check`/`check:full` gate run by both workflows,
+lint and format widened to the whole repo (which surfaced seven dead bindings in
+`e2e/`), the browser campaign automated on PRs, plus coverage thresholds and a
+bundle budget. **Sim**: one item-placement primitive, `ensureArrivalClear`
+searching the full component and reporting failure, descriptive turn-order
+comments, and the broad-seed invariant suite. Also: `randomSeed` no longer
+assumes Web Crypto — a missing implementation used to throw at module scope and
+stop the game booting; it falls back to the clock, never `Math.random`, which
+would violate the seeded-RNG rule.
+
+`window.__game` remains exposed **deliberately**: it is a debugging and
+reproducibility affordance, and hiding it would not be anti-cheat — the POST
+endpoint is spoofable regardless, which is exactly why the board is an
+acknowledged honor system.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,
@@ -721,8 +778,22 @@ cases in `tests/autowalk.test.js`. The animation layer's pure half is covered by
 `idlePhase` spread, and the "idle is mostly still" shape of the cycles), and the
 animation-cycle frame rects by the entitySprites suite.
 
-An opt-in **browser end-to-end** campaign lives in `e2e/` (Playwright via
-`playwright-core`): `npm run build && npm run test:e2e` drives the real PWA through
+**Broad-seed invariants** (`tests/invariants.test.js`, 0.9.5) assert the rules the
+example-based suites' outcomes are supposed to obey, across 40 seeds and down to
+floor 12: no two entities or two items on a tile, nothing in a wall or out of
+bounds, no item on a staircase, revisited floors restored exactly, a squatter
+always cleared off an arrival stair, one turn per successful command and none per
+refusal, no state/RNG movement on a refusal, and same-seed determinism asserted
+directly. Loose performance ceilings (generation, crowded floor-12 turns) catch an
+order-of-magnitude regression, not runner noise. Two of these were mutation-checked
+into usefulness: one read a non-existent `rng.state` field and passed vacuously, and
+the transition sweep never naturally met an occupied arrival stair, so it now plants
+one.
+
+A **browser end-to-end** campaign lives in `e2e/` (Playwright via
+`playwright-core`) and runs in PR CI (Chromium installed with playwright-core's own
+CLI, cached by version; artifacts uploaded on failure):
+`npm run build && npm run test:e2e` drives the real PWA through
 17 scenarios — rendering, input→sim→renderer round-trips, floor persistence, overlay
 layering, the death/leaderboard flow, PWA offline boot, the mobile **gesture
 policy** (E17: computed `touch-action` and panel scrolling with Help open at
@@ -731,8 +802,9 @@ policy** (E17: computed `touch-action` and panel scrolling with Help open at
 and so the replay's length — is regenerated by `node e2e/discover.mjs` after any
 generation-affecting change, including one that shifts turn numbering). It spawns its
 own preview server, stubs the production leaderboard (asserting zero requests
-escape), and is **not** part of `npm test` (needs a browser + build). See
-`e2e/README.md`.
+escape), and is **not** part of `npm test` (needs a browser + build) — `npm run
+check:full` is what runs it locally. The Chromium binary comes from Playwright's
+registry, with `CHROMIUM_PATH` overriding. See `e2e/README.md`.
 
 Balance is guarded empirically: `npm run balance` runs the headless simulator
 (`scripts/balance-sim.js`) — seeded bot-driven runs through the real engine that

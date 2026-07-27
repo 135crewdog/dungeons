@@ -19,10 +19,23 @@ import { APP_VERSION } from './ui/version.js';
 import { createLeaderboardClient, buildScorePayload } from './net/leaderboard.js';
 import { LEADERBOARD_URL } from './net/config.js';
 
+// A fresh run's starting seed. Web Crypto is the good source, but assuming it
+// exists threw on browsers that don't have it (or on an insecure origin, where
+// some engines withhold it) — and the throw happened at module scope, so the
+// game didn't start at all. The fallback is deliberately NOT Math.random: this
+// is a startup value, and gameplay randomness must stay inside the seeded RNG
+// (tests/architecture.test.js forbids Math.random under src/ for exactly that
+// reason). A clock-derived seed is unpredictable enough for picking a dungeon
+// and keeps the run just as reproducible once chosen.
 function randomSeed() {
-  const buf = new Uint32Array(1);
-  (window.crypto || window.msCrypto).getRandomValues(buf);
-  return buf[0];
+  const crypto = window.crypto || window.msCrypto;
+  if (crypto && typeof crypto.getRandomValues === 'function') {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0];
+  }
+  console.warn('[dungeons] Web Crypto unavailable — seeding from the clock instead.');
+  return Date.now() >>> 0;
 }
 
 // Prefer an explicit ?seed= in the URL (to reproduce a run), else a fresh seed.
