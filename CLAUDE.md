@@ -82,9 +82,12 @@ game itself stays a static GitHub Pages deploy. API: `POST /scores` validates
 server-side) and stamps a **server** timestamp; `GET /scores` returns the top 50 of the
 last 30 days ordered **floor DESC, turns ASC, created_at ASC**, plus the server clock so
 row ages ("3d ago") never trust the device clock. CORS is `*` (no credentials);
-body-size cap and a best-effort per-IP rate limit blunt abuse. Anti-cheat is
-honor-level, but every score carries its seed so a run could later be replay-verified
-with the headless engine.
+body-size cap and a best-effort per-IP rate limit blunt abuse. The board is
+**deliberately an honor system** — a settled decision, not a gap awaiting a fix: the
+client asserts its own floor/turns and the server takes them on trust, and the
+leaderboard overlay and README say so in as many words rather than implying a
+verification that isn't there. Every score still carries its seed, so a run could
+later be replay-verified with the headless engine if that ever becomes worth doing.
 
 The client lives in **`src/net/`** — the only code allowed to fetch or touch
 localStorage (the architecture test enforces that the sim never does either).
@@ -417,13 +420,20 @@ view) · **unexplored** (black) — plus the Ring of Sight's full-floor reveal,
 which renders everything fully lit through `query.isRevealed` without touching
 the sim's visibility arrays.
 
-## Asset Licensing
+## Licensing
 
-The vendored tilesheet is from **Shattered Pixel Dungeon** (Evan Debenham), based on
-**Pixel Dungeon** (Watabou), both **GPLv3** — there is no permissive carve-out for
-SPD's art. Distributing this game with that art means honoring GPLv3: keep the
-attribution in `CREDITS.md` (source repo, pinned commit, sha256) and keep this
-repository's source public. Any future vendored art must get the same treatment.
+The project is **GPL-3.0-or-later** (`LICENSE`, the verbatim FSF text; the copyright
+notice lives in `CREDITS.md` and the README, never inside the license document). That
+is forced, not chosen: the vendored tilesheet is from **Shattered Pixel Dungeon**
+(Evan Debenham), based on **Pixel Dungeon** (Watabou), both **GPLv3** — there is no
+permissive carve-out for SPD's art. Distributing this game with that art means
+honoring GPLv3: keep the attribution in `CREDITS.md` (source repo, pinned commit,
+sha256) and keep this repository's source public. Any future vendored art must get
+the same treatment. `LICENSE` and `CREDITS.md` are copied into `dist/` by a small
+plugin in `vite.config.js` — the obligation attaches to the **distribution**, so the
+deployed site has to carry them, not just the repo. Production **source maps are
+published deliberately** (the GPL already requires the source; public maps make a
+live stack trace debuggable).
 
 ## Canvas and Resolution
 
@@ -640,6 +650,22 @@ Floor-10 clear is 34/36/30% on three independent 200-run seed blocks (mean 33%,
 Skeleton kills stay below their 0.9.0 share: a half-speed enemy loses the most when
 it has to walk around a corner it used to reach through, and that is the honest
 residual of the fix rather than something to tune away.
+
+**0.9.4 — audit remediation, waves 1–2** (from the 2026-07-27 engineering audit of
+`194f4f0`, filed with every past audit under `docs/audits/` as a dated,
+commit-pinned **historical snapshot** — never edited to match later code). Four
+findings closed, all outside the balance envelope (the simulator is byte-identical):
+**stair steps consume a turn** like any other move (they were free, and `state.turn`
+is the leaderboard tie-break — see Turn Order) · the project is **licensed**
+GPL-3.0-or-later with `LICENSE`/`CREDITS.md` shipped in `dist/` (see Licensing) ·
+**pinch zoom restored** — `touch-action: none` moved off the page and onto the game
+surface, so the DOM overlays can be magnified and scrolled (WCAG 1.4.4; a static
+test now rejects a page-wide gesture block) · the **HUD and message log are built
+from DOM nodes** instead of interpolated HTML strings, closing the last dynamic
+markup sinks. Two standing decisions were recorded rather than deferred: the
+leaderboard is an **honor system** and says so, and production **source maps stay
+public**. Waves 3–5 of that audit (leaderboard client/server hardening, CI quality
+gates, spawn/invariant refactors) are still open.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,
