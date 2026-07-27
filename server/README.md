@@ -22,7 +22,14 @@ Prefer clicking to typing, or don't want to install anything? Do it all at
    **Edit code**: replace the sample with all of `worker.dashboard.js` and Deploy.
 3. In the Worker's **Settings → Bindings**, add a **D1 database** binding named
    exactly `DB`, pointing at `dungeons-leaderboard`, and Deploy once more.
-4. Copy the Worker's `*.workers.dev` URL into `LEADERBOARD_URL` in
+4. In the same **Settings**, add an environment **Variable** named
+   `ALLOWED_ORIGIN` with the value `*`, and Deploy again. **This one is not
+   optional**: the Worker treats a missing `ALLOWED_ORIGIN` as a
+   misconfiguration and answers with no CORS headers at all, so the game
+   would be unable to read any response. (`*` is fine — the API uses no
+   cookies or credentials. To restrict it later, use a comma-separated list of
+   origins, e.g. `https://you.github.io,http://localhost:5173`.)
+5. Copy the Worker's `*.workers.dev` URL into `LEADERBOARD_URL` in
    `src/net/config.js` and commit.
 
 ## One-time deploy (wrangler CLI)

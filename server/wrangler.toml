@@ -3,8 +3,10 @@ main = "worker.js"
 compatibility_date = "2026-07-01"
 
 [vars]
-# Lock to "https://<user>.github.io" later if desired; "*" is fine because the
-# API uses no cookies or credentials.
+# REQUIRED. The worker treats a missing value as a misconfiguration and sends no
+# CORS headers at all, so leaving it unset breaks the leaderboard in the browser.
+# "*" is fine because the API uses no cookies or credentials; to restrict it,
+# use a comma-separated list, e.g. "https://<user>.github.io,http://localhost:5173".
 ALLOWED_ORIGIN = "*"
 
 [[d1_databases]]
