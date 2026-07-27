@@ -74,6 +74,30 @@ describe('architecture guards', () => {
     }
   });
 
+  it('the state-driven overlays build DOM nodes, never HTML', () => {
+    // The HUD and message log are rewritten every turn from live state. They
+    // must use createElement/textContent/replaceChildren so state can never be
+    // parsed as markup — the sinks that made that possible are banned outright
+    // rather than trusted to stay static.
+    for (const f of ['src/ui/hud.js', 'src/ui/messageLog.js']) {
+      const src = code(f);
+      expect(/\.(inner|outer)HTML\s*=/.test(src), `${f} assigns to innerHTML/outerHTML`).toBe(
+        false,
+      );
+      expect(/insertAdjacentHTML/.test(src), `${f} calls insertAdjacentHTML`).toBe(false);
+    }
+  });
+
+  it('no UI module interpolates a value into an HTML sink', () => {
+    // Static markup templates (the game-over and menu shells) are fine — they
+    // contain no data. Interpolating anything into one is not: that is the
+    // shape an XSS sink takes. Dynamic values go in via textContent.
+    const interpolated = /\.(inner|outer)HTML\s*=[^;]*\$\{|insertAdjacentHTML\s*\([^;]*\$\{/;
+    for (const f of [...jsFiles('src/ui'), MAIN]) {
+      expect(interpolated.test(code(f)), `${f} interpolates into an HTML sink`).toBe(false);
+    }
+  });
+
   it('the simulation never imports the network layer', () => {
     for (const dir of SIM_DIRS) {
       for (const f of jsFiles(dir)) {

@@ -42,8 +42,13 @@ describe('HUD', () => {
   });
 
   it('shows key and ring chips only when held, with injected icons', () => {
-    const iconHtml = (kind) => `<span class="ui-icon" data-kind="${kind}"></span>`;
-    const { update, el } = createHud(document.body, { iconHtml });
+    const iconFor = (kind) => {
+      const s = document.createElement('span');
+      s.className = 'ui-icon';
+      s.dataset.kind = kind;
+      return s;
+    };
+    const { update, el } = createHud(document.body, { iconFor });
     update(stateWith({ hp: 20, maxHp: 20, strength: 0, skill: 0, armor: 0 }));
     expect(el.textContent).not.toContain('KEY');
     expect(el.textContent).not.toContain('Shadow');
@@ -76,6 +81,22 @@ describe('HUD', () => {
     expect(el.textContent).toContain('KEY');
     expect(el.textContent).toContain('Sight');
     expect(el.querySelector('.ui-icon')).toBeNull();
+  });
+
+  it('renders hostile values as text, never as markup', () => {
+    // The HUD's numbers are internal today; this pins the boundary so a future
+    // source of player- or network-controlled data can't turn it into a sink.
+    const hostile = '<img src=x onerror="window.__pwned=1">';
+    const { update, el } = createHud(document.body);
+    update(
+      stateWith(
+        { hp: 20, maxHp: 20, strength: hostile, skill: 0, armor: 0 },
+        { floor: `1${hostile}` },
+      ),
+    );
+    expect(el.querySelector('img')).toBeNull();
+    expect(el.textContent).toContain(hostile); // shown literally
+    expect(window.__pwned).toBeUndefined();
   });
 
   it('exposes a static version watermark', () => {
@@ -115,6 +136,23 @@ describe('message log', () => {
     expect(el.textContent).toContain('+1 Skill');
     // the earliest descend lines fell off the 6-line window
     expect(el.textContent).not.toContain('floor 2.');
+  });
+
+  it('renders hostile log data as text, never as markup', () => {
+    // Log lines embed data from the entries (enemy names, ring names). They are
+    // internal today; this pins the boundary before saves/mods/network data
+    // can reach it.
+    const hostile = '<img src=x onerror="window.__pwned=1">';
+    const { update, el } = createMessageLog(document.body);
+    update(
+      log([
+        { type: 'hit', data: { attacker: 'player', target: hostile, damage: 5 } },
+        { type: 'pickup', data: { item: 'ring', ring: hostile } },
+      ]),
+    );
+    expect(el.querySelector('img')).toBeNull();
+    expect(el.textContent).toContain(hostile);
+    expect(window.__pwned).toBeUndefined();
   });
 
   it('narrates the secrets: glimmer, locked, unlock, key, ring, survival', () => {
