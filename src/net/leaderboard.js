@@ -7,6 +7,16 @@
 const INITIALS_KEY = 'lb.initials';
 const QUEUE_KEY = 'lb.queue';
 const QUEUE_CAP = 10;
+// Bump when the stored shape changes; a queue written by an older client is
+// read through the migration in readQueue rather than crashing a newer one.
+const QUEUE_VERSION = 1;
+const REQUEST_TIMEOUT_MS = 10_000;
+
+// Statuses worth trying again. Everything else in 4xx is the server telling us
+// this payload will never be accepted — retrying it forever only poisons the
+// offline queue.
+const RETRYABLE_STATUS = new Set([408, 425, 429]);
+const isRetryableStatus = (status) => RETRYABLE_STATUS.has(status) || status >= 500;
 
 // Arcade-style initials: exactly 3 characters, A-Z or 0-9. sanitize is used
 // while typing (uppercase, drop everything else, clamp to 3).
@@ -36,13 +46,40 @@ export function formatAge(createdAtMs, nowMs) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+// Retry-After is either delta-seconds or an HTTP date; anything else is
+// ignored. Returns milliseconds to wait, or 0.
+function retryAfterMs(headers, nowMs) {
+  const raw = headers && typeof headers.get === 'function' ? headers.get('retry-after') : null;
+  if (!raw) return 0;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const at = Date.parse(raw);
+  return Number.isNaN(at) ? 0 : Math.max(0, at - nowMs);
+}
+
 // `url` is the worker base URL ('' disables everything), `storage` is
 // localStorage-shaped, `fetchFn` is fetch, `now` returns unix ms.
-export function createLeaderboardClient({ url, storage, fetchFn, now }) {
+export function createLeaderboardClient({
+  url,
+  storage,
+  fetchFn,
+  now,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+}) {
+  // Set when a server asks us to back off (429/503 + Retry-After); the flush
+  // defers until then instead of hammering. In memory only — a backoff that
+  // outlives the tab would be worse than useless.
+  let nextAttemptAt = 0;
+  // The single in-flight flush. Boot and every `online` event call flushQueue,
+  // and two concurrent drains of the same queue would double-submit.
+  let flushing = null;
+
   function readQueue() {
     try {
-      const q = JSON.parse(storage.getItem(QUEUE_KEY) || '[]');
-      return Array.isArray(q) ? q : [];
+      const raw = JSON.parse(storage.getItem(QUEUE_KEY) || 'null');
+      if (Array.isArray(raw)) return raw; // pre-versioning shape
+      if (raw && raw.v === QUEUE_VERSION && Array.isArray(raw.items)) return raw.items;
+      return [];
     } catch {
       return [];
     }
@@ -51,19 +88,87 @@ export function createLeaderboardClient({ url, storage, fetchFn, now }) {
   function writeQueue(queue) {
     try {
       // Oldest entries drop first when over cap.
-      storage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(-QUEUE_CAP)));
+      storage.setItem(
+        QUEUE_KEY,
+        JSON.stringify({ v: QUEUE_VERSION, items: queue.slice(-QUEUE_CAP) }),
+      );
     } catch {
       // Storage full or blocked: the score is lost, which is acceptable.
     }
   }
 
-  async function post(payload) {
-    const res = await fetchFn(`${url}/scores`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
+  // fetch with a deadline. The timeout is raced in here rather than left to
+  // the request's AbortSignal, so a fetch implementation that ignores signals
+  // (or a stubbed one) still can't hang the UI forever; the controller is
+  // aborted too so a real request is actually cancelled.
+  async function request(input, init = {}) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    let timer = null;
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        if (controller) controller.abort();
+        const err = new Error('request timed out');
+        err.name = 'TimeoutError';
+        reject(err);
+      }, timeoutMs);
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    try {
+      return await Promise.race([
+        fetchFn(input, controller ? { ...init, signal: controller.signal } : init),
+        deadline,
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // POST one payload. Never throws: returns { ok } or { ok: false, retryable,
+  // reason } so callers can tell "try again later" from "this will never work".
+  async function post(payload) {
+    let res;
+    try {
+      res = await request(`${url}/scores`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      const timedOut = err && err.name === 'TimeoutError';
+      return { ok: false, retryable: true, reason: timedOut ? 'timeout' : 'network' };
+    }
+    if (res.ok) return { ok: true };
+    const wait = retryAfterMs(res.headers, now());
+    if (wait > 0) nextAttemptAt = now() + wait;
+    return {
+      ok: false,
+      retryable: isRetryableStatus(res.status),
+      reason: `http-${res.status}`,
+    };
+  }
+
+  // Drain the queue in order. A permanently-rejected entry is DISCARDED and the
+  // drain continues — one bad payload used to block every later score forever.
+  // A retryable failure stops the drain and keeps that entry plus the rest.
+  async function drain() {
+    const queue = readQueue();
+    if (queue.length === 0) return { sent: 0, dropped: 0, kept: 0 };
+    if (now() < nextAttemptAt) return { sent: 0, dropped: 0, kept: queue.length, deferred: true };
+
+    let sent = 0;
+    let dropped = 0;
+    for (let i = 0; i < queue.length; i++) {
+      const res = await post(queue[i]);
+      if (res.ok) {
+        sent += 1;
+      } else if (res.retryable) {
+        writeQueue(queue.slice(i));
+        return { sent, dropped, kept: queue.length - i, reason: res.reason };
+      } else {
+        dropped += 1;
+      }
+    }
+    writeQueue([]);
+    return { sent, dropped, kept: 0 };
   }
 
   return {
@@ -87,45 +192,40 @@ export function createLeaderboardClient({ url, storage, fetchFn, now }) {
       }
     },
 
-    // Submit one score. On any failure (offline, server error) the payload is
-    // queued locally and retried by flushQueue on the next boot/online event.
+    // Submit one score. A retryable failure (offline, timeout, 5xx) queues the
+    // payload for the next boot/online event; a permanent rejection reports the
+    // reason and is not queued.
     async submit(payload) {
-      if (url === '') return { ok: false };
-      try {
-        await post(payload);
-        return { ok: true };
-      } catch {
-        writeQueue([...readQueue(), payload]);
-        return { ok: false, queued: true };
-      }
+      if (url === '') return { ok: false, reason: 'disabled' };
+      const res = await post(payload);
+      if (res.ok) return { ok: true };
+      if (!res.retryable) return { ok: false, queued: false, reason: res.reason };
+      writeQueue([...readQueue(), payload]);
+      return { ok: false, queued: true, reason: res.reason };
     },
 
     async fetchScores() {
       if (url === '') return { ok: false, disabled: true };
       try {
-        const res = await fetchFn(`${url}/scores`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const res = await request(`${url}/scores`);
+        if (!res.ok) return { ok: false, reason: `http-${res.status}` };
         const data = await res.json();
         return { ok: true, scores: data.scores || [], now: data.now ?? now() };
-      } catch {
-        return { ok: false };
+      } catch (err) {
+        return { ok: false, reason: err && err.name === 'TimeoutError' ? 'timeout' : 'network' };
       }
     },
 
-    // Drain queued submissions in order; on the first failure, keep the rest
-    // (including the failed one) for next time. Deliberately no backoff.
-    async flushQueue() {
-      if (url === '') return;
-      const queue = readQueue();
-      for (let i = 0; i < queue.length; i++) {
-        try {
-          await post(queue[i]);
-        } catch {
-          writeQueue(queue.slice(i));
-          return;
-        }
+    // Single-flight: concurrent callers (boot + `online`, or two `online`
+    // events) share one drain instead of racing over the same queue.
+    flushQueue() {
+      if (url === '') return Promise.resolve({ sent: 0, dropped: 0, kept: 0 });
+      if (!flushing) {
+        flushing = drain().finally(() => {
+          flushing = null;
+        });
       }
-      if (queue.length > 0) writeQueue([]);
+      return flushing;
     },
   };
 }

@@ -10,8 +10,19 @@ export const MAX_BODY_BYTES = 512;
 export const MAX_SEED_CHARS = 64;
 export const MAX_VERSION_CHARS = 20;
 
+// A resubmission of the same run inside this window is treated as a duplicate.
+// The offline queue can legitimately re-send a payload it already delivered
+// (the response was lost, not the request), and it costs nothing to be casual
+// about spam at the same time.
+export const DUP_WINDOW_MS = 10 * 60 * 1000;
+
 export const INSERT_SQL =
   'INSERT INTO scores (initials, floor, turns, seed, version, created_at) VALUES (?, ?, ?, ?, ?, ?)';
+
+// Has this exact run already been recorded recently? Backed by idx_scores_dupe.
+export const DUPLICATE_SQL =
+  'SELECT id FROM scores WHERE initials = ? AND floor = ? AND turns = ? AND seed = ? ' +
+  'AND created_at >= ? LIMIT 1';
 
 // Rank: deepest floor first, fewer turns breaks ties, earlier submission wins.
 export const SELECT_TOP_SQL =
@@ -20,6 +31,32 @@ export const SELECT_TOP_SQL =
 
 export function windowCutoff(nowMs) {
   return nowMs - WINDOW_MS;
+}
+
+// Encoded size of a body, not its character count — MAX_BODY_BYTES is a byte
+// budget, and one emoji is four bytes of the two that `.length` reports.
+export function byteLength(text) {
+  return new TextEncoder().encode(text).length;
+}
+
+// Which origins may call the API, from the ALLOWED_ORIGIN var. Returns null
+// when the var is absent or empty: a MISSING configuration must not read as a
+// wildcard, so the worker answers without CORS headers and a browser blocks
+// the call. '*' is still honored — but only as a deliberate, configured value.
+export function resolveOrigin(configured, requestOrigin) {
+  const value = String(configured ?? '').trim();
+  if (value === '') return null;
+  if (value === '*') return { origin: '*', vary: false };
+  const allowed = value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  // The response varies by request Origin either way, so caches must not
+  // reuse one origin's answer for another.
+  if (requestOrigin && allowed.includes(requestOrigin)) {
+    return { origin: requestOrigin, vary: true };
+  }
+  return { origin: null, vary: true };
 }
 
 // Validate a submitted score. Returns { ok: true, value } with a normalized

@@ -1,7 +1,7 @@
 {
   "name": "dungeons",
   "private": true,
-  "version": "0.9.4",
+  "version": "0.9.5",
   "type": "module",
   "description": "A browser-based roguelike dungeon crawler (Phaser + Vite PWA).",
   "scripts": {
@@ -10,16 +10,22 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "node e2e/runner.mjs",
-    "lint": "eslint \"src/**/*.js\" \"tests/**/*.js\" \"scripts/**/*.js\" \"server/**/*.js\" eslint.config.js",
+    "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,mjs,json,md}\"",
-    "format:check": "prettier --check \"src/**/*.js\" \"tests/**/*.js\" \"scripts/**/*.js\" \"server/**/*.js\"",
-    "balance": "node scripts/balance-sim.js"
+    "format:check": "prettier --check \"**/*.{js,mjs,json,md}\"",
+    "balance": "node scripts/balance-sim.js",
+    "build:dashboard": "node scripts/build-dashboard-worker.mjs",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "check": "npm run lint && npm run format:check && npm test && npm run build && npm run check:bundle",
+    "check:full": "npm run check && npm run test:e2e"
   },
   "dependencies": {
     "phaser": "^3.88.2"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^9.1.2",
     "globals": "^15.15.0",

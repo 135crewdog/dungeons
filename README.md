@@ -77,11 +77,19 @@ npm run format     # rewrite with Prettier (format:check verifies without writin
 npm run balance    # headless balance simulator (seeded bot runs, survival tables)
 ```
 
-The browser end-to-end campaign is opt-in — it needs a build and a Chromium
-binary, so it is not part of `npm test`:
+Before committing, run the quality gate — the same one CI runs:
 
 ```bash
-npm run build && npm run test:e2e   # set CHROMIUM_PATH if yours isn't the default
+npm run check        # lint + format:check + unit tests + build + bundle budget
+npm run check:full   # the above plus the browser end-to-end campaign
+```
+
+The browser campaign needs a build and a Chromium binary, so it is not part of
+`npm test`. If you don't have one:
+
+```bash
+npx playwright-core install chromium   # or set CHROMIUM_PATH to your own
+npm run test:e2e
 ```
 
 ## Reproducible runs
@@ -156,5 +164,8 @@ one audited — not a statement about current `main`.
 ## Tech
 
 Phaser 3 · Vite · Vitest · vite-plugin-pwa (Workbox). Plain JavaScript, ES modules.
-The leaderboard backend is a tiny Cloudflare Worker + D1 database in `server/`
-(see `server/README.md`); the game itself deploys as static files.
+Quality tooling: ESLint + Prettier, `@vitest/coverage-v8`, jsdom for the DOM
+overlays, and playwright-core for the browser campaign — all wired into the one
+`npm run check` gate that CI runs. The leaderboard backend is a tiny Cloudflare
+Worker + D1 database in `server/` (see `server/README.md`); the game itself
+deploys as static files.

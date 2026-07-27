@@ -24,3 +24,6 @@ e2e/.artifacts/
 .idea/
 .DS_Store
 *.local
+
+# Coverage reports
+coverage/

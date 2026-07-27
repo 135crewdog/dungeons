@@ -25,16 +25,56 @@ import { createEnemy } from './enemies.js';
 import { createPotion, createChest, createKey, createLockedChest } from './items.js';
 import { bandOf, secretPlan } from '../world/secrets.js';
 
-// A random unoccupied FLOOR tile within a room, or null if none found quickly.
-// FLOOR excludes doors and stairs, so nothing spawns in a doorway or on '>'.
+// How many tiles a single room scan samples before giving up. Every caller
+// shares it — changing it reorders the RNG stream and moves the whole balance
+// curve, so it is a constant, not a parameter.
+const TILE_SCAN_ATTEMPTS = 30;
+
+// Placement attempts for a band's key / locked chest. They are one-per-band and
+// a run needs them, so they get more retries than an ordinary potion.
+const SECRET_TRIES = 10;
+
+// A random FLOOR tile within a room that no ENTITY stands on, or null if none
+// was found quickly. FLOOR excludes doors and stairs, so nothing spawns in a
+// doorway or on '>'. Items are deliberately not consulted here — see
+// placeItem, which layers that on without changing what this scan draws.
 export function randomFreeFloorInRoom(state, room) {
   const map = state.map;
-  for (let attempt = 0; attempt < 30; attempt++) {
+  for (let attempt = 0; attempt < TILE_SCAN_ATTEMPTS; attempt++) {
     const x = nextInt(state.rng, room.x, room.x + room.w - 1);
     const y = nextInt(state.rng, room.y, room.y + room.h - 1);
     if (map.tiles[idx(map, x, y)] !== TILE.FLOOR) continue;
     if (entityAt(state, x, y)) continue;
     return { x, y };
+  }
+  return null;
+}
+
+export const itemAt = (state, x, y) => state.items.some((it) => it.x === x && it.y === y);
+
+// Place one item: pick a room, scan it for an entity-free tile, reject the tile
+// if an item is already there, and retry the whole thing up to `attempts`
+// times. Returns the tile, or null if every attempt failed (the caller skips
+// that spawn).
+//
+// Two things here are load-bearing and must not be "cleaned up":
+//
+//  - The item check happens AFTER the scan returns, not inside it. Skipping
+//    item tiles within the scan would consume different RNG draws and land on
+//    different tiles.
+//  - `attempts` stays per-caller: one for potions and chests (a crowded room
+//    simply loses that item), ten for the band's single key and locked chest,
+//    which are too important to drop on one unlucky room.
+//
+// Both are what the old duplicated call sites did; either change reorders the
+// seeded stream and regenerates every floor of every run. `npm run balance`
+// byte-identity is what pins them.
+function placeItem(state, roomPick, attempts) {
+  for (let i = 0; i < attempts; i++) {
+    const tile = randomFreeFloorInRoom(state, roomPick());
+    if (!tile) continue;
+    if (itemAt(state, tile.x, tile.y)) continue;
+    return tile;
   }
   return null;
 }
@@ -93,17 +133,19 @@ function spawnEnemies(state, floorNumber) {
   }
 }
 
+// Drop an item onto the floor under a fresh id. Every item spawn goes through
+// here, so "items never share a tile" is one rule in one place.
+function addItem(state, item) {
+  item.id = allocId(state);
+  state.items.push(item);
+}
+
 function spawnPotions(state) {
   const rooms = state.map.rooms;
   const count = nextInt(state.rng, MIN_POTIONS, MAX_POTIONS);
   for (let i = 0; i < count; i++) {
-    const room = pick(state.rng, rooms);
-    const tile = randomFreeFloorInRoom(state, room);
-    if (!tile) continue;
-    if (state.items.some((it) => it.x === tile.x && it.y === tile.y)) continue;
-    const potion = createPotion(tile.x, tile.y);
-    potion.id = allocId(state);
-    state.items.push(potion);
+    const tile = placeItem(state, () => pick(state.rng, rooms), 1);
+    if (tile) addItem(state, createPotion(tile.x, tile.y));
   }
 }
 
@@ -111,14 +153,9 @@ function spawnChests(state) {
   const rooms = state.map.rooms;
   const count = nextInt(state.rng, MIN_CHESTS, MAX_CHESTS);
   for (let i = 0; i < count; i++) {
-    const room = pick(state.rng, rooms);
-    const tile = randomFreeFloorInRoom(state, room);
-    if (!tile) continue;
     // Guards against potions too — they spawned first into the same array.
-    if (state.items.some((it) => it.x === tile.x && it.y === tile.y)) continue;
-    const chest = createChest(state.rng, tile.x, tile.y);
-    chest.id = allocId(state);
-    state.items.push(chest);
+    const tile = placeItem(state, () => pick(state.rng, rooms), 1);
+    if (tile) addItem(state, createChest(state.rng, tile.x, tile.y));
   }
 }
 
@@ -134,31 +171,15 @@ function spawnSecrets(state, floorNumber) {
   if (rooms.length < 2) return;
   const plan = secretPlan(state.seed, bandOf(floorNumber));
   if (floorNumber === plan.keyFloor) {
-    const tile = freeItemTile(state, () => rooms[nextInt(state.rng, 1, rooms.length - 1)]);
-    if (tile) {
-      const key = createKey(tile.x, tile.y);
-      key.id = allocId(state);
-      state.items.push(key);
-    }
+    const tile = placeItem(
+      state,
+      () => rooms[nextInt(state.rng, 1, rooms.length - 1)],
+      SECRET_TRIES,
+    );
+    if (tile) addItem(state, createKey(tile.x, tile.y));
   }
   if (floorNumber === plan.chestFloor) {
-    const tile = freeItemTile(state, () => pick(state.rng, rooms));
-    if (tile) {
-      const chest = createLockedChest(tile.x, tile.y, plan.ring);
-      chest.id = allocId(state);
-      state.items.push(chest);
-    }
+    const tile = placeItem(state, () => pick(state.rng, rooms), SECRET_TRIES);
+    if (tile) addItem(state, createLockedChest(tile.x, tile.y, plan.ring));
   }
-}
-
-// Retry wrapper with the item-overlap guard the potion/chest spawners inline:
-// a free FLOOR tile in a room chosen by roomPick, not already holding an item.
-function freeItemTile(state, roomPick, attempts = 10) {
-  for (let i = 0; i < attempts; i++) {
-    const tile = randomFreeFloorInRoom(state, roomPick());
-    if (!tile) continue;
-    if (state.items.some((it) => it.x === tile.x && it.y === tile.y)) continue;
-    return tile;
-  }
-  return null;
 }

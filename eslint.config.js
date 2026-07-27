@@ -6,7 +6,20 @@ import prettier from 'eslint-config-prettier';
 // references, obvious mistakes — not style; Prettier owns formatting, and
 // `prettier` (eslint-config-prettier) turns off every rule that would fight it.
 export default [
-  { ignores: ['dist/**', 'dev-dist/**', 'node_modules/**', 'coverage/**'] },
+  // Lint everything not generated: `npm run lint` runs bare `eslint .`, so this
+  // list — not a glob in package.json — decides what is out of scope. Root
+  // configs, e2e/*.mjs, and scripts/*.mjs are all real executable code and are
+  // deliberately included.
+  {
+    ignores: [
+      'dist/**',
+      'dev-dist/**',
+      'node_modules/**',
+      'coverage/**',
+      'e2e/.artifacts/**',
+      'server/worker.dashboard.js', // generated; lint its sources instead
+    ],
+  },
   js.configs.recommended,
   {
     languageOptions: {
