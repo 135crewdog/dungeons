@@ -55,9 +55,19 @@ like the HP/Floor readouts) or pressing the **Escape** key, and closes the same 
 gameplay — the menu starts closed. While it is open the game is **paused** — the
 composition root gates player input and cancels any in-progress auto-walk — and no turn
 advances. Options: **Resume**, **New run** (fresh random seed), **Restart this seed**
-(replay the current run from floor 1), and a **Seed** section that shows/copies the current
-seed and lets the player paste a seed to regenerate its exact dungeon (routed through the
-same `coerceSeed` + `restart` lifecycle as a `?seed=` URL). The menu is **also reachable
+(replay the current run from floor 1), **End run**, and a **Seed** section that shows/copies
+the current seed and lets the player paste a seed to regenerate its exact dungeon (routed
+through the same `coerceSeed` + `restart` lifecycle as a `?seed=` URL).
+
+**End run** (0.9.6) stops the run where it stands and raises the score-submission screen —
+the only way to post a score without dying for it. It **asks twice**: the first click only
+arms it (the label becomes "Really end run?"), and the confirm is dropped whenever the menu
+closes or the player reaches for any other action, so a half-pressed confirm can never
+survive to fire on a later single click. The button is hidden once `canEndRun()` is false
+(the menu is reachable from the end-of-run screen, where ending again is meaningless). It
+routes through `gameState.endRun`, which sets `state.status = 'ended'` — see Death.
+
+The menu is **also reachable
 from the "You died" screen** (the Menu text stays above the death overlay; Escape works
 too) so a dead player can copy the seed or retry the same dungeon. The menu is a DOM
 overlay in `ui/` (like the HUD and game-over screen): it only reads the seed and invokes
@@ -248,6 +258,9 @@ enters their line of sight, then give chase. A chasing enemy that **loses sight*
 player heads for the tile it last saw them on; if it arrives empty-handed (or stays
 blind for several turns) it **gives up** and holds position, re-aggroing only on a fresh
 sighting — so breaking line of sight (e.g. slipping through a door) can shake pursuit.
+A player swing is also **loud**: hit or miss, it marks every enemy within
+`SHADOW_NOISE_RADIUS` of the player as `provoked`, through walls. That flag is read only
+by the Ring of Shadow's gate (see Secrets), so it changes nothing for a ringless run.
 **Every attack is two visible rolls, identical for every combatant** (all through
 the seeded RNG, tabletop style):
 
@@ -288,8 +301,19 @@ keep their numbers.
 Permadeath. At 0 HP a minimal "You died" overlay appears; restarting begins a fresh run
 on floor 1 with a **new random seed** (logged). The one exception: an armed **Ring of
 Survival** fires at the moment HP would hit 0 (both lethal sites — enemy hits and
-chest traps), restoring full HP and crumbling to dust. It works once; a later
-Survival ring re-arms it.
+chest traps), restoring **`SURVIVAL_HEAL_FRACTION` of max HP (half, rounded up, never
+below 1)** and crumbling to dust. It works once; a later Survival ring re-arms it. It
+restored FULL HP until 0.9.6, which made the cheated death cost nothing — you walked
+away from a lethal blow healthier than most fights leave you.
+
+A run can also end **voluntarily**, from the pause menu's **End run**. `gameState.endRun`
+sets `state.status = 'ended'`; the same overlay appears, titled **"Run ended"** rather
+than "You died", and submits an identical leaderboard payload. `'ended'` is a distinct
+status rather than a reuse of `'dead'` because the two must be told apart downstream, and
+a parallel "was it voluntary" flag would be a second source of truth for one fact. It
+costs nothing to add: every guard in the turn engine and controller is written
+`!== 'playing'`, so they freeze the world for `'ended'` unchanged. `endRun` consumes no
+turn and draws no RNG — stopping is not an action.
 
 ## Secrets (Phase 7)
 
@@ -300,7 +324,8 @@ persist). WHICH floors host them and WHICH ring the chest holds derive from a pu
 per-band hash of the run seed (`src/world/secrets.js` — `secretPlan(seed, band)`,
 never the main RNG stream, so any floor's plan is computable in isolation); WHERE on
 the floor uses the main RNG like every other spawn. Constants: `SECRET_BAND_FLOORS`,
-`KEY_REVEAL_RADIUS`, `SPEED_STEPS`, `RING`/`RING_TYPES`/`RING_FLAG`.
+`KEY_REVEAL_RADIUS`, `SPEED_STEPS`, `SHADOW_NOISE_RADIUS`, `SHADOW_NOTICE_RADIUS`,
+`SURVIVAL_HEAL_FRACTION`, `RING`/`RING_TYPES`/`RING_FLAG`.
 
 - **The key** spawns `hidden` (never rendered, not even dimmed) in a non-start room
   and reveals with "A glimmer catches your eye." when the player is within 2 tiles
@@ -320,13 +345,29 @@ the floor uses the main RNG like every other spawn. Constants: `SECRET_BAND_FLOO
     click pathing). Presentation reads `query.isRevealed`; the sim's `visible` array
     stays strictly shadowcast, so **enemy aggro still requires true line of sight**
     (no floor-wide dinner bell) and auto-walk cancel semantics are unchanged.
-  - **Shadow** — invisible **per-enemy**: each enemy ignores the player until the
-    player attacks _it_ (hit or miss sets `enemy.provoked` in combat.js; ai.js gates
-    the sighting on it). Unprovoked enemies never aggro and never swing even when
-    adjacent; an already-chasing enemy loses the trail through the normal de-aggro
-    machinery. Bystanders stay oblivious while their neighbor is stabbed.
+  - **Shadow** — invisible **per-enemy**, with three ways for cover to break. The rule
+    is ONE exported predicate, **`hiddenFromEnemy` in `core/query.js`** — `ai.js` gates
+    sighting on it and the headless balance bot reads the same function, so the two
+    cannot drift (the bot used to mirror the expression by hand):
+    - **Noise** — a player swing, hit _or_ miss, sets `provoked` on the target **and on
+      every enemy within `SHADOW_NOISE_RADIUS` (5) of the player**, deliberately
+      **through walls**: it is sound, not sight. A fight wakes the room instead of one
+      victim. This is what killed the "stab a pack apart one at a time" exploit.
+    - **Bosses** are never fooled — the set-piece of every 5th floor is not something
+      you tiptoe past. (CLAUDE.md nominated this lever at Phase 7; 0.9.6 took it.)
+    - **Proximity** — within `SHADOW_NOTICE_RADIUS` (1) you are simply too close to
+      hide. Note shadowcasting marks **every** depth-1 tile visible, corners included,
+      so this really is unconditional at knife range; the corner protection that
+      remains is `meleeReachable`, so a kitty-corner enemy aggroes and paths around
+      rather than swinging through the wall.
+
+    An already-chasing enemy that goes back out of range loses the trail through the
+    normal de-aggro machinery — cover re-forms, it does not latch. Until 0.9.6 the only
+    breaker was attacking that specific enemy, which made a player who declined to
+    swing literally unkillable.
+
   - **Speed** — two steps per movement turn (see Turn Order for the exact rules).
-  - **Survival** — one cheated death (see Death).
+  - **Survival** — one cheated death, restoring half the bar (see Death).
 
 Enemies route around item tiles already, so hidden keys and locked chests bend their
 paths slightly — harmless. Known accepted quirks: a key within reveal range of the
@@ -663,7 +704,9 @@ HUD chips via composition-root icon injection, balance-bot awareness (single-ste
 opt-out; shadow-aware threat filter), e2e fixtures regenerated. Balance snapshot
 (200-run thorough bot): floor-10 clear 19% → 30% — floors 1–4 untouched, the
 mid/late lift is the rings working; whether that's too generous is an open tuning
-question for a patch (candidate lever: the boss seeing through Shadow).
+question for a patch (candidate lever: the boss seeing through Shadow). _(0.9.6 took
+that lever, and two more — see below. The Secrets section is authoritative for how
+Shadow and Survival behave now.)_
 
 Phase 8 (complete): **animation** — the deliberate reversal of the
 no-animation-clock policy, entirely inside the renderer (sim, input timing, and
@@ -733,6 +776,39 @@ assumes Web Crypto — a missing implementation used to throw at module scope an
 stop the game booting; it falls back to the clock, never `Math.random`, which
 would violate the seeded-RNG rule.
 
+**0.9.6 — ring rebalance + End run.** Playtesting confirmed what the Phase-7 note
+suspected, and named the ring: **Shadow** made a player who declined to swing
+_unkillable_ — nobody ever tried — and let a room be picked apart one at a time while
+the bystanders stayed oblivious. Three cover-breakers now exist (noise through walls,
+boss immunity, knife-range proximity), collapsed into one exported predicate,
+`query.hiddenFromEnemy`, that `ai.js` and the balance bot both read; **Survival**
+restores half the bar instead of all of it. **Sight and Speed are deliberately
+untouched.** Also: a **End run** menu action (two-step confirm) ends a run on purpose
+into the normal score-submission screen — previously the only route to the leaderboard
+was dying — via a new `'ended'` status. No new RNG draws anywhere, so a ringless run is
+byte-identical and the e2e parity fixture needed no regeneration.
+
+Balance (thorough bot, 200 runs/block, `--max-floor 12`), floor-10 clear rate:
+
+| seed block | before | after |
+| ---------- | ------ | ----- |
+| 1000       | 34%    | 25%   |
+| 3000       | 36%    | 28%   |
+
+Boss share of deaths rose 23% → 30% (seed 1000) — the boss lever working, not a
+regression. The **shape** is the point: floors 1–5 are unchanged run-for-run (reached
+100/83/68/58/55 before and after) and the rusher bot is untouched (0% clear, median
+death floor 2, both blocks), because rings do not exist that early and a reckless bot
+rarely carries one. The drop is concentrated from floor 6 on, exactly where the exploit
+lived. Two levers were swept and **rejected** as ineffective rather than shipped blind:
+`SHADOW_NOISE_RADIUS` 5 → 3 moved clear rate by one point (most fights already happen
+within 3 tiles, so the wider, more coherent radius is kept), and reverting Survival to a
+full heal bought two. The remaining ~7 points are intrinsic to the boss and proximity
+rules — i.e. to the fix itself. **Open question deliberately left open:** this lands the
+curve ~6 points under the ~33% the project has calibrated to since 0.9.3, so if that
+gap is judged too harsh the 0.9.3 precedent applies — pay it back with a separate
+enemy-stat lever rather than by watering down the Shadow rules.
+
 `window.__game` remains exposed **deliberately**: it is a debugging and
 reproducibility affordance, and hiding it would not be anti-cheat — the POST
 endpoint is spoofable regardless, which is exactly why the board is an
@@ -779,7 +855,18 @@ purity/determinism + real-run spawn cadence), `tests/lockedChest.test.js`
 (locked/unlock/ring-drop flow), `tests/keyReveal.test.js` (proximity + FOV gating),
 and `tests/rings.test.js` (all four ring effects, including the Ring of Speed's
 turn-engine invariants and both Survival lethal sites), plus ring-speed auto-walk
-cases in `tests/autowalk.test.js`. The animation layer's pure half is covered by
+cases in `tests/autowalk.test.js`. Since 0.9.6 the rings suite also covers each of
+Shadow's three cover-breakers — noise (including that a **miss is exactly as loud as a
+hit**, that the radius boundary is inclusive, and that noise passes a closed door while
+sight does not), boss immunity, and the proximity break — with a decision table over
+`hiddenFromEnemy` itself; the half-heal is pinned in both `rings` (end-to-end, derived
+from `SURVIVAL_HEAL_FRACTION` rather than a literal) and `combat` (`tryRingSurvival`
+directly, including the `max(1, …)` floor at `maxHp: 1`). `tests/ai.test.js` guards the
+gate at the AI level and that a ringless run's aggro is unchanged; `tests/turnEngine.js`
+covers `endRun` (freezes the world, consumes no turn, idempotent, never overwrites a
+death, cleared by `restart`); `tests/ui-menu.test.js` covers the two-step confirm and
+its disarm paths, and `tests/ui-gameOver.test.js` the death/ended wording.
+The animation layer's pure half is covered by
 `tests/motion.test.js` (intent reduction, move chaining, the
 `TWEEN_MOVE_MS === STEP_DELAY_MS` contract and the fast-turn glide clamp,
 `idlePhase` spread, and the "idle is mostly still" shape of the cycles), and the

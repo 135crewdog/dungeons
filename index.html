@@ -271,6 +271,20 @@
         background: #cdd3e0;
         color: #05060a;
       }
+      /* "End run" discards the run in progress, so it reads as the one
+         destructive item in the list — and louder still once armed. */
+      .menu-actions button.menu-danger {
+        margin-top: 6px;
+        color: #b5707a;
+      }
+      .menu-actions button.menu-danger.armed {
+        color: #f0c0c6;
+        background: #4a1f27;
+      }
+      .menu-actions button.menu-danger:hover {
+        background: #b5707a;
+        color: #05060a;
+      }
       .menu-seed {
         margin-top: 12px;
         padding-top: 10px;

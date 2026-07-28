@@ -14,6 +14,7 @@ import {
   isStairsTile,
   hasItemAt,
   tileAt,
+  hiddenFromEnemy,
 } from '../core/query.js';
 import { DEAGGRO_TURNS } from '../core/constants.js';
 import { tryMove } from '../core/movement.js';
@@ -43,13 +44,13 @@ export function enemyTurn(state, enemyId, occupied = buildOccupancy(state)) {
   const player = getPlayer(state);
   if (!player) return events;
 
-  // A Ring-of-Shadow player is hidden from every enemy they haven't attacked
-  // (combat.js sets `provoked` on the player's swing, hit or miss). Hidden ⇒
-  // no sighting at all: no fresh aggro, no lastSeen refresh — an enemy that
-  // was already chasing behaves exactly as if it lost line of sight and gives
-  // up through the normal de-aggro machinery below.
-  const hidden = (player.ringShadow ?? false) && !(enemy.provoked ?? false);
-  const canSee = !hidden && isVisible(state, enemy.x, enemy.y);
+  // A Ring-of-Shadow player is hidden from enemies that haven't heard a swing
+  // near them, aren't the floor's boss, and aren't standing on top of them —
+  // query.hiddenFromEnemy owns the rule. Hidden ⇒ no sighting at all: no fresh
+  // aggro, no lastSeen refresh, so an enemy that was already chasing behaves
+  // exactly as if it lost line of sight and gives up through the normal
+  // de-aggro machinery below.
+  const canSee = !hiddenFromEnemy(state, enemy) && isVisible(state, enemy.x, enemy.y);
   if (canSee) {
     enemy.aggro = true;
     enemy.lastSeen = { x: player.x, y: player.y };

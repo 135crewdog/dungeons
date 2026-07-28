@@ -227,3 +227,51 @@ describe('enemy de-aggro on losing sight', () => {
     expect(enemy.lastSeen).toBe(null);
   });
 });
+
+// The Ring of Shadow gates SIGHTING, not the rest of the AI: an enemy that can
+// perceive the player behaves completely normally from there on.
+describe('Ring of Shadow gating', () => {
+  // The corridor's door sits at x=5; keep both sides on x=1..4 so line of
+  // sight is never the thing under test.
+  const shadowed = (playerX, enemyX, enemyType) => {
+    const built = corridorState({ playerX, enemyX, enemyType });
+    built.player.ringShadow = true;
+    updateVisibility(built.state);
+    return built;
+  };
+
+  it('an unprovoked enemy holds position despite clear line of sight', () => {
+    const { state, enemy } = shadowed(1, 4);
+    enemyTurn(state, enemy.id);
+    expect(enemy.aggro ?? false).toBe(false);
+    expect(enemy.x).toBe(4); // never moved
+  });
+
+  it('an enemy at knife range notices anyway', () => {
+    const { state, enemy } = shadowed(3, 4);
+    enemyTurn(state, enemy.id);
+    expect(enemy.aggro).toBe(true);
+  });
+
+  it('a provoked enemy chases as normal', () => {
+    const { state, enemy } = shadowed(1, 4);
+    enemy.provoked = true;
+    enemyTurn(state, enemy.id);
+    expect(enemy.aggro).toBe(true);
+    expect(enemy.x).toBe(3); // closed in
+  });
+
+  it('a boss ignores the ring entirely', () => {
+    const { state, enemy } = shadowed(1, 4, ENEMY_TYPES.boss);
+    enemyTurn(state, enemy.id);
+    expect(enemy.aggro).toBe(true);
+    expect(enemy.x).toBe(3);
+  });
+
+  it('without the ring, nothing about aggro changes', () => {
+    const { state, enemy } = corridorState({ playerX: 1, enemyX: 4 });
+    updateVisibility(state);
+    enemyTurn(state, enemy.id);
+    expect(enemy.aggro).toBe(true);
+  });
+});

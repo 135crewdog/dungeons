@@ -25,7 +25,7 @@ export function createGameOver(parent, opts = {}) {
   el.className = 'overlay';
   el.innerHTML =
     '<div class="go-panel">' +
-    '<h1>You died</h1>' +
+    '<h1 class="go-title"></h1>' +
     '<p class="go-sub"></p>' +
     '<form class="go-initials">' +
     '<input class="go-initials-input" type="text" maxlength="3" placeholder="AAA" ' +
@@ -41,6 +41,7 @@ export function createGameOver(parent, opts = {}) {
     '</div>';
   parent.appendChild(el);
 
+  const title = el.querySelector('.go-title');
   const sub = el.querySelector('.go-sub');
   const form = el.querySelector('.go-initials');
   const input = el.querySelector('.go-initials-input');
@@ -104,7 +105,15 @@ export function createGameOver(parent, opts = {}) {
     // close); don't reset the initials form once it's on screen.
     if (el.classList.contains('show')) return;
     onRestart = cb;
-    sub.textContent = `You reached floor ${state.floor}.`;
+    // The same panel covers permadeath and a voluntary "End run" — only the
+    // wording differs, and the score submitted is identical either way. Both
+    // are written with textContent: the shell above is static markup, and no
+    // state may be interpolated into an HTML sink from ui/ (architecture test).
+    const ended = state.status === 'ended';
+    title.textContent = ended ? 'Run ended' : 'You died';
+    sub.textContent = ended
+      ? `You stopped on floor ${state.floor}.`
+      : `You reached floor ${state.floor}.`;
     form.style.display = canSubmit() ? '' : 'none';
     input.disabled = false;
     submitBtn.disabled = false;

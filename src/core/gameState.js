@@ -6,6 +6,7 @@
 import { createRng } from './rng.js';
 import { PLAYER_ID, DIRS8 } from './constants.js';
 import { getPlayer, entityAt, isWalkable } from './query.js';
+import { pushLog } from './entity.js';
 import { generateFloor } from '../world/dungeon.js';
 import { roomCenter } from '../world/rooms.js';
 import { createPlayer } from '../entities/player.js';
@@ -86,6 +87,22 @@ export function restart(state, seed) {
   state.floors = new Map();
   state.entities = { nextId: 2, playerId: PLAYER_ID, byId: new Map() };
   generateAndEnter(state, 1, createPlayer(0, 0));
+}
+
+// End the run on purpose (the pause menu's "End run"). Not a death — the
+// player is alive and the score stands exactly as it is — so it gets its own
+// status rather than borrowing 'dead': the two need telling apart downstream
+// (the overlay titles itself from it) and a second parallel flag would be a
+// second source of truth for one fact. Every existing guard is written
+// `!== 'playing'`, so they all freeze the world for 'ended' for free.
+//
+// Runs outside the turn engine: no turn is consumed, no RNG is drawn, and no
+// events are returned — the composition root refreshes the UI itself.
+export function endRun(state) {
+  if (state.status !== 'playing') return false;
+  state.status = 'ended';
+  pushLog(state, 'endrun', {});
+  return true;
 }
 
 // Insert the carried player under its fixed id and make it the active player.

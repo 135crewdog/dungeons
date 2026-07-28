@@ -2,11 +2,18 @@
 // state and returns events describing what happened (hit/miss/death) so the
 // renderer can float numbers. All randomness goes through the game RNG.
 
-import { HIT_DIE, HIT_THRESHOLD, TILE, DIRS8 } from '../core/constants.js';
+import {
+  HIT_DIE,
+  HIT_THRESHOLD,
+  TILE,
+  DIRS8,
+  SHADOW_NOISE_RADIUS,
+  SURVIVAL_HEAL_FRACTION,
+} from '../core/constants.js';
 import { nextInt } from '../core/rng.js';
 import { attackEvent, deathEvent, survivalEvent } from '../core/events.js';
 import { pushLog, allocId } from '../core/entity.js';
-import { tileAt, entityAt } from '../core/query.js';
+import { tileAt, entityAt, enemiesSorted, chebyshev } from '../core/query.js';
 import { createBossChest } from '../entities/items.js';
 
 // Damage after armor. A >0 raw hit always lands for at least 1 (armor can't
@@ -23,10 +30,19 @@ export function resolveAttack(state, attackerId, targetId) {
   const target = state.entities.byId.get(targetId);
   if (!attacker || !target) return events;
 
-  // The player's swing — hit or miss — provokes the target: a Ring-of-Shadow
-  // player stays invisible to each enemy only until they attack it (ai.js
-  // reads `provoked`). Harmless bookkeeping when the ring isn't worn.
-  if (attackerId === state.entities.playerId) target.provoked = true;
+  // The player's swing — hit or miss — is NOISE. It provokes the target and
+  // every enemy within earshot of the player, deliberately through walls:
+  // sound is not sight, and a fight in a small room should wake the room. This
+  // is what stops a Ring-of-Shadow player picking a pack apart one at a time
+  // while the neighbours stay oblivious. `provoked` is read only by the Shadow
+  // gate (query.hiddenFromEnemy), so this stays harmless bookkeeping when the
+  // ring isn't worn — and it draws no RNG, so a ringless run is unchanged.
+  if (attackerId === state.entities.playerId) {
+    target.provoked = true;
+    for (const e of enemiesSorted(state)) {
+      if (chebyshev(attacker.x, attacker.y, e.x, e.y) <= SHADOW_NOISE_RADIUS) e.provoked = true;
+    }
+  }
 
   // To-hit: roll a d20 — a natural 1 always misses; otherwise the attack
   // lands if roll + skill clears the threshold. Every combatant resolves
@@ -47,8 +63,8 @@ export function resolveAttack(state, attackerId, targetId) {
   pushLog(state, 'hit', { attacker: attacker.kind, target: target.kind, damage, roll });
 
   if (target.hp <= 0) {
-    // The Ring of Survival cheats exactly one death: full HP instead of the
-    // grave, and the ring is spent.
+    // The Ring of Survival cheats exactly one death: a partial heal instead of
+    // the grave, and the ring is spent.
     if (target.id === state.entities.playerId && tryRingSurvival(state, target, events)) {
       return events;
     }
@@ -98,13 +114,18 @@ function dropBossChest(state, x, y) {
 
 // The Ring of Survival's moment: called wherever player HP would cross zero
 // (enemy hits here in resolveAttack, chest traps in the turn engine). If the
-// ring is armed, restore full HP, consume it, and report true — the caller
-// skips its death handling. A run can re-arm it by finding another Survival
-// ring in a later band.
+// ring is armed, restore part of the health bar, consume it, and report true —
+// the caller skips its death handling. A run can re-arm it by finding another
+// Survival ring in a later band.
+//
+// It used to restore FULL HP, which made the cheated death cost nothing: you
+// walked away from a lethal hit in better shape than most fights leave you.
+// Half (rounded up, never less than 1) still saves the run and still feels
+// like a reprieve, but leaves the player wounded enough to have to play for it.
 export function tryRingSurvival(state, player, events) {
   if (!(player.ringSurvival ?? false)) return false;
   player.ringSurvival = false;
-  player.hp = player.maxHp;
+  player.hp = Math.max(1, Math.ceil(player.maxHp * SURVIVAL_HEAL_FRACTION));
   events.push(survivalEvent(player.x, player.y));
   pushLog(state, 'survival', {});
   return true;

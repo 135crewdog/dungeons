@@ -2,7 +2,7 @@
 // vocabulary the systems (movement, FOV, pathfinding, AI, combat) share so the
 // notion of "walkable", "transparent", "known", and "occupied" is defined once.
 
-import { TILE } from './constants.js';
+import { TILE, SHADOW_NOTICE_RADIUS } from './constants.js';
 
 export function idx(map, x, y) {
   return y * map.width + x;
@@ -102,6 +102,31 @@ export function chebyshev(ax, ay, bx, by) {
 
 export function isAdjacent(ax, ay, bx, by) {
   return chebyshev(ax, ay, bx, by) === 1;
+}
+
+// Is this enemy blind to the player because of the Ring of Shadow?
+//
+// THE single definition of the rule: ai.js gates aggro on it and the headless
+// balance bot reads it to decide what counts as a threat. The bot used to
+// mirror the expression by hand, which is exactly the kind of duplicate that
+// goes stale the first time the rule moves.
+//
+// Three ways cover breaks, on top of not wearing the ring at all:
+//   · provoked — the player has swung near this enemy (combat.js), for good;
+//   · boss — the floor's set-piece is not something you tiptoe past;
+//   · proximity — within SHADOW_NOTICE_RADIUS you are simply too close to hide.
+// This answers "blind", not "cannot see": callers still AND it with true line
+// of sight. At SHADOW_NOTICE_RADIUS 1 that AND is a formality — shadowcasting
+// marks every depth-1 tile visible, corners included — so a kitty-corner enemy
+// really does notice you. It still cannot SWING through the corner
+// (meleeReachable), so it aggroes and paths around, exactly like any other
+// enemy a corner is standing in the way of.
+export function hiddenFromEnemy(state, enemy) {
+  const player = getPlayer(state);
+  if (!player || !(player.ringShadow ?? false)) return false;
+  if (enemy.provoked ?? false) return false;
+  if (enemy.kind === 'boss') return false;
+  return chebyshev(player.x, player.y, enemy.x, enemy.y) > SHADOW_NOTICE_RADIUS;
 }
 
 // No corner-cutting: a diagonal step from (x, y) by (dx, dy) is legal only when

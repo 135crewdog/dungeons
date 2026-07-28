@@ -13,13 +13,35 @@ function makeOpts(over = {}) {
   };
 }
 
-const deadState = { floor: 7 };
+const deadState = { floor: 7, status: 'dead' };
+const endedState = { floor: 7, status: 'ended' };
 
 beforeEach(() => {
   document.body.innerHTML = '';
 });
 
 describe('game over overlay', () => {
+  it('words itself for a death', () => {
+    const go = createGameOver(document.body, makeOpts());
+    go.show(deadState, vi.fn());
+    expect(go.el.querySelector('.go-title').textContent).toBe('You died');
+    expect(go.el.querySelector('.go-sub').textContent).toBe('You reached floor 7.');
+  });
+
+  it('words itself for a voluntary end, offering the same submission form', () => {
+    const go = createGameOver(document.body, makeOpts());
+    go.show(endedState, vi.fn());
+    expect(go.el.querySelector('.go-title').textContent).toBe('Run ended');
+    expect(go.el.querySelector('.go-sub').textContent).toBe('You stopped on floor 7.');
+    expect(go.el.querySelector('.go-initials').style.display).not.toBe('none');
+  });
+
+  it('falls back to the death wording for a state with no status', () => {
+    const go = createGameOver(document.body, makeOpts());
+    go.show({ floor: 3 }, vi.fn());
+    expect(go.el.querySelector('.go-title').textContent).toBe('You died');
+  });
+
   it('shows the reached floor and the initials form when submission is enabled', () => {
     const go = createGameOver(document.body, makeOpts());
     go.show(deadState, vi.fn());

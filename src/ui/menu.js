@@ -22,6 +22,8 @@ import { createOverlay } from './overlay.js';
 //   onLoadSeed(text) → start a run from a user-entered seed
 //   onLeaderboard()  → open the leaderboard overlay (menu stays open below)
 //   onHelp()         → open the help overlay (menu stays open below)
+//   canEndRun()      → a run is in progress and can be ended (hides the button)
+//   onEndRun()       → stop the run here and raise the score-submission screen
 //   isChildOpen()    → a child overlay (leaderboard/help) is layered on top,
 //                      so Escape belongs to it, not to this menu
 export function createMenu(parent, actions) {
@@ -48,6 +50,7 @@ export function createMenu(parent, actions) {
       '<button type="button" data-act="restart">Restart this seed</button>' +
       '<button type="button" data-act="board">Leaderboard</button>' +
       '<button type="button" data-act="help">Help</button>' +
+      '<button type="button" class="menu-danger" data-act="endrun">End run</button>' +
       '</div>' +
       '<div class="menu-seed">' +
       '<div class="menu-seed-label">Seed</div>' +
@@ -68,7 +71,9 @@ export function createMenu(parent, actions) {
   const seedInput = el.querySelector('.menu-seed-input');
   const copyBtn = el.querySelector('[data-act="copy"]');
   const loadForm = el.querySelector('[data-act="loadform"]');
+  const endBtn = el.querySelector('[data-act="endrun"]');
   let copyFlash = null;
+  let endArmed = false;
 
   function open() {
     if (isOpen() || !actions.canOpen()) return;
@@ -76,6 +81,10 @@ export function createMenu(parent, actions) {
     seedVal.textContent = String(actions.getSeed());
     seedInput.value = '';
     resetCopy();
+    resetEnd();
+    // Nothing to end once the run is over — and the menu is reachable from the
+    // death screen, where the button would just re-raise the overlay.
+    endBtn.hidden = !(actions.canEndRun?.() ?? true);
     show(); // adds .show and focuses the panel
     button.setAttribute('aria-expanded', 'true');
   }
@@ -83,6 +92,9 @@ export function createMenu(parent, actions) {
   function close() {
     if (!isOpen()) return;
     hide();
+    // Disarm on the way out, so a half-pressed confirm can never survive to
+    // the next time the menu opens and fire on a single click.
+    resetEnd();
     button.setAttribute('aria-expanded', 'false');
     button.focus();
   }
@@ -97,6 +109,14 @@ export function createMenu(parent, actions) {
       copyFlash = null;
     }
     copyBtn.textContent = 'Copy';
+  }
+
+  // "End run" throws away a run in progress and sits a couple of rows from
+  // Resume, so it asks twice: the first click only arms it.
+  function resetEnd() {
+    endArmed = false;
+    endBtn.textContent = 'End run';
+    endBtn.classList.remove('armed');
   }
 
   async function copySeed() {
@@ -121,6 +141,8 @@ export function createMenu(parent, actions) {
   el.addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (!act) return;
+    // Reaching for anything else is an answer of "no": disarm the confirm.
+    if (act !== 'endrun') resetEnd();
     switch (act) {
       case 'resume':
         close();
@@ -135,6 +157,18 @@ export function createMenu(parent, actions) {
         break;
       case 'copy':
         copySeed();
+        break;
+      // First click arms and relabels; only the second one commits. The menu
+      // stays open in between so the question is visible where it was asked.
+      case 'endrun':
+        if (!endArmed) {
+          endArmed = true;
+          endBtn.textContent = 'Really end run?';
+          endBtn.classList.add('armed');
+          break;
+        }
+        close();
+        actions.onEndRun();
         break;
       // Leaderboard/help layer over the menu, which stays open underneath so
       // Escape (or closing the child) drops straight back into it.
