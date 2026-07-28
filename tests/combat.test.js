@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { resolveAttack, areHostile, mitigatedDamage } from '../src/systems/combat.js';
+import {
+  resolveAttack,
+  areHostile,
+  mitigatedDamage,
+  tryRingSurvival,
+} from '../src/systems/combat.js';
 import { createRng, nextInt } from '../src/core/rng.js';
 import { createPlayer } from '../src/entities/player.js';
 import { HIT_DIE, HIT_THRESHOLD } from '../src/core/constants.js';
@@ -265,5 +270,32 @@ describe('death and factions', () => {
     expect(areHostile(player, goblin)).toBe(true);
     expect(areHostile(goblin, player)).toBe(true);
     expect(areHostile(goblin, skeleton)).toBe(false);
+  });
+});
+
+describe('tryRingSurvival', () => {
+  const armed = (maxHp) => ({ kind: 'player', x: 0, y: 0, hp: 0, maxHp, ringSurvival: true });
+
+  it('restores half the bar, rounded up, and spends the ring', () => {
+    const player = armed(21);
+    const events = [];
+    expect(tryRingSurvival({ log: [] }, player, events)).toBe(true);
+    expect(player.hp).toBe(11); // ceil(21 * 0.5)
+    expect(player.ringSurvival).toBe(false);
+    expect(events).toHaveLength(1);
+  });
+
+  it('never leaves the player on 0 HP, however small the bar', () => {
+    const player = armed(1);
+    expect(tryRingSurvival({ log: [] }, player, [])).toBe(true);
+    expect(player.hp).toBe(1);
+  });
+
+  it('does nothing at all when the ring is not armed', () => {
+    const player = { kind: 'player', x: 0, y: 0, hp: 0, maxHp: 20 };
+    const events = [];
+    expect(tryRingSurvival({ log: [] }, player, events)).toBe(false);
+    expect(player.hp).toBe(0);
+    expect(events).toHaveLength(0);
   });
 });

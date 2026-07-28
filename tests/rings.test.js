@@ -4,8 +4,15 @@ import { resolveAttack } from '../src/systems/combat.js';
 import { createRng } from '../src/core/rng.js';
 import { updateVisibility } from '../src/systems/visibility.js';
 import { createEnemy } from '../src/entities/enemies.js';
-import { ENEMY_TYPES, TILE, PLAYER_MAX_HP } from '../src/core/constants.js';
-import { idx } from '../src/core/query.js';
+import {
+  ENEMY_TYPES,
+  TILE,
+  PLAYER_MAX_HP,
+  SHADOW_NOISE_RADIUS,
+  SHADOW_NOTICE_RADIUS,
+  SURVIVAL_HEAL_FRACTION,
+} from '../src/core/constants.js';
+import { idx, hiddenFromEnemy } from '../src/core/query.js';
 import { EV } from '../src/core/events.js';
 
 // A horizontal corridor (y=1, x=1..12 in a 14x3 wall field) with real
@@ -67,8 +74,8 @@ function corridor({
     log: [],
   };
   let id = 2;
-  for (const { x, y, frozen = true } of enemies) {
-    const e = createEnemy(ENEMY_TYPES.goblin, x, y, 1);
+  for (const { x, y, kind = 'goblin', frozen = true } of enemies) {
+    const e = createEnemy(ENEMY_TYPES[kind], x, y, 1);
     e.id = id++;
     if (frozen) e.moveCooldown = 99; // hold position; attacking is never gated
     state.entities.byId.set(e.id, e);
@@ -82,42 +89,144 @@ const playerAttacks = (events) => events.filter((e) => e.type === EV.ATTACK && e
 const playerMoves = (events) => events.filter((e) => e.type === EV.MOVE && e.id === 1);
 
 describe('Ring of Shadow', () => {
-  it('an unprovoked enemy never aggroes, even with clear line of sight', () => {
+  it('an unprovoked enemy at range never aggroes, even with clear line of sight', () => {
+    // Player 2 -> 3, goblin at 6: distance 3, comfortably outside NOTICE.
     const { state } = corridor({ ring: 'ringShadow', enemies: [{ x: 6, y: 1 }] });
     processCommand(state, { type: 'move', dx: 1, dy: 0 });
     const goblin = state.entities.byId.get(2);
     expect(goblin.aggro ?? false).toBe(false);
   });
 
-  it('an unprovoked adjacent enemy does not attack a hidden player', () => {
+  it('an adjacent enemy notices a hidden player and swings', () => {
     const { state, player } = corridor({
       playerX: 4,
       ring: 'ringShadow',
       enemies: [{ x: 6, y: 1 }],
     });
-    processCommand(state, { type: 'move', dx: 1, dy: 0 }); // step right up next to it
+    const events = processCommand(state, { type: 'move', dx: 1, dy: 0 });
     expect(player.x).toBe(5); // adjacent to the goblin now
-    expect(player.hp).toBe(PLAYER_MAX_HP); // no swing came
-    expect(state.entities.byId.get(2).aggro ?? false).toBe(false);
+    const goblin = state.entities.byId.get(2);
+    expect(goblin.aggro).toBe(true); // too close to hide from
+    // Assert on the swing, not on HP: the attack roll is allowed to miss.
+    expect(events.filter((e) => e.type === EV.ATTACK && e.attackerId === goblin.id)).toHaveLength(
+      1,
+    );
   });
 
-  it('attacking an enemy provokes that one — and only that one', () => {
+  it('an enemy just outside the notice radius stays hidden from', () => {
+    const { state, player } = corridor({
+      playerX: 2,
+      ring: 'ringShadow',
+      enemies: [{ x: 2 + SHADOW_NOTICE_RADIUS + 1, y: 1 }],
+    });
+    const goblin = state.entities.byId.get(2);
+    expect(hiddenFromEnemy(state, goblin)).toBe(true);
+    expect(player.x).toBe(2);
+  });
+
+  it('a swing is heard by everyone in earshot; distant bystanders stay oblivious', () => {
+    const { state } = corridor({
+      playerX: 5,
+      ring: 'ringShadow',
+      enemies: [
+        { x: 6, y: 1 }, // the target
+        { x: 5 + SHADOW_NOISE_RADIUS - 1, y: 1 }, // inside earshot
+        { x: 5 + SHADOW_NOISE_RADIUS + 1, y: 1 }, // outside it
+      ],
+    });
+    const events = processCommand(state, { type: 'move', dx: 1, dy: 0 }); // bump-attack
+    expect(playerAttacks(events)).toHaveLength(1);
+    expect(state.entities.byId.get(2).provoked).toBe(true); // struck
+    expect(state.entities.byId.get(3).provoked).toBe(true); // heard it
+    expect(state.entities.byId.get(4).provoked ?? false).toBe(false); // too far
+  });
+
+  it('an enemy exactly at the noise radius hears the swing', () => {
     const { state } = corridor({
       playerX: 5,
       ring: 'ringShadow',
       enemies: [
         { x: 6, y: 1 },
-        { x: 10, y: 1 },
+        { x: 5 + SHADOW_NOISE_RADIUS, y: 1 },
       ],
     });
-    const events = processCommand(state, { type: 'move', dx: 1, dy: 0 }); // bump-attack
-    expect(playerAttacks(events)).toHaveLength(1);
-    const struck = state.entities.byId.get(2);
+    processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    expect(state.entities.byId.get(3).provoked).toBe(true);
+  });
+
+  it('a miss is exactly as loud as a hit', () => {
+    const { state, player } = corridor({
+      playerX: 5,
+      ring: 'ringShadow',
+      enemies: [
+        { x: 6, y: 1 },
+        { x: 5 + SHADOW_NOISE_RADIUS - 1, y: 1 },
+      ],
+    });
+    player.skill = -100; // roll + skill can never clear the threshold
+    const events = processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    expect(playerAttacks(events).every((e) => e.hit === false)).toBe(true);
+    expect(state.entities.byId.get(3).provoked).toBe(true);
+  });
+
+  it('noise carries through a closed door — but it is sound, not sight', () => {
+    const { state } = corridor({
+      playerX: 5,
+      doorX: 8, // opaque: breaks line of sight to the bystander beyond it
+      ring: 'ringShadow',
+      enemies: [
+        { x: 6, y: 1 },
+        { x: 9, y: 1 },
+      ],
+    });
+    processCommand(state, { type: 'move', dx: 1, dy: 0 });
     const bystander = state.entities.byId.get(3);
-    expect(struck.provoked).toBe(true);
-    expect(struck.aggro).toBe(true); // saw the player the moment cover broke
-    expect(bystander.provoked ?? false).toBe(false);
-    expect(bystander.aggro ?? false).toBe(false); // still oblivious
+    expect(bystander.provoked).toBe(true); // heard it through the door
+    expect(bystander.aggro ?? false).toBe(false); // but still cannot see
+  });
+
+  it('a boss is never fooled by the ring', () => {
+    const { state } = corridor({
+      playerX: 2,
+      ring: 'ringShadow',
+      enemies: [{ x: 6, y: 1, kind: 'boss' }],
+    });
+    const boss = state.entities.byId.get(2);
+    expect(hiddenFromEnemy(state, boss)).toBe(false);
+    processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    expect(boss.aggro).toBe(true);
+  });
+});
+
+describe('hiddenFromEnemy', () => {
+  const probe = (opts) => {
+    const { state } = corridor(opts);
+    return hiddenFromEnemy(state, state.entities.byId.get(2));
+  };
+
+  it('is false without the ring', () => {
+    expect(probe({ playerX: 2, enemies: [{ x: 8, y: 1 }] })).toBe(false);
+  });
+
+  it('is true for a far, unprovoked, non-boss enemy while the ring is worn', () => {
+    expect(probe({ playerX: 2, ring: 'ringShadow', enemies: [{ x: 8, y: 1 }] })).toBe(true);
+  });
+
+  it('is false once the enemy is provoked', () => {
+    const { state } = corridor({ playerX: 2, ring: 'ringShadow', enemies: [{ x: 8, y: 1 }] });
+    const goblin = state.entities.byId.get(2);
+    goblin.provoked = true;
+    expect(hiddenFromEnemy(state, goblin)).toBe(false);
+  });
+
+  it('is false at knife range', () => {
+    expect(probe({ playerX: 2, ring: 'ringShadow', enemies: [{ x: 3, y: 1 }] })).toBe(false);
+  });
+
+  it('is false for a boss', () => {
+    expect(probe({ playerX: 2, ring: 'ringShadow', enemies: [{ x: 8, y: 1, kind: 'boss' }] })).toBe(
+      false,
+    );
   });
 });
 
@@ -207,6 +316,10 @@ describe('Ring of Speed', () => {
   });
 });
 
+// Half the bar, rounded up — derived from the constant so a re-tune moves the
+// expectation with it rather than leaving a stale literal behind.
+const SURVIVAL_HP = Math.max(1, Math.ceil(PLAYER_MAX_HP * SURVIVAL_HEAL_FRACTION));
+
 describe('Ring of Survival', () => {
   it('cheats death from a chest trap, once', () => {
     const { state, player } = corridor({
@@ -219,7 +332,8 @@ describe('Ring of Survival', () => {
     });
     const events = processCommand(state, { type: 'move', dx: 1, dy: 0 });
     expect(state.status).toBe('playing');
-    expect(player.hp).toBe(PLAYER_MAX_HP); // restored to full
+    expect(player.hp).toBe(SURVIVAL_HP); // a second wind, not a reset
+    expect(player.hp).toBeLessThan(PLAYER_MAX_HP);
     expect(player.ringSurvival).toBe(false); // and spent
     expect(events.filter((e) => e.type === EV.SURVIVAL)).toHaveLength(1);
     expect(state.log.some((e) => e.type === 'survival')).toBe(true);
@@ -242,7 +356,7 @@ describe('Ring of Survival', () => {
     expect(survived).toBe(true);
     expect(player.ringSurvival).toBe(false);
     expect(state.status).toBe('playing');
-    expect(player.hp).toBe(PLAYER_MAX_HP);
+    expect(player.hp).toBe(SURVIVAL_HP);
 
     let dead = false;
     for (let i = 0; i < 10 && !dead; i++) {

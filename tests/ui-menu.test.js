@@ -15,9 +15,13 @@ function makeActions(over = {}) {
     onLeaderboard: vi.fn(),
     onHelp: vi.fn(),
     isChildOpen: () => false,
+    canEndRun: () => true,
+    onEndRun: vi.fn(),
     ...over,
   };
 }
+
+const endBtn = () => document.querySelector('#menu [data-act="endrun"]');
 
 beforeEach(() => {
   document.body.innerHTML = '';
@@ -95,5 +99,63 @@ describe('pause menu', () => {
     childOpen = false;
     window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
     expect(menu.isOpen()).toBe(false); // now it handles the key
+  });
+});
+
+describe('End run', () => {
+  it('takes two clicks: the first only arms it', () => {
+    const actions = makeActions();
+    const menu = createMenu(document.body, actions);
+    menu.open();
+
+    endBtn().click();
+    expect(actions.onEndRun).not.toHaveBeenCalled();
+    expect(menu.isOpen()).toBe(true); // the question stays where it was asked
+    expect(endBtn().textContent).toBe('Really end run?');
+
+    endBtn().click();
+    expect(actions.onEndRun).toHaveBeenCalledOnce();
+    expect(menu.isOpen()).toBe(false);
+  });
+
+  it('closing and reopening disarms it', () => {
+    const actions = makeActions();
+    const menu = createMenu(document.body, actions);
+    menu.open();
+    endBtn().click(); // armed
+    menu.close();
+    menu.open();
+    expect(endBtn().textContent).toBe('End run');
+    endBtn().click(); // must only re-arm, not fire
+    expect(actions.onEndRun).not.toHaveBeenCalled();
+  });
+
+  it('an Escape close disarms it too', () => {
+    const actions = makeActions();
+    const menu = createMenu(document.body, actions);
+    menu.open();
+    endBtn().click();
+    window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' }));
+    menu.open();
+    expect(endBtn().textContent).toBe('End run');
+    endBtn().click();
+    expect(actions.onEndRun).not.toHaveBeenCalled();
+  });
+
+  it('reaching for any other action disarms it', () => {
+    const actions = makeActions();
+    const menu = createMenu(document.body, actions);
+    menu.open();
+    endBtn().click(); // armed
+    document.querySelector('#menu [data-act="help"]').click();
+    expect(endBtn().textContent).toBe('End run');
+    endBtn().click();
+    expect(actions.onEndRun).not.toHaveBeenCalled();
+  });
+
+  it('is hidden once the run is already over', () => {
+    const menu = createMenu(document.body, makeActions({ canEndRun: () => false }));
+    menu.open();
+    expect(endBtn().hidden).toBe(true);
   });
 });

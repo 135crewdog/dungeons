@@ -49,7 +49,9 @@ function format(entry) {
     case 'unlock':
       return 'You unlock the chest — a ring tumbles out!';
     case 'survival':
-      return 'Your ring flares and crumbles to dust — you feel life surge back!';
+      return 'Your ring flares and crumbles to dust — you claw back to your feet.';
+    case 'endrun':
+      return 'You end the run here.';
     case 'descend':
       return `You descend to floor ${d.floor}.`;
     case 'ascend':

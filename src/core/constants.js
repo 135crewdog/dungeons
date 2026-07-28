@@ -112,13 +112,26 @@ export const KEY_REVEAL_RADIUS = 2;
 // Ring of Speed: steps per movement turn. Attacks always end the turn, and
 // the extra step never attacks (and is forfeited on stairs or over loot).
 export const SPEED_STEPS = 2;
+// Ring of Shadow's three escape hatches (see query.hiddenFromEnemy). Shadow
+// shipped as unconditional per-enemy invisibility, which made a player who
+// declined to swing literally unkillable — nobody ever tried. Now:
+//  · a swing is HEARD this far (Chebyshev, deliberately THROUGH walls — it is
+//    noise, not sight), so a fight wakes the room instead of one victim;
+//  · standing this close breaks cover outright, whoever you have attacked.
+// Bosses ignore the ring entirely; that rule needs no constant.
+export const SHADOW_NOISE_RADIUS = 5;
+export const SHADOW_NOTICE_RADIUS = 1;
+// Ring of Survival: the fraction of max HP its one cheated death restores. A
+// full heal made the escape hatch free; half still saves the run and leaves
+// the player to earn the rest back.
+export const SURVIVAL_HEAL_FRACTION = 0.5;
 // The four ring effects, and the player field each one sets when worn.
 // Rings are passive and run-long (Survival consumes itself when it fires).
 export const RING = Object.freeze({
   SIGHT: 'sight', // whole floor rendered/known; enemy aggro still needs true LOS
-  SHADOW: 'shadow', // invisible to each enemy until the player attacks that one
+  SHADOW: 'shadow', // hides from enemies that haven't heard, closed in, or bossed
   SPEED: 'speed', // two steps per movement turn
-  SURVIVAL: 'survival', // once: at 0 HP restore to full, the ring crumbles
+  SURVIVAL: 'survival', // once: at 0 HP restore half the bar, the ring crumbles
 });
 export const RING_TYPES = Object.freeze(Object.values(RING));
 export const RING_FLAG = Object.freeze({

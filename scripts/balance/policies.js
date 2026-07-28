@@ -32,6 +32,7 @@ import {
   tileAt,
   chebyshev,
   entityAt,
+  hiddenFromEnemy,
 } from '../../src/core/query.js';
 
 // First step of the shortest known path from the player to the nearest tile
@@ -178,14 +179,22 @@ export const thorough = {
   name: 'thorough',
   decide(state) {
     const player = getPlayer(state);
-    // With the Ring of Shadow, unprovoked enemies can't see the player — so
-    // they are not threats, and (crucially) not hunt targets: they hold
-    // position forever, and hunting/fleeing a statue at the edge of view
-    // ping-pongs the bot into a stall. Provoked enemies fight as usual.
-    const hiddenFrom = (e) => (player.ringShadow ?? false) && !(e.provoked ?? false);
+    // With the Ring of Shadow, enemies that can't perceive the player are not
+    // threats, and (crucially) not hunt targets: they hold position forever,
+    // and hunting/fleeing a statue at the edge of view ping-pongs the bot into
+    // a stall. The rule itself lives in the sim (query.hiddenFromEnemy) rather
+    // than being mirrored here, so the bot can't drift out of step with it.
+    //
+    // Hidden is not enough on its own, though: cover that breaks at knife
+    // range doesn't set `provoked`, so an enemy that spotted the player at
+    // distance 1 goes back to "hidden from" the moment the player steps away —
+    // while `aggro` is still true and it is actively giving chase. Treating
+    // that as a statue would walk the bot straight back into a live pursuer,
+    // and retreatStep's `d < 2` guard parks it at exactly the flip distance.
+    const oblivious = (e) => hiddenFromEnemy(state, e) && !(e.aggro ?? false);
     const threats = enemiesSorted(state).filter(
       (e) =>
-        !hiddenFrom(e) &&
+        !oblivious(e) &&
         (isVisible(state, e.x, e.y) || chebyshev(player.x, player.y, e.x, e.y) === 1),
     );
     const potions = knownPotions(state);

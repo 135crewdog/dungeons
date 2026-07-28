@@ -1,7 +1,7 @@
 // Composition root. This is the ONLY module allowed to import the renderer
 // layer. It wires the simulation, renderer, input, and UI overlays together,
 // but never contains gameplay rules itself.
-import { createGame, restart } from './core/gameState.js';
+import { createGame, restart, endRun } from './core/gameState.js';
 import { coerceSeed } from './core/rng.js';
 import { EV } from './core/events.js';
 import { createPhaserGame } from './renderer/phaserConfig.js';
@@ -163,20 +163,31 @@ const controller = createController(state, (events) => {
     scene.playEvents(events, { skipMotion: changedFloor });
   }
   refreshUi();
-  if (state.status === 'dead') gameOver.show(state, handleRestart);
+  // Any non-playing status raises the end-of-run panel; it words itself from
+  // the status ('dead' vs a voluntary 'ended').
+  if (state.status !== 'playing') gameOver.show(state, handleRestart);
 });
 
 // Pause/options menu. Its actions call back into startRun (a simulation
 // lifecycle function); the menu itself never mutates state or touches Phaser.
 const menu = createMenu(document.body, {
   getSeed: () => state.seed,
-  // Openable while playing and after death, so a dead player can grab the seed
-  // or retry the same dungeon (Restart this seed) from the menu.
-  canOpen: () => state.status === 'playing' || state.status === 'dead',
+  // Openable while playing and once a run is over (died or ended), so a
+  // finished player can grab the seed or retry the same dungeon from the menu.
+  canOpen: () => state.status === 'playing' || state.status === 'dead' || state.status === 'ended',
   onOpen: () => controller.cancel(), // stop any auto-walk while paused
   onNewRun: () => startRun(randomSeed()),
   onRestartSeed: () => startRun(state.seed),
   onLoadSeed: (text) => startRun(coerceSeed(text)),
+  // Stop here and go straight to the score screen — the only way to submit a
+  // run without dying for it. endRun owns the state change; this just shows
+  // the panel the turn loop would have shown on a death.
+  canEndRun: () => state.status === 'playing',
+  onEndRun: () => {
+    endRun(state);
+    refreshUi();
+    gameOver.show(state, handleRestart);
+  },
   onLeaderboard: () => leaderboard.open(),
   onHelp: () => help.open(),
   isChildOpen: () => leaderboard.isOpen() || help.isOpen(),

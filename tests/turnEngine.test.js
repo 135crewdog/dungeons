@@ -3,6 +3,7 @@ import { processCommand } from '../src/core/turnEngine.js';
 import { canStep } from '../src/core/movement.js';
 import { TILE } from '../src/core/constants.js';
 import { idx } from '../src/core/query.js';
+import { createGame, endRun, restart } from '../src/core/gameState.js';
 
 // Build a small handcrafted state so movement outcomes are exact. All interior
 // tiles are floor unless overridden via `walls`.
@@ -94,5 +95,41 @@ describe('turn engine — player movement', () => {
     expect(player.x).toBe(3);
     expect(player.y).toBe(1);
     expect(state.turn).toBe(1);
+  });
+});
+
+describe('endRun', () => {
+  it('freezes the run without consuming a turn', () => {
+    const state = createGame(12345);
+    const before = state.turn;
+    expect(endRun(state)).toBe(true);
+    expect(state.status).toBe('ended');
+    expect(state.turn).toBe(before); // stopping is not an action
+    expect(state.log.some((e) => e.type === 'endrun')).toBe(true);
+
+    // Every turn-engine guard is written `!== 'playing'`, so 'ended' stops the
+    // world exactly as a death does.
+    expect(processCommand(state, { type: 'move', dx: 1, dy: 0 })).toEqual([]);
+    expect(state.turn).toBe(before);
+  });
+
+  it('is idempotent and never overwrites a death', () => {
+    const state = createGame(999);
+    endRun(state);
+    expect(endRun(state)).toBe(false);
+    expect(state.status).toBe('ended');
+
+    const dead = createGame(999);
+    dead.status = 'dead';
+    expect(endRun(dead)).toBe(false);
+    expect(dead.status).toBe('dead');
+  });
+
+  it('restart clears it back to a live run', () => {
+    const state = createGame(4242);
+    endRun(state);
+    restart(state, 4242);
+    expect(state.status).toBe('playing');
+    expect(state.turn).toBe(0);
   });
 });
