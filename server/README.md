@@ -80,8 +80,42 @@ dashboard is the thing to avoid — those edits are lost on the next push.
 
 A build pipeline ships code; it does not run migrations. After changing
 `schema.sql`, apply it once by hand: D1 → `dungeons-leaderboard` → **Console** →
-paste the file → Run. Every statement is `CREATE ... IF NOT EXISTS`, so it is
-safe to re-run against a live database and cannot disturb existing rows.
+run it → Run. Every statement is `CREATE ... IF NOT EXISTS`, so it is safe to
+re-run against a live database and cannot disturb existing rows.
+
+**The console will not always take the file verbatim.** It reports
+
+> The request is malformed: Requests without any query are not supported.
+
+when what it receives contains no executable statement — which a comment block,
+or the empty fragment after the file's trailing `;`, can produce. Paste the
+statements themselves, without the comments, and one at a time if it still
+objects. Comment-free, that is the whole schema:
+
+```sql
+CREATE TABLE IF NOT EXISTS scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  initials TEXT NOT NULL,
+  floor INTEGER NOT NULL,
+  turns INTEGER NOT NULL,
+  seed TEXT NOT NULL,
+  version TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+```
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_scores_created ON scores (created_at);
+```
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_scores_dupe ON scores (seed, initials, floor, turns, created_at);
+```
+
+On an **existing** database only the last one is new — the table and
+`idx_scores_created` have been there since the original deploy — so bringing a
+live database up to v0.9.5 is that single statement. Running all three is still
+harmless.
 
 ### Checking a deploy landed
 
