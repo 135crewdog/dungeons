@@ -456,3 +456,203 @@ describe('attack intent (clicking a visible enemy)', () => {
     expect(state.path).toBeNull();
   });
 });
+
+// An open 7x5 room (x=1..7, y=1..5) in a 9x7 wall field, with a down-staircase
+// planted anywhere inside it. Unlike corridorState/hallState there is room to
+// walk AROUND the staircase, which is the whole point. `floors`/`seed` are
+// present so a deliberate descent can actually generate the next floor.
+function roomState({ playerX = 1, playerY = 3, stairs = null } = {}) {
+  const width = 9;
+  const height = 7;
+  const tiles = new Uint8Array(width * height); // WALL
+  const map = {
+    width,
+    height,
+    tiles,
+    rooms: [],
+    roomAt: new Int16Array(width * height).fill(-1),
+    stairsDown: null,
+    stairsUp: null,
+  };
+  for (let y = 1; y <= 5; y++) for (let x = 1; x <= 7; x++) tiles[idx(map, x, y)] = TILE.FLOOR;
+  if (stairs) {
+    tiles[idx(map, stairs.x, stairs.y)] = TILE.STAIRS_DOWN;
+    map.stairsDown = { x: stairs.x, y: stairs.y };
+  }
+  const player = {
+    id: 1,
+    kind: 'player',
+    x: playerX,
+    y: playerY,
+    hp: 20,
+    maxHp: 20,
+    attackDie: 8,
+    glyph: '@',
+    strength: 0,
+    skill: 0,
+    armor: 0,
+  };
+  const state = {
+    seed: 1,
+    rng: createRng(1),
+    status: 'playing',
+    turn: 0,
+    floor: 1,
+    map,
+    vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
+    entities: { nextId: 2, playerId: 1, byId: new Map([[1, player]]) },
+    items: [],
+    path: null,
+    floors: new Map(),
+    log: [],
+  };
+  state.vis.explored.fill(1);
+  updateVisibility(state);
+  return { state, player };
+}
+
+// A one-wide corridor (y=1, x=1..8) whose ONLY route runs over a staircase —
+// the chokepoint case where no stair-free path exists at all.
+function stairChokepoint({ playerX = 1, stairsX = 4 } = {}) {
+  const width = 10;
+  const height = 3;
+  const tiles = new Uint8Array(width * height); // WALL
+  const map = {
+    width,
+    height,
+    tiles,
+    rooms: [],
+    roomAt: new Int16Array(width * height).fill(-1),
+    stairsDown: null,
+    stairsUp: null,
+  };
+  for (let x = 1; x <= 8; x++) tiles[idx(map, x, 1)] = TILE.FLOOR;
+  tiles[idx(map, stairsX, 1)] = TILE.STAIRS_DOWN;
+  map.stairsDown = { x: stairsX, y: 1 };
+  const player = {
+    id: 1,
+    kind: 'player',
+    x: playerX,
+    y: 1,
+    hp: 20,
+    maxHp: 20,
+    attackDie: 8,
+    glyph: '@',
+    strength: 0,
+    skill: 0,
+    armor: 0,
+  };
+  const state = {
+    seed: 1,
+    rng: createRng(1),
+    status: 'playing',
+    turn: 0,
+    floor: 1,
+    map,
+    vis: { visible: new Uint8Array(width * height), explored: new Uint8Array(width * height) },
+    entities: { nextId: 2, playerId: 1, byId: new Map([[1, player]]) },
+    items: [],
+    path: null,
+    floors: new Map(),
+    log: [],
+  };
+  state.vis.explored.fill(1);
+  updateVisibility(state);
+  return { state, player };
+}
+
+describe('auto-walk routes around staircases', () => {
+  const syncSchedule = (fn) => {
+    fn();
+    return () => {};
+  };
+  const stairNodes = (state) =>
+    state.path.nodes.filter((n) => state.map.tiles[idx(state.map, n.x, n.y)] === TILE.STAIRS_DOWN);
+
+  it('detours around a staircase lying between the player and the click', () => {
+    // (4,3) sits dead on the straight line from (1,3) to (7,3).
+    const { state } = roomState({ playerX: 1, playerY: 3, stairs: { x: 4, y: 3 } });
+    expect(planPath(state, 7, 3)).toBe(true);
+    expect(stairNodes(state)).toHaveLength(0);
+  });
+
+  it('walks the whole detour without ever changing floor', () => {
+    const { state, player } = roomState({ playerX: 1, playerY: 3, stairs: { x: 4, y: 3 } });
+    const controller = createController(state, () => {}, syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 7, y: 3 });
+    expect(player.x).toBe(7);
+    expect(player.y).toBe(3); // arrived at the clicked tile
+    expect(state.floor).toBe(1); // and never fell through the stairs on the way
+  });
+
+  it('still takes the stairs when the staircase IS the clicked tile', () => {
+    // The goal is exempt from the avoidance rule: clicking the stairs is how
+    // you use them, and that must keep working.
+    const { state } = roomState({ playerX: 1, playerY: 3, stairs: { x: 4, y: 3 } });
+    const controller = createController(state, () => {}, syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 4, y: 3 });
+    expect(state.floor).toBe(2);
+  });
+
+  it('plans normally when no staircase is in the way', () => {
+    // A staircase parked off the route changes nothing about the path.
+    const clear = roomState({ playerX: 1, playerY: 3 });
+    const withStairs = roomState({ playerX: 1, playerY: 3, stairs: { x: 4, y: 1 } });
+    expect(planPath(clear.state, 7, 3)).toBe(true);
+    expect(planPath(withStairs.state, 7, 3)).toBe(true);
+    expect(withStairs.state.path.nodes).toEqual(clear.state.path.nodes);
+  });
+
+  describe('when the staircase is the only way through', () => {
+    it('stops on the tile before it instead of falling through', () => {
+      const { state, player } = stairChokepoint({ playerX: 1, stairsX: 4 });
+      const controller = createController(state, () => {}, syncSchedule);
+      controller.dispatch({ type: 'moveTo', x: 8, y: 1 });
+      expect(player.x).toBe(3); // pulled up one short of the staircase
+      expect(state.floor).toBe(1);
+      expect(state.path).toBeNull();
+    });
+
+    it('leaves the descent to a second, deliberate command', () => {
+      // A keyboard step onto stairs is untouched by any of this — the rule
+      // lives in the click planner, not in what a step is allowed to do.
+      const { state } = stairChokepoint({ playerX: 3, stairsX: 4 });
+      const controller = createController(state, () => {}, syncSchedule);
+      controller.dispatch({ type: 'move', dx: 1, dy: 0 });
+      expect(state.floor).toBe(2);
+    });
+
+    it('refuses the click outright when the very next step is the staircase', () => {
+      // Nothing left to walk after truncation, so the command is a no-op rather
+      // than a one-tile shuffle — the player is already standing next to it.
+      const { state, player } = stairChokepoint({ playerX: 3, stairsX: 4 });
+      expect(planPath(state, 8, 1)).toBe(false);
+      expect(state.path).toBeNull();
+      expect(player.x).toBe(3);
+      expect(state.floor).toBe(1);
+    });
+
+    it('still reaches a goal on the near side of the staircase', () => {
+      const { state, player } = stairChokepoint({ playerX: 1, stairsX: 6 });
+      const controller = createController(state, () => {}, syncSchedule);
+      controller.dispatch({ type: 'moveTo', x: 5, y: 1 });
+      expect(player.x).toBe(5); // no truncation: the stairs were never on the route
+      expect(state.floor).toBe(1);
+    });
+  });
+
+  it('pursues an enemy standing on a staircase and swings without descending', () => {
+    const { state, player } = roomState({ playerX: 1, playerY: 3, stairs: { x: 4, y: 3 } });
+    const enemy = createEnemy(ENEMY_TYPES.goblin, 4, 3, 1);
+    enemy.id = 2;
+    enemy.moveCooldown = 99;
+    state.entities.byId.set(2, enemy);
+    updateVisibility(state);
+    const events = [];
+    const controller = createController(state, (evs) => events.push(...evs), syncSchedule);
+    controller.dispatch({ type: 'moveTo', x: 4, y: 3 });
+    expect(events.filter((e) => e.type === 'attack' && e.attackerId === 1)).toHaveLength(1);
+    expect(player.x).toBe(3); // pulled up at melee range, never onto the staircase
+    expect(state.floor).toBe(1);
+  });
+});

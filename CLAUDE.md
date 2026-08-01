@@ -208,6 +208,19 @@ that sit exactly one wall apart are linked by a single door. Rooms are also plac
   step that reached melee doesn't abort (enemies strike the moment the player arrives, and
   the swing is the next action). Losing the target — dead or out of sight — also ends the
   pursuit. Clicking a tile that holds a _non_-visible enemy is a plain walk.
+- **The click path routes around staircases** (0.9.7). Stepping onto one swaps the floor
+  immediately, so a staircase that merely happens to lie between the player and where
+  they clicked used to end the floor by accident. `planPath` now runs a stair-free A\*
+  pass first, with the **clicked tile exempt** — clicking the stairs is still how you
+  take them, and an enemy standing on them is still a legal attack target. When no
+  stair-free route exists at all (a staircase in a one-wide chokepoint) the fallback
+  pass is **truncated before the staircase**: the walk goes as far as the tile in front
+  of it and stops, so changing floors always costs a second, deliberate command. A path
+  with nothing left after truncation is refused outright rather than shuffling one tile.
+  Keyboard steps are untouched — the rule lives in the planner, not in what a step may
+  do. Because the same A\* predicate feeds `diagonalAllowed`, a diagonal squeezing past
+  a staircase corner is refused and the route detours a tile; harmless, and exactly what
+  enemies have always done.
 - **Ring of Speed and auto-walk.** With the ring on, a plain walk consumes two
   **colinear** path nodes per turn and lets the engine double the step; at a path
   corner the controller forces `single: true` (the engine's doubling can only repeat
@@ -225,8 +238,11 @@ that sit exactly one wall apart are linked by a single door. Rooms are also plac
 - **Enemies route around stairs and items.** An enemy can't use stairs or collect
   potions/chests, so it treats those tiles as obstacles and paths around them — stepping
   onto one only when boxed in (the sole route to the player runs over it), so a player can't
-  hide behind a potion. Only the player uses stairs and picks up items; this is an
-  enemy-only pathing rule and never changes the shared `isWalkable`.
+  hide behind a potion. The **item** half stays enemy-only (the player wants to walk over
+  loot); since 0.9.7 the **stairs** half is shared with the player's click planner, though
+  each applies it through its own A\* predicate and with its own boxed-in fallback —
+  enemies cross the staircase, the player stops in front of it. Neither narrows the shared
+  `isWalkable`, so a deliberate step onto a staircase always works.
 
 ## Field of View
 
@@ -514,6 +530,30 @@ still be pinched and scrolled. Putting it on `html`/`body` — as the page did
 until 0.9.4 — blocks zoom over the DOM overlays, which is exactly the text a
 low-vision player needs to magnify; `tests/gesturePolicy.test.js` and the
 campaign's E17 both reject that regression.
+
+**Click alignment vs. the pseudo-3D art** (0.9.7). The screen→tile math is exact
+and axis-symmetric (`screenToTile` unprojects against the settled `camCenter`,
+which is the player tile's true center; `followPlayer` cancels `spriteOffset` so
+that center really is mid-screen). The **art** is not symmetric: a wall paints its
+top over the **bottom half** of the open cell above it (`WALL_OVERHANG`, drawn in
+the walls layer over actors), while the wall _above_ an open cell contributes
+nothing into it. So a one-tile-wide **east–west corridor only shows its top 8px**
+even though its hit box is the full 16 — the target reads a quarter-tile below
+where the eye puts it, and the player sprite, feet `SPRITE_LIFT` above the tile
+bottom, is drawn 4px up into the wall row, so clicking a character's head in a
+corridor lands on solid wall. Rooms escape it because only a room's bottom-most
+floor row carries an overhang; a one-wide corridor is _all_ bottom row. **Sideways
+(east–west) doors** have the same shape and slightly worse.
+
+The compensation is `pickClickTile` in `renderer/camera.js` (pure, Node-tested):
+a click that already lands on a known-walkable tile is returned **untouched** —
+which is why rooms, items and enemies in the open are unaffected — and only a
+dead click gets a second chance, snapping down when it fell in the bottom
+`CLICK_SNAP_PX` (half a tile) of a wall whose south neighbor is walkable. That
+re-centers a corridor's hit box on the opening you can actually see. The fix is
+deliberately in the **hit test, not the art**: shrinking the overhang would break
+SPD's autotiling, and making the hit test perfectly faithful to the art would
+shrink the corridor target to 8px rather than fix it.
 
 ## Language and Tooling
 
@@ -809,6 +849,39 @@ curve ~6 points under the ~33% the project has calibrated to since 0.9.3, so if 
 gap is judged too harsh the 0.9.3 precedent applies — pay it back with a separate
 enemy-stat lever rather than by watering down the Shadow rules.
 
+**0.9.7 — playtest polish.** Three fixes, no new mechanics. **The click path routes
+around staircases**: a staircase between the player and a click used to end the floor
+by accident, since a step onto one swaps the floor immediately. The planner now
+prefers a stair-free route (clicked tile exempt) and, where a staircase is the only
+way through, stops on the tile in front of it — see Movement and Pathfinding.
+**Corridor clicks are aligned to the art**: the SPD wall overhang covers the bottom
+half of the cell above it, so a one-wide east–west corridor shows only its top 8px
+while its hit box is the full 16, putting the target a quarter-tile below where the
+eye is aiming; a dead click in the lower half of a wall now snaps onto the walkable
+tile below it (`pickClickTile`) — see Canvas and Resolution. **The boss chest no
+longer stacks**: it relocated off a staircase already, and now off a tile that
+already holds an item, which a boxed-in boss can die on.
+
+Two playtest reports resolved as **not bugs**, with a regression test where one was
+missing. "The first locked chest is always a Ring of Survival" — the pick is
+uniform (`ringFor` is a correct Fisher–Yates over `RING_TYPES`; measured 25.1/25.0/
+25.0/25.0% for band 0 over 200k seeds, and Survival is `RING_TYPES[3]`, the entry
+the first swap moves _out_). What makes a small sample look rigged is that the
+band-0 chest is on floor 5 in **52%** of runs, so few runs ever open one — and that
+a browser **refresh replays the same run**, since `syncUrlSeed` keeps `?seed=` in the
+URL, so reloading rather than using **New run** reproduces the identical ring every
+time. That URL behavior is deliberate and unchanged. And "does boss loot drop onto
+the player's tile and instantly vanish" — no: the drop lands on the boss's own death
+tile, which two entities can never share.
+
+Balance: the stair and click changes are **provably zero-impact** — the headless bots
+have their own BFS and never call `planPath` or the renderer, and with only the boss
+chest fix reverted the simulator output is byte-identical to 0.9.6. With it in, every
+survival number still matches exactly (per-floor reached, deaths, floor-10 clear 25%,
+median death floor 3, death causes, turns/run); only mean HP and armor on descent
+move, and only on floors 10–12, which is the relocated chest being collected instead
+of stranded.
+
 `window.__game` remains exposed **deliberately**: it is a debugging and
 reproducibility affordance, and hiding it would not be anti-cheat — the POST
 endpoint is spoofable regardless, which is exactly why the board is an
@@ -871,6 +944,22 @@ The animation layer's pure half is covered by
 `TWEEN_MOVE_MS === STEP_DELAY_MS` contract and the fast-turn glide clamp,
 `idlePhase` spread, and the "idle is mostly still" shape of the cycles), and the
 animation-cycle frame rects by the entitySprites suite.
+
+0.9.7 adds `tests/camera.test.js` — tile↔pixel round-trips plus a decision table
+over `pickClickTile`: an already-walkable click is untouched, the bottom half of
+the wall above a corridor snaps down, the **top** half of that same wall does not,
+a wall with a wall below never snaps, and the snap is downward-only (the wall
+_below_ a room never reaches up into it). `tests/autowalk.test.js` gains the
+staircase cases — a detour that contains no staircase node and ends on the clicked
+tile with the floor unchanged, a click on the staircase itself still descending,
+an off-route staircase leaving the path byte-identical to the stair-free map's,
+the chokepoint stopping one tile short, a click refused outright when the very
+next step is the staircase, a keyboard step still descending, and an enemy
+standing on a staircase still being pursued and swung at without descending.
+`tests/boss.test.js` covers the drop relocating off a littered tile and the scan
+skipping littered tiles as well as occupied ones. `tests/secrets.test.js` pins the
+band-0 ring split near 25% each over 20k LCG-generated seeds — deterministic
+input, loose bounds, so it catches a collapsed shuffle rather than flaking.
 
 **Broad-seed invariants** (`tests/invariants.test.js`, 0.9.5) assert the rules the
 example-based suites' outcomes are supposed to obey, across 40 seeds and down to

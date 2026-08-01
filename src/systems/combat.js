@@ -82,25 +82,43 @@ export function resolveAttack(state, attackerId, targetId) {
   return events;
 }
 
-// A slain boss always leaves a bonus chest. Stairs tiles swallow pickups — a
-// player stepping onto stairs changes floor before pickups resolve — so a
-// death on the staircase shifts the drop to the first adjacent unoccupied,
-// item-free floor/door tile (deterministic DIRS8 scan; no RNG draw, so
-// replays match). Occupied tiles are excluded so the chest can't land under
-// the attacking player (which would open it instantly via resolvePickups) or
-// under another enemy.
+// A slain boss always leaves a bonus chest, normally right where it fell —
+// which is never under the player, since two entities never share a tile.
+//
+// Two death tiles can't hold it, and both shift the drop to the first adjacent
+// unoccupied, item-free floor/door tile (deterministic DIRS8 scan; no RNG draw,
+// so replays match):
+//
+//  - A STAIRCASE swallows the pickup: a player stepping onto stairs changes
+//    floor before pickups resolve, so the chest would be unreachable.
+//  - A tile that ALREADY HOLDS AN ITEM would end up with two, breaking the
+//    one-item-per-tile invariant. A boss reaches one only when boxed in (enemies
+//    route around item tiles), so this is rare rather than impossible.
+//
+// Occupied tiles are excluded from the scan so the chest can't land under the
+// attacking player (which would open it instantly via resolvePickups) or under
+// another enemy. If the scan comes up empty — every neighbor wall, occupied or
+// littered, which a room-bound boss fight makes vanishingly unlikely — the
+// chest still drops on the death tile: a reward that is awkward to collect
+// beats no reward at all.
 function dropBossChest(state, x, y) {
   let dropX = x;
   let dropY = y;
-  const t = tileAt(state.map, x, y);
-  if (t === TILE.STAIRS_DOWN || t === TILE.STAIRS_UP) {
+  // One predicate for "a chest can sit here", applied to the death tile and
+  // then to its neighbors — a staircase fails it on the tile type, a littered
+  // tile on the item check. The dying boss is already out of state.entities by
+  // the time this runs, so its own tile reads as unoccupied.
+  const free = (fx, fy) => {
+    const ft = tileAt(state.map, fx, fy);
+    return (
+      (ft === TILE.FLOOR || ft === TILE.DOOR) &&
+      !entityAt(state, fx, fy) &&
+      !state.items.some((it) => it.x === fx && it.y === fy)
+    );
+  };
+  if (!free(x, y)) {
     for (const { dx, dy } of DIRS8) {
-      const nt = tileAt(state.map, x + dx, y + dy);
-      const free =
-        (nt === TILE.FLOOR || nt === TILE.DOOR) &&
-        !entityAt(state, x + dx, y + dy) &&
-        !state.items.some((it) => it.x === x + dx && it.y === y + dy);
-      if (free) {
+      if (free(x + dx, y + dy)) {
         dropX = x + dx;
         dropY = y + dy;
         break;

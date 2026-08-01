@@ -71,9 +71,9 @@ describe('boss spawning', () => {
 
 describe('boss chest drop', () => {
   // A 4x3 all-floor arena; `bossTile` optionally retypes the boss's tile
-  // (e.g. stairs) to test drop placement, and `playerAt` repositions the
-  // player (default: west of the boss).
-  function bossFight(seed, { bossTile = null, playerAt = { x: 0, y: 1 } } = {}) {
+  // (e.g. stairs) to test drop placement, `playerAt` repositions the player
+  // (default: west of the boss), and `items` pre-litters the floor.
+  function bossFight(seed, { bossTile = null, playerAt = { x: 0, y: 1 }, items = [] } = {}) {
     const rng = createRng(seed);
     const width = 4;
     const height = 3;
@@ -99,7 +99,7 @@ describe('boss chest drop', () => {
       status: 'playing',
       turn: 0,
       log: [],
-      items: [],
+      items,
       map,
       entities: {
         nextId: 3,
@@ -150,6 +150,34 @@ describe('boss chest drop', () => {
     expect(chest.x === 1 && chest.y === 0).toBe(false); // not under the player
     expect(chest.x === boss.x && chest.y === boss.y).toBe(false); // not on the stairs
     expect(state.map.tiles[chest.y * state.map.width + chest.x]).toBe(TILE.FLOOR);
+  });
+
+  it('a boss dying on an item tile drops the chest beside it, never stacked', () => {
+    // Enemies route around item tiles, but a boxed-in one steps onto them. Two
+    // items on a tile would break the one-item-per-tile invariant (and the
+    // second could never be reached separately).
+    const potion = { id: 9, type: 'potion', x: 1, y: 1 };
+    const { state, boss } = bossFight(3, { items: [potion] });
+    for (let i = 0; i < 30 && state.entities.byId.has(2); i++) resolveAttack(state, 1, 2);
+    expect(state.items).toHaveLength(2);
+    const chest = state.items.find((it) => it.type === 'chest');
+    expect(chest.x === boss.x && chest.y === boss.y).toBe(false); // not on the potion
+    expect(Math.max(Math.abs(chest.x - boss.x), Math.abs(chest.y - boss.y))).toBe(1); // adjacent
+    const tiles = state.items.map((it) => `${it.x},${it.y}`);
+    expect(new Set(tiles).size).toBe(state.items.length); // no tile holds two items
+  });
+
+  it('the relocation scan skips littered tiles as well as occupied ones', () => {
+    // Boss on the stairs, with the whole north row already littered: the scan
+    // has to walk past those before it finds somewhere legal.
+    const litter = [0, 1, 2, 3].map((x, i) => ({ id: 20 + i, type: 'potion', x, y: 0 }));
+    const { state } = bossFight(3, { bossTile: TILE.STAIRS_DOWN, items: litter });
+    for (let i = 0; i < 30 && state.entities.byId.has(2); i++) resolveAttack(state, 1, 2);
+    const chest = state.items.find((it) => it.type === 'chest');
+    expect(chest.y).not.toBe(0); // never on the littered row
+    expect(state.map.tiles[chest.y * state.map.width + chest.x]).toBe(TILE.FLOOR);
+    const tiles = state.items.map((it) => `${it.x},${it.y}`);
+    expect(new Set(tiles).size).toBe(state.items.length);
   });
 
   it('never drops a trap; all three bonuses occur across seeds', () => {

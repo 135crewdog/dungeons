@@ -7,6 +7,7 @@ import {
   enemiesSorted,
   tileAt,
   isKnownWalkable,
+  isStairsTile,
   isVisible,
   entityAt,
   hasItemAt,
@@ -289,17 +290,53 @@ function enemyPhase(state, events) {
 // Plan a path from the player to (tx, ty) over ONLY known-walkable tiles
 // (unexplored is treated as blocked). Stores it on state.path and returns true
 // if a usable path exists; a click on an unknown or unreachable tile is a no-op.
+//
+// The route also steers around STAIRCASES. Stepping onto one swaps the floor
+// immediately (resolveStairStep), so a staircase that merely happens to lie
+// between the player and where they clicked would end the floor by accident —
+// never what the click meant. The clicked tile itself is exempt: clicking the
+// stairs is how you take them. When no stair-free route exists at all (a
+// staircase sitting in a one-wide chokepoint) the walk goes as far as the tile
+// BEFORE the staircase and stops, so changing floors always costs a second,
+// deliberate command rather than happening mid-walk.
+//
+// Enemies have avoided stairs since Phase 1 (ai.js stepToward) and so do the
+// headless balance bots; the player was the only mover without the rule.
 export function planPath(state, tx, ty) {
   const player = getPlayer(state);
   if (tx === player.x && ty === player.y) return false;
   if (!isKnownWalkable(state, tx, ty)) return false;
 
-  const passable = (x, y) => isKnownWalkable(state, x, y);
-  const path = aStar(passable, { x: player.x, y: player.y }, { x: tx, y: ty }, state.map.width);
+  const start = { x: player.x, y: player.y };
+  const goal = { x: tx, y: ty };
+  const known = (x, y) => isKnownWalkable(state, x, y);
+  const stairFree = (x, y) =>
+    known(x, y) && ((x === tx && y === ty) || !isStairsTile(tileAt(state.map, x, y)));
+
+  let path = aStar(stairFree, start, goal, state.map.width);
+  if (!path || path.length < 2) {
+    path = truncateBeforeStairs(state, aStar(known, start, goal, state.map.width), tx, ty);
+  }
   if (!path || path.length < 2) return false;
 
   state.path = { nodes: path, index: 0 };
   return true;
+}
+
+// Cut a path short at the first staircase it would step onto, keeping the tile
+// before it. The start node is never trimmed (arriving by stairs leaves the
+// player standing on one) and the goal is never trimmed (that click was
+// deliberate). A path whose very next step is the staircase becomes too short
+// to walk and the click falls through to a no-op — the player is already
+// standing next to the stairs and can take that one step by hand.
+function truncateBeforeStairs(state, path, tx, ty) {
+  if (!path) return null;
+  for (let i = 1; i < path.length; i++) {
+    const n = path[i];
+    if (n.x === tx && n.y === ty) break;
+    if (isStairsTile(tileAt(state.map, n.x, n.y))) return path.slice(0, i);
+  }
+  return path;
 }
 
 // The next step of the stored path as { dx, dy }, advancing the path cursor; or
