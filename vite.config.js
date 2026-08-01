@@ -70,6 +70,30 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
+        // A precache entry with `revision: null` is never re-fetched while its
+        // URL is unchanged — correct for a file whose NAME carries a content
+        // hash, wrong for anything else.
+        //
+        // vite-plugin-pwa defaults this to /^assets/, i.e. "everything under
+        // dist/assets/ is hashed". That is false here: the vendored SPD sheets
+        // live in public/assets/ (Phaser loads them by runtime URL string, so
+        // Vite never hashes them) and shipped revision-less. A re-vendored or
+        // corrected sheet would therefore never reach an already-installed PWA —
+        // and tests/entitySprites.test.js validates frame rects against the REPO
+        // png, so such a change would pass CI while installed clients sampled
+        // the old art.
+        //
+        // Match exactly what Vite hashes — a top-level `assets/name-[hash].js|css`
+        // chunk — rather than "has a hyphen and some characters", which also
+        // swallows `apple-touch-icon.png` and `icon-maskable-512.png` and merely
+        // moves the bug to different files.
+        //
+        // Adding revisions is self-repairing: the same URL with a revision reads
+        // as a changed entry, so the next service-worker update re-fetches those
+        // sheets once and every later change propagates normally.
+        // scripts/check-bundle.mjs fails the build if an unhashed URL ever goes
+        // revision-less again.
+        dontCacheBustURLsMatching: /^assets\/[^/]*-[A-Za-z0-9_-]{8}\.(js|css)$/,
       },
     }),
   ],

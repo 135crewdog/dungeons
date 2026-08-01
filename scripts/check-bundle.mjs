@@ -9,6 +9,11 @@
 // Source maps are excluded on purpose: they are published deliberately (see
 // README), they are not downloaded during play, and at ~10 MB they would swamp
 // any signal from the code itself.
+//
+// It also checks a correctness property of the generated service worker, not
+// just a size: that no UNHASHED precache entry ships with `revision: null`.
+// Such an entry is never re-fetched while its URL stays the same, so the file
+// it points at can never be updated on an already-installed PWA.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -74,6 +79,40 @@ for (const { name, actual, limit } of checks) {
   const over = actual > limit;
   failed = failed || over;
   console.log(`${over ? 'FAIL' : 'ok  '} ${name}: ${KB(actual)} / ${KB(limit)} (${pct}%)`);
+}
+
+// --- Precache revisions -----------------------------------------------------
+//
+// Workbox skips re-fetching an entry with `revision: null` as long as its URL is
+// unchanged. That is right for a file whose NAME carries a content hash and
+// wrong for everything else: the vendored SPD sheets sit under dist/assets/ with
+// stable names, and vite-plugin-pwa's default `dontCacheBustURLsMatching`
+// (/^assets/) used to exempt them, so a re-vendored sheet could never reach an
+// installed client. vite.config.js narrows that to real Vite chunks; this is the
+// assertion that keeps it narrow.
+const HASHED = /^assets\/[^/]*-[A-Za-z0-9_-]{8}\.(js|css)$/;
+let manifest = '';
+try {
+  manifest = readFileSync(join(DIST, 'sw.js'), 'utf8');
+} catch {
+  console.error('dist/sw.js missing — did the PWA plugin run?');
+  process.exit(1);
+}
+const entries = [...manifest.matchAll(/\{url:"([^"]+)",revision:(null|"[^"]*")\}/g)];
+if (entries.length === 0) {
+  console.error('could not parse the precache manifest out of dist/sw.js');
+  process.exit(1);
+}
+const unrevisioned = entries
+  .filter(([, url, rev]) => rev === 'null' && !HASHED.test(url))
+  .map(([, url]) => url);
+if (unrevisioned.length > 0) {
+  failed = true;
+  console.log(`FAIL precache revisions: unhashed and revision-less — ${unrevisioned.join(', ')}`);
+} else {
+  console.log(
+    `ok   precache revisions: ${entries.length} entries, only hashed chunks unrevisioned`,
+  );
 }
 
 if (failed) {

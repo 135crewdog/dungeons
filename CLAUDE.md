@@ -559,6 +559,20 @@ deliberately in the **hit test, not the art**: shrinking the overhang would brea
 SPD's autotiling, and making the hit test perfectly faithful to the art would
 shrink the corridor target to 8px rather than fix it.
 
+`pickClickTile` runs a **second, earlier correction** (0.9.9) for the same class
+of problem on the actor layer. `spriteOffset` lifts every character frame so its
+feet clear the tile bottom, which draws **4px of a humanoid and 7px of the boss
+into the cell above** — and in a room that cell is plain walkable floor, so the
+click succeeded at the wrong thing: no entity there, attack intent quietly
+downgraded to a walk, and clicking the boss's eye strolled you past it. The
+sprite-lift pass therefore runs **before** the walkable early-return, the only
+one of the three that fires on an otherwise-good click. It is scoped hard: the
+click must fall in the bottom ≤7px of a cell **and** a currently-**visible**
+entity must stand directly below, so walking onto the tile over an enemy still
+works from the upper ~9px. The per-entity lift arrives through a `liftBelow`
+callback the scene supplies (`GameScene.spriteLift`), keeping `camera.js` pure
+and Node-testable and the sprite table out of the geometry.
+
 ## Language and Tooling
 
 Plain JavaScript, ES modules throughout. No TypeScript. No barrel/`index.js` files
@@ -966,15 +980,55 @@ release, balance byte-identical throughout:
   the client, and a dashboard-parity case whose CORS dimension compared `null`
   to `null`).
 
-**Deferred deliberately:** vendored art is precached with `revision: null`
-(`public/assets/` matches vite-plugin-pwa's `dontCacheBustURLsMatching` despite
-having no content hash), so a re-vendored sheet would never reach an
-already-installed PWA. Every fix changes asset URLs, and whether installed
-clients recover cannot be answered from a repository — it needs a real device
-with the old service worker. First item for the next release rather than
-changed blind. Four P3 items (the death overlay's modal a11y contract, clicking
-a sprite's head in a room, `trapTabKey` vs the `hidden` attribute, a stale
-comment in `motion.js`) are recorded in the audit and left open.
+0.9.8 deferred the precache finding and the four P3 items; **0.9.9 closed all
+five** — see below.
+
+**0.9.9 — everything the audit left open.** Nothing in the repo is now recorded
+as unresolved except the manual leaderboard-worker deploy, which needs a
+Cloudflare account rather than a code change.
+
+- **Vendored art now gets precache revisions.** An entry with `revision: null`
+  is never re-fetched while its URL is unchanged — correct for a file whose
+  NAME carries a content hash, wrong for anything else. vite-plugin-pwa defaults
+  `dontCacheBustURLsMatching` to `/^assets/`, i.e. "everything under
+  `dist/assets/` is hashed", which is false here: the SPD sheets live in
+  `public/assets/` because Phaser loads them by runtime URL string, so Vite
+  never hashes them. A re-vendored sheet could not have reached an installed
+  PWA, and `tests/entitySprites.test.js` validates rects against the _repo_ PNG,
+  so such a change would have passed CI while installed clients sampled the old
+  art. Now matched on Vite's actual chunk shape,
+  `^assets/name-[hash].js|css`. **The 0.9.8 deferral reason was wrong** and is
+  worth recording as wrong: "whether installed clients recover cannot be
+  answered from a repository" is true of _moving the files_, but adding a
+  revision is self-repairing — the same URL with a revision reads as a changed
+  entry, so the next service-worker update re-fetches once and every later
+  change propagates. That is answerable from the generated manifest.
+  `scripts/check-bundle.mjs` now **fails the build** if any unhashed URL ships
+  revision-less, which also caught a first attempt whose regex was loose enough
+  to swallow `apple-touch-icon.png`.
+- **The death overlay joins the modal contract** the other three get from
+  `ui/overlay.js`: `role="dialog"`, `aria-modal`, `aria-label`, `tabIndex=-1`,
+  focus restored on close, and the panel itself focused when the initials form
+  is hidden — without which nothing inside the dialog held focus and the Tab
+  trap never fired at all. It still does not go _through_ `createOverlay`: no
+  close button, its own Enter/Space restart, a form.
+- **Clicking a character targets the character.** `spriteOffset` lifts frames so
+  their feet clear the tile bottom, which draws 4px of a humanoid (7px of the
+  boss) into the cell _above_ — and in a room that cell is walkable, so
+  `pickClickTile` returned it untouched and "attack the boss" silently became
+  "walk past the boss". A third pass, ordered **first** because it is the only
+  one that fires on an already-walkable click, snaps down when a **visible**
+  entity below pokes into the clicked band. The per-entity lift comes from a
+  `liftBelow` seam the scene supplies, so `camera.js` stays pure and the sprite
+  table stays out of it.
+- **`trapTabKey` respects the `hidden` attribute**, not just inline
+  `display:none` — `menu.js` sets `endBtn.hidden` on the death screen, which
+  left a non-focusable element in the Tab cycle.
+- **The rate-limiter bound is tested**, not just implemented: the 0.9.5
+  "bounded map" headline had zero coverage and the 0.9.8 audit had to verify it
+  by hand. Both branches are now driven through the real fetch handler.
+- A comment in `motion.js` claiming the lunge guard is "never true today" was
+  simply wrong — it fires whenever turns arrive faster than `TWEEN_MOVE_MS`.
 
 `window.__game` remains exposed **deliberately**: it is a debugging and
 reproducibility affordance, and hiding it would not be anti-cheat — the POST
@@ -1069,6 +1123,17 @@ sealed-rim invariant in `tests/invariants.test.js` is load-bearing for
 its predicate cannot tell from a wall, so the snap could only reach in from outside
 if row 0 were walkable. The generator never makes it so, and that test is what keeps
 it true.
+
+0.9.9 extends `tests/camera.test.js` with the sprite-lift pass (a head-band click
+over a visible entity targets it; the same click with no entity, an unseen one, or
+no `liftBelow` at all is untouched; the boss's 7px reach does not become 8; the
+0.9.7 wall cases are unchanged), and `tests/leaderboard-server.test.js` with the
+rate limiter's two bounds — the window reopening after its stamps go stale, and an
+early IP getting a fresh allowance because it was **evicted** rather than retained
+past the cap. Both are mutation-checked. The precache-revision rule is asserted at
+BUILD time instead of in a unit test: `scripts/check-bundle.mjs` parses the
+generated `dist/sw.js` and fails when any URL without a content hash carries
+`revision: null`, which is the only place the property is actually observable.
 
 **Broad-seed invariants** (`tests/invariants.test.js`, 0.9.5) assert the rules the
 example-based suites' outcomes are supposed to obey, across 40 seeds and down to

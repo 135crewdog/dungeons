@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import worker from '../server/worker.js';
 import dashboardWorker from '../server/worker.dashboard.js';
@@ -400,5 +400,54 @@ describe('dashboard worker parity', () => {
     expect(src).not.toMatch(/^import /m);
     expect(src).not.toMatch(/^export (?!default)/m);
     expect(src).toMatch(/^export default \{/m); // still a module worker
+  });
+});
+
+// The 0.9.5 hardening headline was "the rate-limit map is bounded". That was
+// implemented (sweepRateLimiter + a hard cap eviction in worker.js) but never
+// asserted — the 2026-08-01 audit had to verify it by hand. These drive the two
+// branches through the real fetch handler, which is the only surface that can
+// observe them: the map is module-level and not exported.
+//
+// They live last in the file because they leave the map near its cap, which is
+// harmless for tests that use their own IPs but pointless to inflict earlier.
+describe('rate limiter bounds (worker.js)', () => {
+  const RATE_MAX_IPS = 5000; // mirrors worker.js; the module does not export it
+  const okDb = () => fakeDb([]);
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('prunes stamps once their window has passed, so an IP is not limited forever', async () => {
+    let clock = 1_000_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const ip = 'window-probe';
+    for (let i = 0; i < 6; i++) {
+      const res = await worker.fetch(post(VALID, ip), withEnv(okDb()));
+      expect(res.status, `post ${i + 1} of the allowance`).toBe(201);
+    }
+    expect((await worker.fetch(post(VALID, ip), withEnv(okDb()))).status).toBe(429);
+
+    clock += 60_001; // past RATE_WINDOW_MS: every stamp is now stale
+    const after = await worker.fetch(post(VALID, ip), withEnv(okDb()));
+    expect(after.status, 'the window reopened').toBe(201);
+  });
+
+  it('evicts old IPs rather than growing without limit', async () => {
+    // Spray past the cap from unique IPs, all at one instant so nothing is
+    // stale and the SWEEP cannot reclaim anything — the hard-cap eviction is
+    // the only thing that can hold the bound.
+    vi.spyOn(Date, 'now').mockImplementation(() => 2_000_000_000);
+    const first = 'spray-0';
+    expect((await worker.fetch(post(VALID, first), withEnv(okDb()))).status).toBe(201);
+    for (let i = 1; i < RATE_MAX_IPS + 100; i++) {
+      await worker.fetch(post(VALID, `spray-${i}`), withEnv(okDb()));
+    }
+    // If the map had simply grown, `spray-0` would still be holding its one
+    // stamp and would 429 on its sixth further post. Evicted, it gets a fresh
+    // full allowance.
+    for (let i = 0; i < 6; i++) {
+      const res = await worker.fetch(post(VALID, first), withEnv(okDb()));
+      expect(res.status, `post ${i + 1} after eviction`).toBe(201);
+    }
   });
 });

@@ -20,6 +20,12 @@ const FOCUSABLE =
 function isShown(el) {
   for (let node = el; node; node = node.parentElement) {
     if (node.style && node.style.display === 'none') return false;
+    // The `hidden` ATTRIBUTE hides too, and the overlays use it — menu.js sets
+    // endBtn.hidden on the death screen. Missing it left a non-focusable
+    // element in the cycle: Tab would call .focus() on something the browser
+    // will not focus, and focus falls out of the trap to <body>. Harmless only
+    // as long as such an element is never first or last in the list.
+    if (node.hidden) return false;
   }
   return true;
 }

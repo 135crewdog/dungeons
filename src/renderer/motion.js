@@ -179,8 +179,14 @@ export function createMotion(scene) {
     for (const l of lunges) {
       const attacker = scene.state.entities.byId.get(l.id);
       const img = scene.entityImages.get(l.id);
-      // Skip when the attacker's sprite is mid-move (never true today — a
-      // combatant either moved or attacked — but cheap insurance).
+      // Skip when the attacker's sprite has a tween in flight. Within one turn a
+      // combatant either moves or attacks, so this is not about THIS turn's
+      // move — it fires when the PREVIOUS turn's glide is still running, which
+      // happens whenever turns arrive faster than TWEEN_MOVE_MS (held-key
+      // repeat at the ~30ms OS rate, auto-walk at the step cadence). Dropping
+      // the lunge there is the right trade: retargeting a live glide to add a
+      // 4px yoyo would fight the move it is in the middle of, and the swing
+      // still reads through its damage number.
       if (!attacker || !img || isActive(l.id)) continue;
       const ddx = Math.sign(l.x - attacker.x);
       const ddy = Math.sign(l.y - attacker.y);

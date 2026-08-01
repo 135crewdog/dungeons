@@ -41,6 +41,17 @@ export function createGameOver(parent, opts = {}) {
     '</div>';
   parent.appendChild(el);
 
+  // The same modal contract the other three overlays get from ui/overlay.js.
+  // This panel does not go through createOverlay — it has no close button, its
+  // own Enter/Space restart, and an initials form — but a screen reader should
+  // not be able to tell that from the outside: without role/aria-modal the end
+  // of a run is announced as nothing at all.
+  const panel = el.querySelector('.go-panel');
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-label', 'Run over');
+  panel.tabIndex = -1;
+
   const title = el.querySelector('.go-title');
   const sub = el.querySelector('.go-sub');
   const form = el.querySelector('.go-initials');
@@ -48,6 +59,7 @@ export function createGameOver(parent, opts = {}) {
   const submitBtn = form.querySelector('button');
   const status = el.querySelector('.go-status');
   let onRestart = null;
+  let restoreTo = null;
 
   // Keep the field arcade-clean while typing: uppercase, A-Z0-9, max 3.
   input.addEventListener('input', () => {
@@ -82,7 +94,6 @@ export function createGameOver(parent, opts = {}) {
 
   // Focus trap while the death screen is up (scoped to the overlay, so a menu
   // or leaderboard layered above — which holds its own focus — is unaffected).
-  const panel = el.querySelector('.go-panel');
   el.addEventListener('keydown', (e) => {
     if (el.classList.contains('show')) trapTabKey(panel, e);
   });
@@ -120,12 +131,25 @@ export function createGameOver(parent, opts = {}) {
     input.value = getLastInitials();
     status.textContent = '';
     el.classList.add('show');
-    // Arcade UX: land the keyboard straight in the initials field.
+    // Remember where focus was so hide() can put it back — otherwise "New run"
+    // leaves focus on a button whose ancestor becomes display:none and the
+    // browser drops it to <body>.
+    restoreTo = document.activeElement;
+    // Arcade UX: land the keyboard straight in the initials field. With
+    // submission unavailable there is no field, so focus the panel itself:
+    // something inside the dialog has to hold focus or the Tab trap (scoped to
+    // `el`) never fires and Tab walks straight out into the page behind.
     if (canSubmit()) input.focus();
+    else panel.focus();
   }
 
   function hide() {
+    const wasShown = el.classList.contains('show');
     el.classList.remove('show');
+    if (wasShown && restoreTo && typeof restoreTo.focus === 'function') {
+      restoreTo.focus();
+    }
+    restoreTo = null;
   }
 
   return { show, hide, el };
