@@ -72,12 +72,18 @@ is in here. Workers Builds looks for a Wrangler config in the build's **root
 directory** — which defaults to the repository root — and **rejects the build
 before it starts** when it finds none.
 
-That is what four consecutive failed builds were. Each reported the same second
-for start and finish; a build that failed while installing or deploying takes
-tens of seconds, so an instant one never ran at all. The log was never needed to
-tell that. Moving the file fixed it on the first try — `7b6cd46` is the first
-build that ran (~15 minutes, most of it installing the game's dev dependencies)
-and the first that deployed.
+That is what four consecutive failed builds were, and moving the file fixed it on
+the first try: `7b6cd46` is the first build that ran (~15 minutes, most of it
+installing the game's dev dependencies) and the first that deployed.
+
+**Do not try to diagnose this from the GitHub check run's timestamps.** The
+failed builds all reported the same second for start and finish, which looks like
+"rejected before it started" — but the *successful* builds report the same second
+too (`bd35efb`: `20:45:49` → `20:45:49`, for a build that took a quarter of an
+hour). Cloudflare stamps both fields when it updates the check, so they carry no
+duration information at all and cannot distinguish a rejection from a run. The
+PR comment the bot edits in place does show real progress (`In progress` →
+`Deployment successful`); the check run does not.
 
 Keeping the config where the tooling already looks means the deploy works on
 Cloudflare's **default** settings — no root directory to set, no deploy command

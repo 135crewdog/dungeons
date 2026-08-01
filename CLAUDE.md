@@ -134,9 +134,11 @@ throughout, so re-running it is safe).
 **Why `wrangler.toml` is at the repository root, not in `server/`** (0.9.9):
 Workers Builds looks for a Wrangler config in the build's **root directory**
 (default: the repo root) and **rejects the build before it starts** when it finds
-none. That is what four consecutive failed builds were — each reported the same
-second for start and finish, which is a rejection, not a build that ran and
-broke. Keeping the config where the tooling already looks makes the deploy work
+none. That is what four consecutive failed builds were; moving the file fixed it
+on the first attempt. (The GitHub check run's timestamps do NOT show this — a
+successful 15-minute build reports the same start and finish second as an instant
+rejection, so they carry no duration at all. `server/README.md` records that trap.)
+Keeping the config where the tooling already looks makes the deploy work
 on Cloudflare's **default** settings, with nothing to configure in the dashboard;
 `main = "server/worker.js"` points back at the code. It is the **only** Wrangler
 config in the repo, deliberately — a second one under `server/` would drift, and
