@@ -90,11 +90,9 @@ The one networked feature. A tiny **Cloudflare Worker + D1** backend lives in
 **Cloudflare Workers Builds from this repository** — a change under `server/`
 that lands on `main` ships itself (steps and the one dangerous rule in
 `server/README.md`); the game itself stays a static GitHub Pages deploy, so the
-two halves deploy from the same push but by different pipelines. **Caveat, as of
-0.9.9: that connection is configured and its builds had been failing** — the
-cause is now identified (below) and the fix is in; until a build is observed
-green, treat the dashboard-paste fallback in `server/README.md` as the route
-that is known to work. API: `POST /scores` validates
+two halves deploy from the same push but by different pipelines. First green
+build: `7b6cd46`, which is also the commit that fixed it — see the config-location
+note below. API: `POST /scores` validates
 `{ initials, floor, turns, seed, version }` (initials exactly 3 chars A–Z0-9, uppercased
 server-side) and stamps a **server** timestamp; `GET /scores` returns the top 50 of the
 last 30 days ordered **floor DESC, turns ASC, created_at ASC**, plus the server clock so

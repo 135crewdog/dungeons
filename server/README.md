@@ -65,15 +65,6 @@ the backend deploy from the same push instead of the backend waiting on somebody
 to remember it. The game's own workflow still only publishes `dist/` — it is
 Cloudflare, not GitHub Actions, that ships the worker.
 
-> **Status: the cause of the failing builds is identified and the fix is in, but
-> no build has been observed green yet.** Until one is, the section above
-> describes the intended route rather than a proven one, and the dashboard-paste
-> fallback at the bottom of this file remains what is known to work — it is how
-> the current v0.9.5+ worker got live. Delete this note in the commit that sees a
-> build pass. It is here because a document that confidently describes a
-> deployment path that does not work is exactly what let issue #30 sit open for a
-> week, and "I fixed it" is not the same as "it ran".
-
 ### Why the config is a directory up
 
 `wrangler.toml` is at the **repository root** even though everything it describes
@@ -84,7 +75,9 @@ before it starts** when it finds none.
 That is what four consecutive failed builds were. Each reported the same second
 for start and finish; a build that failed while installing or deploying takes
 tens of seconds, so an instant one never ran at all. The log was never needed to
-tell that.
+tell that. Moving the file fixed it on the first try — `7b6cd46` is the first
+build that ran (~15 minutes, most of it installing the game's dev dependencies)
+and the first that deployed.
 
 Keeping the config where the tooling already looks means the deploy works on
 Cloudflare's **default** settings — no root directory to set, no deploy command
