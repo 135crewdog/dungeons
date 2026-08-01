@@ -81,6 +81,30 @@ describe('generation invariants', () => {
       expect(state.map.stairsDown, `seed ${seed}`).toBeTruthy();
     }
   });
+
+  it('never makes a border cell walkable, so the map is sealed by a wall rim', () => {
+    // Load-bearing beyond "you cannot walk off the edge": renderer/camera.js's
+    // pickClickTile snaps a dead click DOWN onto the walkable tile below it, and
+    // an out-of-bounds click one pixel above the map floors to row -1, which is
+    // indistinguishable from a wall to its predicate. The snap can only reach
+    // into the map from outside if row 0 is walkable — this is what guarantees
+    // it never is. If the generator ever stops reserving the rim, the click
+    // helper needs an explicit bounds check.
+    const problems = [];
+    for (const seed of SEEDS) {
+      const state = createGame(seed);
+      const m = state.map;
+      for (let x = 0; x < m.width; x++) {
+        if (isWalkable(m, x, 0)) problems.push(`seed ${seed}: (${x},0) walkable`);
+        if (isWalkable(m, x, m.height - 1)) problems.push(`seed ${seed}: (${x},${m.height - 1})`);
+      }
+      for (let y = 0; y < m.height; y++) {
+        if (isWalkable(m, 0, y)) problems.push(`seed ${seed}: (0,${y}) walkable`);
+        if (isWalkable(m, m.width - 1, y)) problems.push(`seed ${seed}: (${m.width - 1},${y})`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
 });
 
 describe('floor transition invariants', () => {

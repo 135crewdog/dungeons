@@ -54,7 +54,10 @@ three initials on the cross-device leaderboard.
   diagonals.
 - **Click / tap** anywhere on the map to auto-walk there along a path over
   explored ground. The walk stops if a new enemy appears, you take damage, or you
-  press a key.
+  press a key. It also routes **around** staircases, so a walk across the room
+  never drops you to the next floor by accident — you change floors only by
+  clicking the stairs themselves or stepping onto them. Clicking a visible enemy
+  closes to melee and lands one swing.
 - **Escape** (or the "Menu" text, top-right) opens the pause menu: new run,
   restart this seed, enter a seed, leaderboard, help.
 - Attack by moving into an enemy. Walk onto the stairs to descend or ascend, onto

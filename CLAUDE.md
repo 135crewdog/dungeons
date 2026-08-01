@@ -481,7 +481,9 @@ STEP_DELAY_MS` (110ms) is load-bearing**: a glide fills its step edge to edge, s
   Following the sprite makes de-sync unrepresentable. **Clicks still unproject
   against the SETTLED camera center** (`camCenter`, the tile the player already
   occupies — `screenToTile` never reads the live camera matrix), so spam-clicking
-  mid-glide can never mistarget.
+  mid-glide can never mistarget. That unprojected pixel then goes through
+  `pickClickTile`, which compensates for the wall art crowding corridors from
+  above — see Canvas and Resolution.
 - **Excluded, deliberately**: frame-based attack animations (the lunge sells the
   hit) and death animations (the sim deletes the entity and its sprite the same
   turn — a corpse-sprite pool is real new machinery; deferred).
@@ -531,10 +533,12 @@ until 0.9.4 — blocks zoom over the DOM overlays, which is exactly the text a
 low-vision player needs to magnify; `tests/gesturePolicy.test.js` and the
 campaign's E17 both reject that regression.
 
-**Click alignment vs. the pseudo-3D art** (0.9.7). The screen→tile math is exact
-and axis-symmetric (`screenToTile` unprojects against the settled `camCenter`,
-which is the player tile's true center; `followPlayer` cancels `spriteOffset` so
-that center really is mid-screen). The **art** is not symmetric: a wall paints its
+**Click alignment vs. the pseudo-3D art** (0.9.7). The screen→pixel half of the
+math is exact and axis-symmetric: `screenToTile` unprojects against the settled
+`camCenter`, which is the player tile's true center, and `followPlayer` cancels
+`spriteOffset` so that center really is mid-screen. (`screenToTile` itself is no
+longer symmetric end to end — it finishes through the deliberately one-directional
+`pickClickTile` below.) The **art** is not symmetric either: a wall paints its
 top over the **bottom half** of the open cell above it (`WALL_OVERHANG`, drawn in
 the walls layer over actors), while the wall _above_ an open cell contributes
 nothing into it. So a one-tile-wide **east–west corridor only shows its top 8px**
@@ -743,10 +747,11 @@ rules, per-enemy provoke, two lethal-site survival hook, sprite-first Help legen
 HUD chips via composition-root icon injection, balance-bot awareness (single-step
 opt-out; shadow-aware threat filter), e2e fixtures regenerated. Balance snapshot
 (200-run thorough bot): floor-10 clear 19% → 30% — floors 1–4 untouched, the
-mid/late lift is the rings working; whether that's too generous is an open tuning
-question for a patch (candidate lever: the boss seeing through Shadow). _(0.9.6 took
-that lever, and two more — see below. The Secrets section is authoritative for how
-Shadow and Survival behave now.)_
+mid/late lift is the rings working; whether that was too generous was left as a
+tuning question for a patch (candidate lever: the boss seeing through Shadow).
+_(0.9.6 took that lever, and two more, overshooting slightly; 0.9.8 closed the
+question by setting an accepted band — see below. The Secrets section is
+authoritative for how Shadow and Survival behave now.)_
 
 Phase 8 (complete): **animation** — the deliberate reversal of the
 no-animation-clock policy, entirely inside the renderer (sim, input timing, and
@@ -844,10 +849,9 @@ lived. Two levers were swept and **rejected** as ineffective rather than shipped
 `SHADOW_NOISE_RADIUS` 5 → 3 moved clear rate by one point (most fights already happen
 within 3 tiles, so the wider, more coherent radius is kept), and reverting Survival to a
 full heal bought two. The remaining ~7 points are intrinsic to the boss and proximity
-rules — i.e. to the fix itself. **Open question deliberately left open:** this lands the
-curve ~6 points under the ~33% the project has calibrated to since 0.9.3, so if that
-gap is judged too harsh the 0.9.3 precedent applies — pay it back with a separate
-enemy-stat lever rather than by watering down the Shadow rules.
+rules — i.e. to the fix itself. This landed the curve ~6 points under the ~33% the
+project had calibrated to since 0.9.3, and 0.9.6 deliberately left open whether that
+gap was too harsh. **0.9.8 closed it — see the difficulty target below.**
 
 **0.9.7 — playtest polish.** Three fixes, no new mechanics. **The click path routes
 around staircases**: a staircase between the player and a click used to end the floor
@@ -881,6 +885,44 @@ survival number still matches exactly (per-floor reached, deaths, floor-10 clear
 median death floor 3, death causes, turns/run); only mean HP and armor on descent
 move, and only on floors 10–12, which is the relocated chest being collected instead
 of stranded.
+
+**0.9.8 — the last two quirks, and a difficulty target.** Both quirks the Secrets
+section had listed as accepted came from one root cause: the reveal and fill passes
+are keyed to a **player command**, and arriving on a floor and unlocking a chest are
+not commands. **A key beside the arrival stair now glimmers on arrival**, not on the
+next command — `resolveStairStep` runs the reveal pass after the floor swap, where
+`descend`/`ascend` have already computed FOV. **The Ring of Sight's `explored` fill
+lands on the pickup turn**, not the next one — the ring is worn at turn step 5, after
+step 3's FOV pass, so the floor lit up instantly (the renderer reads
+`query.isRevealed`) while click pathing across it silently lagged a turn; a second
+`updateVisibility` runs when the flag flips. Neither draws RNG.
+
+**Difficulty target (supersedes the 0.9.6 open question).** Floor-10 clear rate for
+the thorough bot is a **band, 25–33%**, not a single number. Measured across four
+independent 200-run seed blocks at 0.9.8 — 1000/3000/5000/7000 → **25 / 28 / 26 /
+28%** (mean 26.75%) — so 0.9.6's Shadow nerf is inside the band and **no enemy-stat
+lever is being pulled**; the ~33% figure was one point in the band, not the target.
+Worth knowing: the curve sits at the band's **lower edge**, with one block exactly on
+25%, so any future change that makes the game harder should be measured against this
+before shipping. If one ever pushes it below 25%, the 0.9.3 precedent still applies —
+pay it back with a separate enemy-stat lever rather than by watering down the Shadow
+rules.
+
+Balance for the quirk fixes themselves: **byte-identical**. Both were expected to be
+able to move it — `scripts/balance/policies.js` targets revealed keys and the Sight
+fill feeds `isKnownWalkable`, so a bot could in principle route differently a turn
+earlier — so it was measured rather than assumed, and the simulator output did not
+move at all.
+
+Also 0.9.8: **`pickClickTile` is gated on sprite mode.** The snap compensates for
+the SPD wall overhang, and the ASCII fallback has no overhang — a `#` fills its own
+cell — so applying it there turned a click on a plainly-visible wall into a move.
+`screenToTile` now uses the plain `worldToTile` whenever `useSprites()` is false,
+which is the same predicate `makeGrid` already branches on. Found by automated
+review on the PR. A second review finding — that a click just above the map could
+snap into row 0 — was **checked and rejected**: it needs a walkable border cell, and
+the generator seals the rim (0 walkable border cells across 120 generated floors).
+Rather than leave that as an unverified claim, the rim is now a tested invariant.
 
 `window.__game` remains exposed **deliberately**: it is a debugging and
 reproducibility affordance, and hiding it would not be anti-cheat — the POST
@@ -960,6 +1002,21 @@ standing on a staircase still being pursued and swung at without descending.
 skipping littered tiles as well as occupied ones. `tests/secrets.test.js` pins the
 band-0 ring split near 25% each over 20k LCG-generated seeds — deterministic
 input, loose bounds, so it catches a collapsed shuffle rather than flaking.
+
+0.9.8 adds the two quirk fixes' regression cases, both mutation-checked (each
+fails with its fix reverted, and its control case passes either way):
+`tests/keyReveal.test.js` descends onto a **pre-cached** floor 2 — cached rather
+than generated, so the arrival geometry is exact — and asserts a key within
+`KEY_REVEAL_RADIUS` of the up-stairs glimmers on the arrival turn itself, that one
+tile further stays hidden, and that it still announces only once;
+`tests/rings.test.js` clears `explored`, puts a closed door between the player and
+the far end so it is genuinely unseen, and asserts that the turn which picks up the
+Ring of Sight leaves that end both `isKnownWalkable` and `planPath`-able. The
+sealed-rim invariant in `tests/invariants.test.js` is load-bearing for
+`pickClickTile`: an out-of-bounds click just above the map floors to row −1, which
+its predicate cannot tell from a wall, so the snap could only reach in from outside
+if row 0 were walkable. The generator never makes it so, and that test is what keeps
+it true.
 
 **Broad-seed invariants** (`tests/invariants.test.js`, 0.9.5) assert the rules the
 example-based suites' outcomes are supposed to obey, across 40 seeds and down to

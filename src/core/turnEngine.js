@@ -95,6 +95,12 @@ export function processCommand(state, command) {
 // doesn't ricochet straight back the way they came. Returns true when the
 // floor changed: the caller must stop cold (the whole floor state was swapped,
 // and any remaining Ring-of-Speed step is forfeited).
+//
+// Arriving still runs the key-reveal pass. descend/ascend compute FOV for the
+// arrival tile, but the rest of the turn is skipped, so until 0.9.8 a key
+// sitting within reveal range of the arrival stair only glimmered on the NEXT
+// command — the player was standing next to it, looking at it, and the game
+// waited a turn to say so. Reveals draw no RNG, so this costs nothing.
 function resolveStairStep(state, player, fromX, fromY, events) {
   if (player.x === fromX && player.y === fromY) return false;
   const tile = tileAt(state.map, player.x, player.y);
@@ -102,12 +108,14 @@ function resolveStairStep(state, player, fromX, fromY, events) {
     descend(state);
     pushLog(state, 'descend', { floor: state.floor });
     events.push(descendEvent(state.floor));
+    revealNearbyKeys(state, events);
     return true;
   }
   if (tile === TILE.STAIRS_UP) {
     ascend(state);
     pushLog(state, 'ascend', { floor: state.floor });
     events.push(ascendEvent(state.floor));
+    revealNearbyKeys(state, events);
     return true;
   }
   return false;
@@ -139,7 +147,18 @@ function advanceWorld(state, events) {
   // Enemies act in ascending id order.
   enemyPhase(state, events);
   // Item pickups last: the player walking over an item collects it.
+  const sightBefore = getPlayer(state)?.ringSight ?? false;
   resolvePickups(state, events);
+  // Picking up the Ring of Sight happens AFTER this turn's FOV pass, so its
+  // floor-wide `explored` fill would not land until the next command — the
+  // floor lit up instantly (the renderer reads query.isRevealed) but click
+  // pathing across it silently lagged a turn behind what the player could see.
+  // One extra pass closes that. It is cheap and safe: the player has not moved
+  // since the pass above, so `visible` recomputes identically, revealRoom is
+  // guarded by _revealedRoom, and no RNG is drawn. Reading the flag after the
+  // fact catches both routes to it — the ring pickup and dropRing's boxed-in
+  // direct set.
+  if (!sightBefore && (getPlayer(state)?.ringSight ?? false)) updateVisibility(state);
 }
 
 // Hidden keys blink into view when the player passes close by: within

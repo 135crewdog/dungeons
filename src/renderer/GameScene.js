@@ -10,7 +10,7 @@ import { EV } from '../core/events.js';
 import { TILE_SIZE } from '../core/constants.js';
 import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
 import { SpriteTileGrid, TILESHEET_KEY } from './spriteLayer.js';
-import { computeZoom, tileToWorld, tileCenterWorld, pickClickTile } from './camera.js';
+import { computeZoom, tileToWorld, tileCenterWorld, worldToTile, pickClickTile } from './camera.js';
 import {
   entityGlyph,
   entityColor,
@@ -400,9 +400,14 @@ export class DungeonScene extends Phaser.Scene {
   // pan resolve exactly as they will once it lands, so spam-clicking while
   // the camera glides can never mistarget.
   //
-  // The world pixel resolves through pickClickTile rather than worldToTile: the
-  // terrain art crowds a walkable tile from above, so a click that misses into
-  // the wall over a corridor still means the corridor (see CLICK_SNAP_PX).
+  // In SPRITE mode the world pixel resolves through pickClickTile rather than
+  // worldToTile: the terrain art crowds a walkable tile from above, so a click
+  // that misses into the wall over a corridor still means the corridor (see
+  // CLICK_SNAP_PX). The GLYPH fallback gets the plain conversion — a `#` fills
+  // its own cell and overhangs nothing, so its hit box already matches what is
+  // drawn, and snapping there would turn a click on a wall the player can
+  // plainly see into a move. The correction exists for the art, so it is gated
+  // on the art actually being in use.
   screenToTile(cssX, cssY) {
     const r = this.renderRatio || 1;
     const cam = this.cameras.main;
@@ -410,6 +415,7 @@ export class DungeonScene extends Phaser.Scene {
     const cy = this.camCenter ? this.camCenter.y : cam.midPoint.y;
     const wx = cx + (cssX * r - cam.width / 2) / cam.zoom;
     const wy = cy + (cssY * r - cam.height / 2) / cam.zoom;
+    if (!this.useSprites()) return worldToTile(wx, wy);
     return pickClickTile(wx, wy, (x, y) => isKnownWalkable(this.state, x, y));
   }
 }

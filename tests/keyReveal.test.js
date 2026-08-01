@@ -105,3 +105,65 @@ describe('hidden key proximity reveal', () => {
     expect(key.hidden).toBe(true); // but the secret keeps its secret
   });
 });
+
+// Floor 1 with a down-staircase, plus a pre-cached floor 2 holding a hidden key
+// `keyGap` tiles east of its up-staircase — where the player lands. Caching
+// floor 2 (rather than letting the generator make one) is what makes the
+// arrival geometry exact; descend() restores it through activateFloor.
+function twoFloors({ keyGap }) {
+  const { state, player } = corridor({ playerX: 5, keyX: 99 });
+  state.items = []; // floor 1 carries no key
+  state.map.tiles[idx(state.map, 6, 1)] = TILE.STAIRS_DOWN;
+  state.map.stairsDown = { x: 6, y: 1 };
+
+  const width = 14;
+  const height = 3;
+  const tiles = new Uint8Array(width * height); // WALL
+  const map = {
+    width,
+    height,
+    tiles,
+    rooms: [],
+    roomAt: new Int16Array(width * height).fill(-1),
+    stairsDown: null,
+    stairsUp: { x: 3, y: 1 },
+  };
+  for (let x = 1; x <= 12; x++) tiles[x + width] = TILE.FLOOR;
+  tiles[3 + width] = TILE.STAIRS_UP;
+  const key = { id: 31, type: 'key', x: 3 + keyGap, y: 1, hidden: true };
+  const explored = new Uint8Array(width * height).fill(1);
+  state.floors.set(2, {
+    map,
+    vis: { visible: new Uint8Array(width * height), explored },
+    items: [key],
+    byId: new Map(),
+    nextId: 50,
+  });
+  return { state, player, key };
+}
+
+describe('arriving on a floor runs the reveal pass', () => {
+  it('glimmers a key beside the arrival stair on arrival, not a command later', () => {
+    const { state, key } = twoFloors({ keyGap: KEY_REVEAL_RADIUS });
+    const events = processCommand(state, { type: 'move', dx: 1, dy: 0 }); // take the stairs
+    expect(state.floor).toBe(2);
+    expect(key.hidden).toBe(false);
+    expect(events.filter((e) => e.type === EV.REVEAL)).toHaveLength(1);
+    expect(revealLogs(state)).toHaveLength(1);
+  });
+
+  it('leaves a key beyond the radius hidden, same as anywhere else', () => {
+    const { state, key } = twoFloors({ keyGap: KEY_REVEAL_RADIUS + 1 });
+    const events = processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    expect(state.floor).toBe(2);
+    expect(key.hidden).toBe(true);
+    expect(events.filter((e) => e.type === EV.REVEAL)).toHaveLength(0);
+  });
+
+  it('announces it once, not again on the next command', () => {
+    const { state } = twoFloors({ keyGap: KEY_REVEAL_RADIUS });
+    processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    expect(revealLogs(state)).toHaveLength(1);
+  });
+});

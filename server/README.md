@@ -55,8 +55,46 @@ the game runs normally with the leaderboard showing "not configured".
 
 ## Updating an already-deployed worker
 
-Worker changes are **not** picked up by the game's GitHub Pages deploy — the
-backend is deployed by hand. After merging a change under `server/`:
+Worker changes are **not** picked up by the game's GitHub Pages deploy — that
+workflow only publishes `dist/`. The backend is deployed by hand, and **this
+project's worker was set up through the dashboard**, not the CLI (which is why
+`wrangler.toml` still carries the `database_id` placeholder). Update it the same
+way you created it.
+
+### Do these in order — the order is what makes it safe
+
+**1. Set `ALLOWED_ORIGIN` first, before touching the code.** Since v0.9.5 a
+missing value means _unconfigured_: the worker sends no CORS headers at all, so
+the browser discards a reply that looks perfectly fine server-side. Pre-0.9.5
+code read `env.ALLOWED_ORIGIN || '*'`, so adding the variable to a worker still
+running the old code changes nothing — which is exactly why it goes first. Do it
+and the new code lands already configured, with no window where the board is dark.
+
+In the worker's **Settings → Variables and Secrets**, add `ALLOWED_ORIGIN` = `*`
+and save. `*` is fine — the API uses no cookies or credentials. Narrow it later
+to a comma-separated origin list if you want, e.g.
+`https://example.github.io,http://localhost:5173`.
+
+**2. Run the schema.** D1 → `dungeons-leaderboard` → **Console** → paste all of
+`schema.sql` → Run. Every statement is `CREATE ... IF NOT EXISTS`, so it cannot
+disturb existing rows; it adds `idx_scores_dupe`, which backs the duplicate check
+the worker runs before every insert. Without the index the check still works, it
+just scans.
+
+**3. Paste the code.** Worker → **Edit Code** → replace everything with
+`worker.dashboard.js` → Deploy. That file is committed and CI fails if it drifts
+from `scores.js` + `worker.js`, so copy it as-is; `npm run build:dashboard` is
+only needed if you edited `server/*.js` yourself.
+
+**4. Check it.** `curl -si <worker-url>/scores | grep -i access-control-allow-origin`
+should print a line containing `*` — nothing means step 1 didn't take. Then POST
+the same score twice: `201` then `409` confirms duplicate suppression is live.
+
+### With wrangler instead
+
+`wrangler.toml` supplies the binding and the variable automatically, so it is
+just the two commands — but fill in `database_id` first (see the CLI section
+above; `npx wrangler d1 list` prints it for an existing database):
 
 ```sh
 # 1. new indexes / schema (idempotent, safe to re-run on a live database)
@@ -64,21 +102,6 @@ npx wrangler d1 execute dungeons-leaderboard --remote --file=./schema.sql
 # 2. the worker itself
 npx wrangler deploy
 ```
-
-Since **v0.9.5** that checklist matters for two reasons:
-
-- `schema.sql` adds `idx_scores_dupe`, which backs the duplicate check the
-  worker now runs before every insert. Without the index the check still works,
-  it just scans.
-- `ALLOWED_ORIGIN` must be set **deliberately**. A missing or empty value no
-  longer falls back to `*` — the worker answers with no CORS headers at all, so
-  browsers block it. `wrangler.toml` ships `"*"` (fine: the API uses no cookies
-  or credentials), and you can narrow it to a comma-separated origin list
-  whenever you like, e.g. `ALLOWED_ORIGIN = "https://example.github.io"`.
-
-If you paste into the dashboard editor instead of using wrangler, use
-`worker.dashboard.js` — and regenerate it first with `npm run build:dashboard`,
-since it is a generated flattening of `scores.js` + `worker.js`.
 
 ## Local development
 
@@ -104,8 +127,16 @@ To point the game at it, temporarily set `LEADERBOARD_URL` in
   — `now` is the server clock (unix ms) so clients can render ages without
   trusting the device clock.
 - `POST /scores` with `{ initials, floor, turns, seed, version }` →
-  `201 { ok: true }`, or `400` (invalid), `413` (body > 512 bytes),
-  `429` (> 6 posts/min/IP, best-effort per isolate).
+  `201 { ok: true }`, or `400` (invalid JSON or a field that fails validation),
+  `409` (an identical `initials`/`floor`/`turns`/`seed` within 10 minutes — the
+  offline queue re-sending a score whose response was lost), `413` (body > 512
+  bytes, measured in real UTF-8 bytes and also checked against `Content-Length`
+  before the body is read), `415` (content type is not JSON), `429` (> 6
+  posts/min/IP, best-effort per isolate, with `Retry-After`).
+- Any other method on `/scores` → `405`; any other path → `404`; a D1 failure on
+  either route → `500 { error: 'storage unavailable' }` with `no-store`.
+- `OPTIONS` → `204`. CORS **fails closed**: with `ALLOWED_ORIGIN` unset, every
+  response above carries no CORS headers at all and browsers discard it.
 
 Anti-cheat is honor-level: the payload carries the seed, so a suspicious run
 could later be replay-verified with the headless engine, but nothing enforces
