@@ -12,4 +12,8 @@ ALLOWED_ORIGIN = "*"
 [[d1_databases]]
 binding = "DB"
 database_name = "dungeons-leaderboard"
+# Still a placeholder because this project's worker was deployed through the
+# Cloudflare dashboard, not the CLI — so nothing has ever needed it. Before any
+# wrangler command will work, replace it with the real id: `npx wrangler d1 list`
+# prints it for an existing database, `d1 create` prints it for a new one.
 database_id = "PASTE_DATABASE_ID_HERE"

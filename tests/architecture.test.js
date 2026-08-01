@@ -92,10 +92,39 @@ describe('architecture guards', () => {
     // Static markup templates (the game-over and menu shells) are fine — they
     // contain no data. Interpolating anything into one is not: that is the
     // shape an XSS sink takes. Dynamic values go in via textContent.
-    const interpolated = /\.(inner|outer)HTML\s*=[^;]*\$\{|insertAdjacentHTML\s*\([^;]*\$\{/;
+    //
+    // Both splice forms are banned. Matching only `${` missed CONCATENATION,
+    // and menu.js was already building its version line that way — the banned
+    // shape present in a form the guard could not see, one non-constant value
+    // away from shipping unflagged.
+    const sinks = [
+      /\.(inner|outer)HTML\s*=[^;]*\$\{/, // el.innerHTML = `…${x}…`
+      /\.(inner|outer)HTML\s*=[^;]*'\s*\+\s*[A-Za-z_$]/, // el.innerHTML = '…' + x
+      /insertAdjacentHTML\s*\([^;]*\$\{/, // insertAdjacentHTML(pos, `…${x}…`)
+      /insertAdjacentHTML\s*\([^;]*'\s*\+\s*[A-Za-z_$]/, // …, '…' + value
+    ];
     for (const f of [...jsFiles('src/ui'), MAIN]) {
-      expect(interpolated.test(code(f)), `${f} interpolates into an HTML sink`).toBe(false);
+      const src = code(f);
+      for (const re of sinks) {
+        expect(re.test(src), `${f} splices a value into an HTML sink (${re})`).toBe(false);
+      }
     }
+  });
+
+  it('the e2e leaderboard stub targets the URL the game actually uses', () => {
+    // The production worker URL is written down TWICE — src/net/config.js and
+    // e2e/runner.mjs's LB_ORIGIN, which is what the campaign routes/stubs. If
+    // they drift, the stub stops matching and real requests head for the live
+    // backend; the catch-all abort does stop them, but the campaign then fails
+    // somewhere confusing rather than here. Cheap to make self-checking.
+    // Read RAW, not through code(): its line-comment stripper eats the `//` in
+    // an https:// URL and would truncate both values to "https:".
+    const raw = (p) => readFileSync(join(ROOT, p), 'utf8');
+    const stub = raw('e2e/runner.mjs').match(/const LB_ORIGIN = '([^']*)'/);
+    const cfg = raw('src/net/config.js').match(/LEADERBOARD_URL = '([^']*)'/);
+    expect(stub, 'e2e/runner.mjs no longer declares LB_ORIGIN').toBeTruthy();
+    expect(cfg, 'src/net/config.js no longer declares LEADERBOARD_URL').toBeTruthy();
+    expect(stub[1], 'e2e LB_ORIGIN must match src/net/config.js LEADERBOARD_URL').toBe(cfg[1]);
   });
 
   it('the simulation never imports the network layer', () => {

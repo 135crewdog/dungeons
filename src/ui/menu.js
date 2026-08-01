@@ -61,10 +61,13 @@ export function createMenu(parent, actions) {
       'spellcheck="false" placeholder="Enter seed" aria-label="Enter seed" />' +
       '<button type="submit" data-act="load">Play</button></form>' +
       '</div>' +
-      '<div class="menu-version">Dungeons v' +
-      APP_VERSION +
-      '</div>',
+      '<div class="menu-version"></div>',
   );
+  // The version goes in as TEXT, not spliced into the markup above. It is a
+  // build-time constant so nothing could be injected through it today, but it
+  // was the one place in ui/ still modelling "concatenate a value into an HTML
+  // sink", and the next value added the same way would not be a constant.
+  el.querySelector('.menu-version').textContent = `Dungeons v${APP_VERSION}`;
   parent.appendChild(el);
 
   const seedVal = el.querySelector('.menu-seed-val');

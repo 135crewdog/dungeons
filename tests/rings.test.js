@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { processCommand } from '../src/core/turnEngine.js';
+import { processCommand, planPath } from '../src/core/turnEngine.js';
 import { resolveAttack } from '../src/systems/combat.js';
 import { createRng } from '../src/core/rng.js';
 import { updateVisibility } from '../src/systems/visibility.js';
@@ -12,7 +12,7 @@ import {
   SHADOW_NOTICE_RADIUS,
   SURVIVAL_HEAL_FRACTION,
 } from '../src/core/constants.js';
-import { idx, hiddenFromEnemy } from '../src/core/query.js';
+import { idx, hiddenFromEnemy, isKnownWalkable } from '../src/core/query.js';
 import { EV } from '../src/core/events.js';
 
 // A horizontal corridor (y=1, x=1..12 in a 14x3 wall field) with real
@@ -241,6 +241,27 @@ describe('Ring of Sight', () => {
     expect(state.vis.explored.every((v) => v === 1)).toBe(true);
     expect(state.vis.visible[idx(state.map, 9, 1)]).toBe(0); // door still blocks sight
     expect(state.entities.byId.get(2).aggro ?? false).toBe(false); // no dinner bell
+  });
+
+  it('fills explored on the very turn the ring is picked up, not the next one', () => {
+    // The ring is worn during pickups (turn step 5), AFTER the turn's FOV pass,
+    // so until 0.9.8 the floor-wide `explored` fill landed a turn late: the
+    // screen lit up instantly but click pathing across it still refused. The
+    // closed door at x=5 is what keeps the far end genuinely unexplored, so the
+    // fill is the only thing that could make it known.
+    const { state } = corridor({
+      playerX: 2,
+      doorX: 5,
+      items: [{ id: 40, type: 'ring', x: 3, y: 1, ring: 'sight' }],
+    });
+    state.vis.explored.fill(0);
+    updateVisibility(state);
+    expect(isKnownWalkable(state, 12, 1)).toBe(false); // beyond the door, unseen
+
+    processCommand(state, { type: 'move', dx: 1, dy: 0 }); // steps onto the ring
+    expect(state.entities.byId.get(1).ringSight).toBe(true);
+    expect(isKnownWalkable(state, 12, 1)).toBe(true);
+    expect(planPath(state, 12, 1)).toBe(true); // and it is pathable the same turn
   });
 });
 

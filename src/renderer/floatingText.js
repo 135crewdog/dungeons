@@ -48,3 +48,20 @@ export function spawnFloatingText(scene, tileX, tileY, text, color) {
     },
   });
 }
+
+// Kill every in-flight label and park it back in the pool. Floats are addressed
+// in WORLD pixels, and a 450ms rise outlives a 110ms step, so a hit taken two
+// or three steps before the stairs was still in the air when the floor swapped
+// — and then finished floating over an unrelated tile of the new map. Called
+// from rebuildFloor, alongside motion.clear(), for the same reason.
+export function clearFloatingText(scene) {
+  const pool = (scene._floatPool ??= []);
+  for (const label of pool) scene.tweens.killTweensOf(label);
+  // Labels currently mid-tween are not in the pool (they return on complete),
+  // so sweep the display list for the ones this module owns.
+  for (const label of scene.children.list.filter((c) => c.type === 'Text' && c.depth === 1000)) {
+    scene.tweens.killTweensOf(label);
+    label.setVisible(false).setActive(false);
+    if (!pool.includes(label)) pool.push(label);
+  }
+}

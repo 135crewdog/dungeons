@@ -32,7 +32,11 @@ const LOOT = [
 
 const RINGS = [
   ['ring:sight', 'Ring of Sight', 'The whole floor lies revealed before you'],
-  ['ring:shadow', 'Ring of Shadow', 'Enemies cannot see you until you strike them'],
+  [
+    'ring:shadow',
+    'Ring of Shadow',
+    'Enemies lose you — unless you fight near them, crowd them, or face a boss',
+  ],
   ['ring:speed', 'Ring of Speed', 'Two steps a turn; attacks still end the turn'],
   ['ring:survival', 'Ring of Survival', 'Cheats death once, then crumbles to dust'],
 ];

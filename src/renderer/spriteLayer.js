@@ -81,9 +81,20 @@ export class SpriteTileGrid {
     // the sim's arrays are untouched; apply() reads this flag).
     this.sightAll = getPlayer(state)?.ringSight ?? false;
 
+    // Doors render open while an entity stands in them — but only in a cell the
+    // player can currently SEE. A merely-remembered doorway that repainted from
+    // live entity positions would swing open and shut across the map as an
+    // unseen enemy walked through it, which is a position leak: doors are
+    // deliberately opaque (isTransparentTile excludes DOOR) so that what is in a
+    // doorway is unknowable until you stand in it, and syncEntities already
+    // hides out-of-view enemies. The Ring of Sight lights the floor, so it sees
+    // door state too — consistent with what it grants everywhere else.
     const occupied = new Set();
     for (const e of entitiesSorted(state)) occupied.add(idx(map, e.x, e.y));
-    const isOpen = (x, y) => occupied.has(idx(map, x, y));
+    const isOpen = (x, y) => {
+      const i = idx(map, x, y);
+      return occupied.has(i) && (this.sightAll || !!visible[i]);
+    };
 
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {

@@ -7,6 +7,7 @@ import {
   enemiesSorted,
   tileAt,
   isKnownWalkable,
+  isStairsTile,
   isVisible,
   entityAt,
   hasItemAt,
@@ -94,6 +95,12 @@ export function processCommand(state, command) {
 // doesn't ricochet straight back the way they came. Returns true when the
 // floor changed: the caller must stop cold (the whole floor state was swapped,
 // and any remaining Ring-of-Speed step is forfeited).
+//
+// Arriving still runs the key-reveal pass. descend/ascend compute FOV for the
+// arrival tile, but the rest of the turn is skipped, so until 0.9.8 a key
+// sitting within reveal range of the arrival stair only glimmered on the NEXT
+// command — the player was standing next to it, looking at it, and the game
+// waited a turn to say so. Reveals draw no RNG, so this costs nothing.
 function resolveStairStep(state, player, fromX, fromY, events) {
   if (player.x === fromX && player.y === fromY) return false;
   const tile = tileAt(state.map, player.x, player.y);
@@ -101,12 +108,14 @@ function resolveStairStep(state, player, fromX, fromY, events) {
     descend(state);
     pushLog(state, 'descend', { floor: state.floor });
     events.push(descendEvent(state.floor));
+    revealNearbyKeys(state, events);
     return true;
   }
   if (tile === TILE.STAIRS_UP) {
-    ascend(state);
+    if (!ascend(state)) return false; // refused (floor 1): not a floor change
     pushLog(state, 'ascend', { floor: state.floor });
     events.push(ascendEvent(state.floor));
+    revealNearbyKeys(state, events);
     return true;
   }
   return false;
@@ -138,7 +147,18 @@ function advanceWorld(state, events) {
   // Enemies act in ascending id order.
   enemyPhase(state, events);
   // Item pickups last: the player walking over an item collects it.
+  const sightBefore = getPlayer(state)?.ringSight ?? false;
   resolvePickups(state, events);
+  // Picking up the Ring of Sight happens AFTER this turn's FOV pass, so its
+  // floor-wide `explored` fill would not land until the next command — the
+  // floor lit up instantly (the renderer reads query.isRevealed) but click
+  // pathing across it silently lagged a turn behind what the player could see.
+  // One extra pass closes that. It is cheap and safe: the player has not moved
+  // since the pass above, so `visible` recomputes identically, revealRoom is
+  // guarded by _revealedRoom, and no RNG is drawn. Reading the flag after the
+  // fact catches both routes to it — the ring pickup and dropRing's boxed-in
+  // direct set.
+  if (!sightBefore && (getPlayer(state)?.ringSight ?? false)) updateVisibility(state);
 }
 
 // Hidden keys blink into view when the player passes close by: within
@@ -206,7 +226,7 @@ function resolvePickups(state, events) {
       state.items.splice(i, 1);
       events.push(pickupEvent(item.id, item.x, item.y, { item: 'lockedChest', effect: item.ring }));
       pushLog(state, 'unlock', { ring: item.ring });
-      dropRing(state, item.x, item.y, item.ring, player);
+      dropRing(state, item.x, item.y, item.ring, player, events);
     } else if (events.some((e) => e.type === EV.MOVE && e.id === player.id)) {
       // Locked and keyless: the chest is never spliced, so announce only on
       // the turn the player ARRIVES (this turn has a player move event). A
@@ -224,7 +244,7 @@ function resolvePickups(state, events) {
 // chest drop (no RNG draw, so replays match). The player is standing ON the
 // chest tile, so the ring never lands underfoot; if every neighbor is blocked
 // (vanishingly rare) it goes straight onto the player's finger instead.
-function dropRing(state, x, y, ring, player) {
+function dropRing(state, x, y, ring, player, events) {
   for (const { dx, dy } of DIRS8) {
     const nt = tileAt(state.map, x + dx, y + dy);
     const free =
@@ -238,7 +258,15 @@ function dropRing(state, x, y, ring, player) {
       return;
     }
   }
+  // Boxed in: the ring goes straight onto the finger. It still has to ANNOUNCE
+  // itself the same way a walked-over ring does — this branch used to set the
+  // flag silently, so the player read "a ring tumbles out!" and then nothing:
+  // no float, and a message log that never named which ring they had just been
+  // given. Reachable in ordinary play, since the enemy phase runs before
+  // pickups and a chaser can seal a dead-end alcove behind you.
   player[RING_FLAG[ring]] = true;
+  events.push(pickupEvent(0, x, y, { item: 'ring', effect: ring }));
+  pushLog(state, 'pickup', { item: 'ring', ring });
 }
 
 function openChest(state, player, item, events) {
@@ -289,17 +317,58 @@ function enemyPhase(state, events) {
 // Plan a path from the player to (tx, ty) over ONLY known-walkable tiles
 // (unexplored is treated as blocked). Stores it on state.path and returns true
 // if a usable path exists; a click on an unknown or unreachable tile is a no-op.
+//
+// The route also steers around STAIRCASES. Stepping onto one swaps the floor
+// immediately (resolveStairStep), so a staircase that merely happens to lie
+// between the player and where they clicked would end the floor by accident —
+// never what the click meant. The clicked tile itself is exempt: clicking the
+// stairs is how you take them. When no stair-free route exists at all (a
+// staircase sitting in a one-wide chokepoint) the walk goes as far as the tile
+// BEFORE the staircase and stops, so changing floors always costs a second,
+// deliberate command rather than happening mid-walk.
+//
+// Enemies have avoided stairs since Phase 1 (ai.js stepToward) and so do the
+// headless balance bots; the player was the only mover without the rule.
 export function planPath(state, tx, ty) {
   const player = getPlayer(state);
+  // Drop any previous path FIRST. Every failure exit below returns false, and
+  // "false" must not read as "the old path is still installed and walkable" —
+  // today's callers all stop the walk on failure, but that is their discipline,
+  // not this function's contract.
+  state.path = null;
   if (tx === player.x && ty === player.y) return false;
   if (!isKnownWalkable(state, tx, ty)) return false;
 
-  const passable = (x, y) => isKnownWalkable(state, x, y);
-  const path = aStar(passable, { x: player.x, y: player.y }, { x: tx, y: ty }, state.map.width);
+  const start = { x: player.x, y: player.y };
+  const goal = { x: tx, y: ty };
+  const known = (x, y) => isKnownWalkable(state, x, y);
+  const stairFree = (x, y) =>
+    known(x, y) && ((x === tx && y === ty) || !isStairsTile(tileAt(state.map, x, y)));
+
+  let path = aStar(stairFree, start, goal, state.map.width);
+  if (!path || path.length < 2) {
+    path = truncateBeforeStairs(state, aStar(known, start, goal, state.map.width), tx, ty);
+  }
   if (!path || path.length < 2) return false;
 
   state.path = { nodes: path, index: 0 };
   return true;
+}
+
+// Cut a path short at the first staircase it would step onto, keeping the tile
+// before it. The start node is never trimmed (arriving by stairs leaves the
+// player standing on one) and the goal is never trimmed (that click was
+// deliberate). A path whose very next step is the staircase becomes too short
+// to walk and the click falls through to a no-op — the player is already
+// standing next to the stairs and can take that one step by hand.
+function truncateBeforeStairs(state, path, tx, ty) {
+  if (!path) return null;
+  for (let i = 1; i < path.length; i++) {
+    const n = path[i];
+    if (n.x === tx && n.y === ty) break;
+    if (isStairsTile(tileAt(state.map, n.x, n.y))) return path.slice(0, i);
+  }
+  return path;
 }
 
 // The next step of the stored path as { dx, dy }, advancing the path cursor; or

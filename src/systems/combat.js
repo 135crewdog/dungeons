@@ -82,29 +82,74 @@ export function resolveAttack(state, attackerId, targetId) {
   return events;
 }
 
-// A slain boss always leaves a bonus chest. Stairs tiles swallow pickups — a
-// player stepping onto stairs changes floor before pickups resolve — so a
-// death on the staircase shifts the drop to the first adjacent unoccupied,
-// item-free floor/door tile (deterministic DIRS8 scan; no RNG draw, so
-// replays match). Occupied tiles are excluded so the chest can't land under
-// the attacking player (which would open it instantly via resolvePickups) or
-// under another enemy.
+// A slain boss always leaves a bonus chest, normally right where it fell —
+// which is never under the player, since two entities never share a tile.
+//
+// Two death tiles can't hold it, and both shift the drop to the first adjacent
+// unoccupied, item-free floor/door tile (deterministic DIRS8 scan; no RNG draw,
+// so replays match):
+//
+//  - A STAIRCASE swallows the pickup: a player stepping onto stairs changes
+//    floor before pickups resolve, so the chest would be unreachable.
+//  - A tile that ALREADY HOLDS AN ITEM would end up with two, breaking the
+//    one-item-per-tile invariant. A boss reaches one only when boxed in (enemies
+//    route around item tiles), so this is rare rather than impossible.
+//
+// Occupied tiles are excluded from the scan so the chest can't land under the
+// attacking player (which would open it instantly via resolvePickups) or under
+// another enemy. If the scan comes up empty — every neighbor wall, occupied or
+// littered, which a room-bound boss fight makes vanishingly unlikely — the
+// chest still drops on the death tile: a reward that is awkward to collect
+// beats no reward at all.
 function dropBossChest(state, x, y) {
   let dropX = x;
   let dropY = y;
-  const t = tileAt(state.map, x, y);
-  if (t === TILE.STAIRS_DOWN || t === TILE.STAIRS_UP) {
-    for (const { dx, dy } of DIRS8) {
-      const nt = tileAt(state.map, x + dx, y + dy);
-      const free =
-        (nt === TILE.FLOOR || nt === TILE.DOOR) &&
-        !entityAt(state, x + dx, y + dy) &&
-        !state.items.some((it) => it.x === x + dx && it.y === y + dy);
-      if (free) {
-        dropX = x + dx;
-        dropY = y + dy;
-        break;
+  // One predicate for "a chest can sit here", applied to the death tile and
+  // then to its neighbors — a staircase fails it on the tile type, a littered
+  // tile on the item check. The dying boss is already out of state.entities by
+  // the time this runs, so its own tile reads as unoccupied.
+  const free = (fx, fy) => {
+    const ft = tileAt(state.map, fx, fy);
+    return (
+      (ft === TILE.FLOOR || ft === TILE.DOOR) &&
+      !entityAt(state, fx, fy) &&
+      !state.items.some((it) => it.x === fx && it.y === fy)
+    );
+  };
+  if (!free(x, y)) {
+    // Widening BFS in DIRS8 order rather than a single ring — the same shape,
+    // and for the same reason, as ensureArrivalClear. A single ring had to fall
+    // back to the DEATH TILE when it found nothing, and that tile is the one
+    // already known to fail the check: a boss dying on loot in a pocket stacked
+    // its chest on that loot, re-breaking the very invariant this relocation
+    // exists to protect. Searching outward means "nowhere to put it" can only
+    // happen on a floor with no free tile at all. Ring 1 is explored first and
+    // in DIRS8 order, so every case a ring scan already handled resolves to the
+    // identical tile — the balance simulator's byte-identity is the acceptance
+    // test for that. No RNG, so replays stay exact.
+    const map = state.map;
+    const seen = new Set([y * map.width + x]);
+    const queue = [{ x, y }];
+    for (let qi = 0; qi < queue.length; qi++) {
+      const cur = queue[qi];
+      let placed = false;
+      for (const { dx, dy } of DIRS8) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        const key = ny * map.width + nx;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const t = tileAt(map, nx, ny);
+        if (t === TILE.WALL) continue; // never queue through rock
+        if (free(nx, ny)) {
+          dropX = nx;
+          dropY = ny;
+          placed = true;
+          break;
+        }
+        queue.push({ x: nx, y: ny });
       }
+      if (placed) break;
     }
   }
   const chest = createBossChest(state.rng, dropX, dropY);

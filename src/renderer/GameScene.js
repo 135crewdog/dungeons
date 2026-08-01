@@ -1,10 +1,16 @@
 import Phaser from 'phaser';
-import { getPlayer, entitiesSorted, isExplored, isRevealed } from '../core/query.js';
+import {
+  getPlayer,
+  entitiesSorted,
+  isExplored,
+  isKnownWalkable,
+  isRevealed,
+} from '../core/query.js';
 import { EV } from '../core/events.js';
 import { TILE_SIZE } from '../core/constants.js';
 import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
 import { SpriteTileGrid, TILESHEET_KEY } from './spriteLayer.js';
-import { computeZoom, tileToWorld, tileCenterWorld, worldToTile } from './camera.js';
+import { computeZoom, tileToWorld, tileCenterWorld, worldToTile, pickClickTile } from './camera.js';
 import {
   entityGlyph,
   entityColor,
@@ -16,7 +22,7 @@ import {
   RENDER_STYLE,
   SPRITE_DIM,
 } from './tileStyle.js';
-import { spawnFloatingText } from './floatingText.js';
+import { spawnFloatingText, clearFloatingText } from './floatingText.js';
 import { applyEventFacing } from './facing.js';
 import { createMotion } from './motion.js';
 import {
@@ -170,6 +176,7 @@ export class DungeonScene extends Phaser.Scene {
     // in-flight tweens die with their sprites, and the camera snaps.
     this.facing.clear();
     this.motion.clear();
+    clearFloatingText(this);
     this.camFollowing = null;
     this.forceCamSnap = true;
     this.render();
@@ -393,6 +400,15 @@ export class DungeonScene extends Phaser.Scene {
   // in-flight pan is headed), not the live camera matrix — clicks during the
   // pan resolve exactly as they will once it lands, so spam-clicking while
   // the camera glides can never mistarget.
+  //
+  // In SPRITE mode the world pixel resolves through pickClickTile rather than
+  // worldToTile: the terrain art crowds a walkable tile from above, so a click
+  // that misses into the wall over a corridor still means the corridor (see
+  // CLICK_SNAP_PX). The GLYPH fallback gets the plain conversion — a `#` fills
+  // its own cell and overhangs nothing, so its hit box already matches what is
+  // drawn, and snapping there would turn a click on a wall the player can
+  // plainly see into a move. The correction exists for the art, so it is gated
+  // on the art actually being in use.
   screenToTile(cssX, cssY) {
     const r = this.renderRatio || 1;
     const cam = this.cameras.main;
@@ -400,6 +416,7 @@ export class DungeonScene extends Phaser.Scene {
     const cy = this.camCenter ? this.camCenter.y : cam.midPoint.y;
     const wx = cx + (cssX * r - cam.width / 2) / cam.zoom;
     const wy = cy + (cssY * r - cam.height / 2) / cam.zoom;
-    return worldToTile(wx, wy);
+    if (!this.useSprites()) return worldToTile(wx, wy);
+    return pickClickTile(wx, wy, (x, y) => isKnownWalkable(this.state, x, y));
   }
 }

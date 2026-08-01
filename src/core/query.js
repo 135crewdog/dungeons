@@ -36,9 +36,12 @@ export function isTransparent(map, x, y) {
   return isTransparentTile(tileAt(map, x, y));
 }
 
-// Stairs are walkable for the player and the click planner (isWalkableTile),
-// but enemies treat them as obstacles — they can't use stairs, so they route
-// around. This predicate is the enemy-only exclusion; it never gates the player.
+// Stairs stay walkable (isWalkableTile) for everyone — this predicate is the
+// ROUTING exclusion layered on top, and both movers use it: enemies can't take
+// stairs at all, and the player's click planner won't cross one incidentally
+// because doing so would end the floor by accident. Each applies it through its
+// own A* predicate; the shared isWalkable is never narrowed, so a deliberate
+// step onto a staircase — by key, or by clicking it — always works.
 export function isStairsTile(t) {
   return t === TILE.STAIRS_DOWN || t === TILE.STAIRS_UP;
 }

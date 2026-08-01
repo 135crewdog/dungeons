@@ -102,7 +102,13 @@ export default defineConfig({
       // A floor, not a target: set a few points under the measured level so
       // ordinary work never trips it, and raise it when a change lands well
       // above. The point is to notice coverage FALLING, not to chase a number.
-      thresholds: { lines: 75, branches: 82, functions: 82, statements: 75 },
+      //
+      // "A few points" has to stay true to mean anything. lines/statements sat
+      // at 75 against a measured 88.8 — nearly 14 points of slack, room for
+      // hundreds of lines to go dark unnoticed, which is not a ratchet. Raised
+      // to match branches/functions in tightness. Measured at 0.9.8: 88.8
+      // lines / 88.8 branches / 90.5 functions / 88.8 statements.
+      thresholds: { lines: 85, branches: 85, functions: 87, statements: 85 },
     },
   },
 });
