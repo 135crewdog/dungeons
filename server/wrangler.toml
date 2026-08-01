@@ -12,8 +12,10 @@ ALLOWED_ORIGIN = "*"
 [[d1_databases]]
 binding = "DB"
 database_name = "dungeons-leaderboard"
-# Still a placeholder because this project's worker was deployed through the
-# Cloudflare dashboard, not the CLI — so nothing has ever needed it. Before any
-# wrangler command will work, replace it with the real id: `npx wrangler d1 list`
-# prints it for an existing database, `d1 create` prints it for a new one.
-database_id = "PASTE_DATABASE_ID_HERE"
+# The real id of the live database. NOT a secret — it names a database inside
+# the account, and touching it still needs account credentials; Cloudflare's own
+# templates commit this field. It is load-bearing for the Git deploy: a deploy
+# REPLACES the worker's bindings with what this file says, so a wrong or
+# placeholder id silently detaches the worker from its data and every request
+# comes back 500 "storage unavailable". `npx wrangler d1 list` reprints it.
+database_id = "0b3f742e-9b5d-420b-a393-b49160683244"

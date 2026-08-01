@@ -55,46 +55,57 @@ the game runs normally with the leaderboard showing "not configured".
 
 ## Updating an already-deployed worker
 
-Worker changes are **not** picked up by the game's GitHub Pages deploy — that
-workflow only publishes `dist/`. The backend is deployed by hand, and **this
-project's worker was set up through the dashboard**, not the CLI (which is why
-`wrangler.toml` still carries the `database_id` placeholder). Update it the same
-way you created it.
+The worker is **connected to this GitHub repository** (Cloudflare Workers
+Builds), so a change under `server/` that lands on `main` deploys itself. That
+connection is the fix for the failure mode that produced issue #30: the game and
+the backend deploy from the same push instead of the backend waiting on somebody
+to remember it. The game's own workflow still only publishes `dist/` — it is
+Cloudflare, not GitHub Actions, that ships the worker.
 
-### Do these in order — the order is what makes it safe
+### The one rule that will bite you
 
-**1. Set `ALLOWED_ORIGIN` first, before touching the code.** Since v0.9.5 a
-missing value means _unconfigured_: the worker sends no CORS headers at all, so
-the browser discards a reply that looks perfectly fine server-side. Pre-0.9.5
-code read `env.ALLOWED_ORIGIN || '*'`, so adding the variable to a worker still
-running the old code changes nothing — which is exactly why it goes first. Do it
-and the new code lands already configured, with no window where the board is dark.
+**A deploy makes the live worker match `wrangler.toml`, replacing whatever is
+configured in the dashboard** — both `[vars]` and bindings. So:
 
-In the worker's **Settings → Variables and Secrets**, add `ALLOWED_ORIGIN` = `*`
-and save. `*` is fine — the API uses no cookies or credentials. Narrow it later
-to a comma-separated origin list if you want, e.g.
-`https://example.github.io,http://localhost:5173`.
+- `database_id` must be the real id of the live D1 database. A wrong or
+  placeholder value silently detaches the worker from its data and every request
+  returns `500 {"error":"storage unavailable"}`.
+- Setting `ALLOWED_ORIGIN` by hand in the dashboard is redundant: the value in
+  this file wins on the next deploy. Change it here, not there.
 
-**2. Run the schema.** D1 → `dungeons-leaderboard` → **Console** → paste all of
-`schema.sql` → Run. Every statement is `CREATE ... IF NOT EXISTS`, so it cannot
-disturb existing rows; it adds `idx_scores_dupe`, which backs the duplicate check
-the worker runs before every insert. Without the index the check still works, it
-just scans.
+Both are correct in the committed file. Editing bindings or vars in the
+dashboard is the thing to avoid — those edits are lost on the next push.
 
-**3. Paste the code.** Worker → **Edit Code** → replace everything with
+### Schema changes are NOT automatic
+
+A build pipeline ships code; it does not run migrations. After changing
+`schema.sql`, apply it once by hand: D1 → `dungeons-leaderboard` → **Console** →
+paste the file → Run. Every statement is `CREATE ... IF NOT EXISTS`, so it is
+safe to re-run against a live database and cannot disturb existing rows.
+
+### Checking a deploy landed
+
+```sh
+curl -si <worker-url>/scores | grep -i access-control-allow-origin
+```
+
+should print a line containing `*`. Nothing means CORS is unconfigured — check
+that the deploy actually replaced the code. Then POST the same score twice:
+`201` then `409`. The `409` is duplicate suppression, which exists only in
+v0.9.5+, so it is the clearest single proof of which code is live. A `500` on the
+first POST means the D1 binding is wrong.
+
+### Fallbacks, if the Git deploy is unavailable
+
+**By hand in the dashboard.** Worker → **Edit Code** → replace everything with
 `worker.dashboard.js` → Deploy. That file is committed and CI fails if it drifts
 from `scores.js` + `worker.js`, so copy it as-is; `npm run build:dashboard` is
-only needed if you edited `server/*.js` yourself.
+only needed if you edited `server/*.js` yourself. Note this route does **not**
+apply `wrangler.toml`, so bindings and vars must already be right in the
+dashboard.
 
-**4. Check it.** `curl -si <worker-url>/scores | grep -i access-control-allow-origin`
-should print a line containing `*` — nothing means step 1 didn't take. Then POST
-the same score twice: `201` then `409` confirms duplicate suppression is live.
-
-### With wrangler instead
-
-`wrangler.toml` supplies the binding and the variable automatically, so it is
-just the two commands — but fill in `database_id` first (see the CLI section
-above; `npx wrangler d1 list` prints it for an existing database):
+**With wrangler.** `wrangler.toml` supplies the binding and the variable, so it
+is just:
 
 ```sh
 # 1. new indexes / schema (idempotent, safe to re-run on a live database)

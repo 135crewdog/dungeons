@@ -86,8 +86,10 @@ autofocuses the initials field, and status lines are `aria-live` regions.
 
 The one networked feature. A tiny **Cloudflare Worker + D1** backend lives in
 **`server/`** (worker.js + pure logic in scores.js + schema.sql + wrangler.toml),
-deployed **manually once** via `npx wrangler deploy` (steps in `server/README.md`); the
-game itself stays a static GitHub Pages deploy. API: `POST /scores` validates
+deployed by **Cloudflare Workers Builds from this repository** — a change under
+`server/` that lands on `main` ships itself (steps and the one dangerous rule in
+`server/README.md`); the game itself stays a static GitHub Pages deploy, so the
+two halves deploy from the same push but by different pipelines. API: `POST /scores` validates
 `{ initials, floor, turns, seed, version }` (initials exactly 3 chars A–Z0-9, uppercased
 server-side) and stamps a **server** timestamp; `GET /scores` returns the top 50 of the
 last 30 days ordered **floor DESC, turns ASC, created_at ASC**, plus the server clock so
@@ -112,8 +114,17 @@ opaque crash. An identical `(initials, floor, turns, seed)` inside 10 minutes is
 refused **409** — mostly the offline queue re-sending a score whose response was
 lost. `server/worker.dashboard.js` is **generated** from `scores.js` + `worker.js`
 (`npm run build:dashboard`), guarded by both a byte-identity check and the
-behavioral parity battery. None of it is live until `npx wrangler deploy` is run by
-hand — see `server/README.md`.
+behavioral parity battery; since the Git connection it is a **fallback** for
+deploying without one, not the normal route.
+
+**The rule that makes the Git deploy safe** (0.9.9): a deploy makes the live
+worker match `wrangler.toml`, **replacing** the dashboard's vars and bindings. So
+`database_id` must be the real database's id — a placeholder detaches the worker
+from its data and every request returns `500 storage unavailable` — and
+`ALLOWED_ORIGIN` is owned by the file, not the dashboard. Schema changes are the
+one thing NOT automatic: a pipeline ships code, not migrations, so `schema.sql`
+is applied by hand in the D1 console (it is `CREATE ... IF NOT EXISTS`
+throughout, so re-running it is safe).
 
 The client lives in **`src/net/`** — the only code allowed to fetch or touch
 localStorage (the architecture test enforces that the sim never does either).
