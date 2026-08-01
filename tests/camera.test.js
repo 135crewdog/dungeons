@@ -98,3 +98,97 @@ describe('pickClickTile (corridor click alignment)', () => {
     expect(pickClickTile(-TILE_SIZE + 1, -1, corridor)).toEqual({ x: -1, y: -1 });
   });
 });
+
+describe('pickClickTile (sprite lift)', () => {
+  // Character frames are drawn with their feet SPRITE_LIFT above the tile
+  // bottom, so a frame taller than TILE_SIZE - SPRITE_LIFT pokes into the cell
+  // ABOVE: 4px for the 12x15 humanoids, 7px for the 16x18 boss. Clicking those
+  // pixels used to select the empty floor over the character's shoulder.
+  const room = grid(['....', '....', '....']);
+  const inCell = (t, frac) => t * TILE_SIZE + frac;
+  // An enemy on (1,1) lifting `px` into the cell above it.
+  const liftOn = (tx, ty, px) => (x, y) => (x === tx && y === ty ? px : 0);
+
+  it('targets a humanoid whose head is drawn into the tile above', () => {
+    const lift = liftOn(1, 1, 4);
+    for (const frac of [TILE_SIZE - 4, TILE_SIZE - 1]) {
+      expect(pickClickTile(inCell(1, 8), inCell(0, frac), room, lift)).toEqual({ x: 1, y: 1 });
+    }
+  });
+
+  it('reaches further for the boss, which is drawn 7px up', () => {
+    const lift = liftOn(1, 1, 7);
+    expect(pickClickTile(inCell(1, 8), inCell(0, TILE_SIZE - 7), room, lift)).toEqual({
+      x: 1,
+      y: 1,
+    });
+    // ...but no further than its own frame: 8px up is the floor above it.
+    expect(pickClickTile(inCell(1, 8), inCell(0, TILE_SIZE - 8), room, lift)).toEqual({
+      x: 1,
+      y: 0,
+    });
+  });
+
+  it('leaves the click alone above the head band', () => {
+    const lift = liftOn(1, 1, 4);
+    // Deliberately walking onto the tile over an enemy still works from the
+    // upper ~12px of that cell.
+    expect(pickClickTile(inCell(1, 8), inCell(0, TILE_SIZE - 5), room, lift)).toEqual({
+      x: 1,
+      y: 0,
+    });
+    expect(pickClickTile(inCell(1, 8), inCell(0, 0), room, lift)).toEqual({ x: 1, y: 0 });
+  });
+
+  it('does nothing when the tile below is empty, or holds an unseen enemy', () => {
+    // liftBelow returns 0 for an empty tile, the player, or an enemy out of
+    // view — so those clicks resolve exactly as they did before 0.9.9.
+    const none = () => 0;
+    expect(pickClickTile(inCell(1, 8), inCell(0, TILE_SIZE - 1), room, none)).toEqual({
+      x: 1,
+      y: 0,
+    });
+  });
+
+  it('is skipped entirely when no lift predicate is supplied', () => {
+    expect(pickClickTile(inCell(1, 8), inCell(0, TILE_SIZE - 1), room)).toEqual({ x: 1, y: 0 });
+  });
+
+  it('still fires with the wall snap disabled (glyph terrain, sprite actors)', () => {
+    // Terrain and creature sheets fall back independently: if only
+    // tiles_prison.png fails, the map is glyphs but actors are still lifted
+    // sprites, so the head band is real while the wall overhang is not.
+    const lift = liftOn(1, 1, 4);
+    expect(pickClickTile(inCell(1, 8), inCell(0, TILE_SIZE - 1), room, lift, 0)).toEqual({
+      x: 1,
+      y: 1,
+    });
+    // ...and with the wall snap off, a dead click on a wall stays dead.
+    expect(pickClickTile(inCell(1, 4), inCell(0, TILE_SIZE - 1), corridor, () => 0, 0)).toEqual({
+      x: 1,
+      y: 0,
+    });
+  });
+
+  it('degenerates to worldToTile with both corrections off', () => {
+    // Full glyph mode: no lift, no overhang — every click resolves by plain
+    // arithmetic, exactly as it did before either correction existed.
+    for (const frac of [0, 4, 8, TILE_SIZE - 1]) {
+      expect(pickClickTile(inCell(1, 4), inCell(0, frac), corridor, () => 0, 0)).toEqual(
+        worldToTile(inCell(1, 4), inCell(0, frac)),
+      );
+    }
+  });
+
+  it('does not disturb the wall-overhang snap it runs ahead of', () => {
+    // The corridor cases from 0.9.7, now with a lift predicate present but
+    // reporting nothing: identical results.
+    const none = () => 0;
+    expect(pickClickTile(inCell(1, 4), inCell(0, TILE_SIZE - 1), corridor, none)).toEqual({
+      x: 1,
+      y: 1,
+    });
+    expect(pickClickTile(inCell(1, 4), inCell(0, 0), corridor, none)).toEqual({ x: 1, y: 0 });
+    expect(pickClickTile(inCell(1, 4), inCell(1, 4), corridor, none)).toEqual({ x: 1, y: 1 });
+  });
+});

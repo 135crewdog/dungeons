@@ -2,15 +2,23 @@ import Phaser from 'phaser';
 import {
   getPlayer,
   entitiesSorted,
+  entityAt,
   isExplored,
   isKnownWalkable,
   isRevealed,
+  isVisible,
 } from '../core/query.js';
 import { EV } from '../core/events.js';
 import { TILE_SIZE } from '../core/constants.js';
 import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
 import { SpriteTileGrid, TILESHEET_KEY } from './spriteLayer.js';
-import { computeZoom, tileToWorld, tileCenterWorld, worldToTile, pickClickTile } from './camera.js';
+import {
+  computeZoom,
+  tileToWorld,
+  tileCenterWorld,
+  pickClickTile,
+  CLICK_SNAP_PX,
+} from './camera.js';
 import {
   entityGlyph,
   entityColor,
@@ -416,7 +424,35 @@ export class DungeonScene extends Phaser.Scene {
     const cy = this.camCenter ? this.camCenter.y : cam.midPoint.y;
     const wx = cx + (cssX * r - cam.width / 2) / cam.zoom;
     const wy = cy + (cssY * r - cam.height / 2) / cam.zoom;
-    if (!this.useSprites()) return worldToTile(wx, wy);
-    return pickClickTile(wx, wy, (x, y) => isKnownWalkable(this.state, x, y));
+    // Each correction is gated on the art it compensates for, separately:
+    // terrain and creature sheets fall back to glyphs independently, and a run
+    // with glyph terrain but sprite actors still draws lifted heads even though
+    // no wall overhang exists. spriteLift already returns 0 without entity
+    // sprites, and overhangPx 0 disables the wall snap, so full glyph mode
+    // degenerates to plain worldToTile.
+    return pickClickTile(
+      wx,
+      wy,
+      (x, y) => isKnownWalkable(this.state, x, y),
+      (x, y) => this.spriteLift(x, y),
+      this.useSprites() ? CLICK_SNAP_PX : 0,
+    );
+  }
+
+  // How many pixels a VISIBLE entity standing on (x, y) draws up into the cell
+  // above it — the negative half of spriteOffset's dy, which exists because
+  // frames are lifted SPRITE_LIFT off the tile bottom. 0 when the tile is empty,
+  // holds the player, holds an enemy the player cannot currently see, or when
+  // entity sprites are not in use (glyphs draw inside their own cell). Feeding
+  // pickClickTile through this seam keeps camera.js pure and keeps the sprite
+  // table out of it.
+  spriteLift(x, y) {
+    if (!this.entitySprites) return 0;
+    const e = entityAt(this.state, x, y);
+    if (!e || e.id === this.state.entities.playerId) return 0;
+    if (!isVisible(this.state, x, y)) return 0;
+    const spec = ENTITY_SPRITES[e.kind];
+    if (!spec) return 0;
+    return Math.max(0, -spriteOffset(spec).dy);
   }
 }

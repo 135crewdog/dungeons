@@ -46,19 +46,41 @@ export function worldToTile(wx, wy) {
 // escape this because only a room's bottom-most floor row carries an overhang.
 export const CLICK_SNAP_PX = TILE_SIZE / 2;
 
-// World pixel → the tile a CLICK there meant, given a walkability predicate.
+// World pixel → the tile a CLICK there meant, given two predicates from the
+// scene. Pure, so it unit-tests without Phaser.
 //
-// A click that already lands on a walkable tile is returned untouched — which
-// is why rooms, items and enemies in the open behave exactly as before. Only a
-// dead click gets a second chance: falling in the lower half of a wall whose
-// south neighbor is walkable means the tile below, re-centering a corridor's
-// hit box on the opening you can actually see. Pure, so it unit-tests without
-// Phaser; the scene supplies the predicate.
-export function pickClickTile(wx, wy, walkable) {
+// Two corrections, both downward, both for the same reason: SPD's art is drawn
+// taller than the cell that owns it, so the pixels under the cursor can belong
+// to the tile BELOW the one plain arithmetic returns.
+//
+//  1. Sprite lift. `liftBelow(x, y)` reports how many px a visible entity on
+//     (x, y) pokes up into the cell above it — 4 for the 12x15 humanoids, 7 for
+//     the 16x18 boss, straight out of spriteOffset. A click in that band is the
+//     character, not the floor it is drawn over. This one has to run FIRST and
+//     on an otherwise-good click, because in a room the tile over an enemy's
+//     head is perfectly walkable: the click used to succeed at the wrong thing,
+//     silently turning "attack the boss" into "walk past the boss".
+//  2. Wall overhang. A DEAD click in the lower CLICK_SNAP_PX of a wall whose
+//     south neighbor is walkable means that neighbor — see CLICK_SNAP_PX.
+//
+// Everything else is returned untouched, which is what keeps rooms, items and
+// open ground behaving exactly as they always have.
+// The two corrections have INDEPENDENT gates, so `overhangPx` is a parameter
+// rather than a constant: terrain sprites and creature sprites fall back to
+// glyphs separately (useSprites vs useEntitySprites), and a run with glyph
+// terrain but sprite actors still needs the lift correction while the wall
+// overhang no longer exists to compensate for. Pass 0 to disable the wall snap
+// — `withinCell` is always < TILE_SIZE, so the test can never fire. With both
+// off this degenerates to plain worldToTile.
+export function pickClickTile(wx, wy, walkable, liftBelow = () => 0, overhangPx = CLICK_SNAP_PX) {
   const t = worldToTile(wx, wy);
-  if (walkable(t.x, t.y)) return t;
   const withinCell = wy - t.y * TILE_SIZE;
-  if (withinCell >= TILE_SIZE - CLICK_SNAP_PX && walkable(t.x, t.y + 1)) {
+
+  const lift = liftBelow(t.x, t.y + 1);
+  if (lift > 0 && withinCell >= TILE_SIZE - lift) return { x: t.x, y: t.y + 1 };
+
+  if (walkable(t.x, t.y)) return t;
+  if (overhangPx > 0 && withinCell >= TILE_SIZE - overhangPx && walkable(t.x, t.y + 1)) {
     return { x: t.x, y: t.y + 1 };
   }
   return t;
