@@ -76,46 +76,47 @@ configured in the dashboard** — both `[vars]` and bindings. So:
 Both are correct in the committed file. Editing bindings or vars in the
 dashboard is the thing to avoid — those edits are lost on the next push.
 
-### Schema changes are NOT automatic
+### Schema changes are NOT automatic — and they must go FIRST
 
-A build pipeline ships code; it does not run migrations. After changing
-`schema.sql`, apply it once by hand: D1 → `dungeons-leaderboard` → **Console** →
-run it → Run. Every statement is `CREATE ... IF NOT EXISTS`, so it is safe to
-re-run against a live database and cannot disturb existing rows.
+A build pipeline ships code; it does not run migrations. `schema.sql` is applied
+by hand: D1 → `dungeons-leaderboard` → **Console** → run it.
+
+**Order matters, and the Git deploy makes it easy to get wrong.** Code now ships
+the moment a change lands on `main`, so merging a worker that depends on a new
+table or column _before_ applying the migration deploys code against a schema
+that does not exist yet — a live failure window that lasts until somebody
+notices. The old by-hand checklist ran the schema first because both steps were
+manual and adjacent; now only one of them is. So:
+
+- **Apply the migration BEFORE merging** code that depends on it, or
+- make the change **backward compatible** — a worker that tolerates both the old
+  and new shape can ship in either order, and the schema catches up after.
+
+`CREATE ... IF NOT EXISTS` throughout means re-running the file is always safe,
+so applying it early costs nothing.
 
 **The console will not always take the file verbatim.** It reports
 
 > The request is malformed: Requests without any query are not supported.
 
 when what it receives contains no executable statement — which a comment block,
-or the empty fragment after the file's trailing `;`, can produce. Paste the
-statements themselves, without the comments, and one at a time if it still
-objects. Comment-free, that is the whole schema:
+or the empty fragment after the file's trailing `;`, can produce. Strip the
+comments and paste the statements, one at a time if it still objects:
 
-```sql
-CREATE TABLE IF NOT EXISTS scores (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  initials TEXT NOT NULL,
-  floor INTEGER NOT NULL,
-  turns INTEGER NOT NULL,
-  seed TEXT NOT NULL,
-  version TEXT NOT NULL,
-  created_at INTEGER NOT NULL
-);
+```sh
+grep -v '^\s*--' schema.sql
 ```
 
-```sql
-CREATE INDEX IF NOT EXISTS idx_scores_created ON scores (created_at);
-```
+`schema.sql` is the **only** authoritative copy; do not transcribe it into prose
+here, or the two drift and an operator runs the stale one.
+
+The exception, because it is a one-off rather than a description of the schema:
+bringing a database created before v0.9.5 up to date is exactly one statement,
+since the table and `idx_scores_created` already exist.
 
 ```sql
 CREATE INDEX IF NOT EXISTS idx_scores_dupe ON scores (seed, initials, floor, turns, created_at);
 ```
-
-On an **existing** database only the last one is new — the table and
-`idx_scores_created` have been there since the original deploy — so bringing a
-live database up to v0.9.5 is that single statement. Running all three is still
-harmless.
 
 ### Checking a deploy landed
 
@@ -126,8 +127,15 @@ curl -si <worker-url>/scores | grep -i access-control-allow-origin
 should print a line containing `*`. Nothing means CORS is unconfigured — check
 that the deploy actually replaced the code. Then POST the same score twice:
 `201` then `409`. The `409` is duplicate suppression, which exists only in
-v0.9.5+, so it is the clearest single proof of which code is live. A `500` on the
-first POST means the D1 binding is wrong.
+v0.9.5+, so it is the clearest single proof of which code is live.
+
+A `500 storage unavailable` means the worker could not reach its data, but it
+does **not** pin down why: `storageError` normalizes every D1 exception into that
+one response, so a wrong binding, a missing table, a half-applied migration and a
+transient D1 outage all look identical from outside. Nor is a `201` proof the
+binding is right — a different database with the same schema answers just as
+happily. Check the binding in `wrangler.toml` against `npx wrangler d1 list`, and
+the build log, before assuming which it is.
 
 ### Fallbacks, if the Git deploy is unavailable
 

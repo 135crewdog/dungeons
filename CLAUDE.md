@@ -995,8 +995,11 @@ release, balance byte-identical throughout:
 five** — see below.
 
 **0.9.9 — everything the audit left open.** Nothing in the repo is now recorded
-as unresolved except the manual leaderboard-worker deploy, which needs a
-Cloudflare account rather than a code change.
+as unresolved except confirming the leaderboard worker is serving current code
+(issue #30) — a verification, not a code change. The worker itself is no longer
+deployed by hand: it builds from this repository, so `server/` ships with
+everything else (see Leaderboard). The one step that stays manual is applying
+`schema.sql`, and it has to happen BEFORE merging code that depends on it.
 
 - **Vendored art now gets precache revisions.** An entry with `revision: null`
   is never re-fetched while its URL is unchanged — correct for a file whose
