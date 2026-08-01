@@ -85,9 +85,14 @@ autofocuses the initials field, and status lines are `aria-live` regions.
 ## Leaderboard (cross-device, 30-day rolling)
 
 The one networked feature. A tiny **Cloudflare Worker + D1** backend lives in
-**`server/`** (worker.js + pure logic in scores.js + schema.sql + wrangler.toml),
-deployed **manually once** via `npx wrangler deploy` (steps in `server/README.md`); the
-game itself stays a static GitHub Pages deploy. API: `POST /scores` validates
+**`server/`** (worker.js + pure logic in scores.js + schema.sql; its
+**`wrangler.toml` sits at the repository root**, see below), deployed by
+**Cloudflare Workers Builds from this repository** — a change under `server/`
+that lands on `main` ships itself (steps and the one dangerous rule in
+`server/README.md`); the game itself stays a static GitHub Pages deploy, so the
+two halves deploy from the same push but by different pipelines. First green
+build: `7b6cd46`, which is also the commit that fixed it — see the config-location
+note below. API: `POST /scores` validates
 `{ initials, floor, turns, seed, version }` (initials exactly 3 chars A–Z0-9, uppercased
 server-side) and stamps a **server** timestamp; `GET /scores` returns the top 50 of the
 last 30 days ordered **floor DESC, turns ASC, created_at ASC**, plus the server clock so
@@ -112,8 +117,32 @@ opaque crash. An identical `(initials, floor, turns, seed)` inside 10 minutes is
 refused **409** — mostly the offline queue re-sending a score whose response was
 lost. `server/worker.dashboard.js` is **generated** from `scores.js` + `worker.js`
 (`npm run build:dashboard`), guarded by both a byte-identity check and the
-behavioral parity battery. None of it is live until `npx wrangler deploy` is run by
-hand — see `server/README.md`.
+behavioral parity battery; since the Git connection it is a **fallback** for
+deploying without one, not the normal route.
+
+**The rule that makes the Git deploy safe** (0.9.9): a deploy makes the live
+worker match `wrangler.toml`, **replacing** the dashboard's vars and bindings. So
+`database_id` must be the real database's id — a placeholder detaches the worker
+from its data and every request returns `500 storage unavailable` — `ALLOWED_ORIGIN`
+is owned by the file, not the dashboard, and `workers_dev = true` is stated
+explicitly because `LEADERBOARD_URL` is a `*.workers.dev` address and an unstated
+value could switch it off. Schema changes are the
+one thing NOT automatic: a pipeline ships code, not migrations, so `schema.sql`
+is applied by hand in the D1 console (it is `CREATE ... IF NOT EXISTS`
+throughout, so re-running it is safe).
+
+**Why `wrangler.toml` is at the repository root, not in `server/`** (0.9.9):
+Workers Builds looks for a Wrangler config in the build's **root directory**
+(default: the repo root) and **rejects the build before it starts** when it finds
+none. That is what four consecutive failed builds were; moving the file fixed it
+on the first attempt. (The GitHub check run's timestamps do NOT show this — a
+successful 15-minute build reports the same start and finish second as an instant
+rejection, so they carry no duration at all. `server/README.md` records that trap.)
+Keeping the config where the tooling already looks makes the deploy work
+on Cloudflare's **default** settings, with nothing to configure in the dashboard;
+`main = "server/worker.js"` points back at the code. It is the **only** Wrangler
+config in the repo, deliberately — a second one under `server/` would drift, and
+the loser would be whichever a deploy doesn't read.
 
 The client lives in **`src/net/`** — the only code allowed to fetch or touch
 localStorage (the architecture test enforces that the sim never does either).
@@ -984,8 +1013,11 @@ release, balance byte-identical throughout:
 five** — see below.
 
 **0.9.9 — everything the audit left open.** Nothing in the repo is now recorded
-as unresolved except the manual leaderboard-worker deploy, which needs a
-Cloudflare account rather than a code change.
+as unresolved except confirming the leaderboard worker is serving current code
+(issue #30) — a verification, not a code change. The worker itself is no longer
+deployed by hand: it builds from this repository, so `server/` ships with
+everything else (see Leaderboard). The one step that stays manual is applying
+`schema.sql`, and it has to happen BEFORE merging code that depends on it.
 
 - **Vendored art now gets precache revisions.** An entry with `revision: null`
   is never re-fetched while its URL is unchanged — correct for a file whose
