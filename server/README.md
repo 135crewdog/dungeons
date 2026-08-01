@@ -62,6 +62,14 @@ the backend deploy from the same push instead of the backend waiting on somebody
 to remember it. The game's own workflow still only publishes `dist/` — it is
 Cloudflare, not GitHub Actions, that ships the worker.
 
+> **Status: the connection exists but its builds are not yet succeeding.** Until
+> one goes green, the section above describes the intended route rather than the
+> working one, and deploys go through the dashboard-paste fallback at the bottom
+> of this file — which is how the current v0.9.5+ worker got live. Delete this
+> note in the commit that gets a build passing. It is here because a document
+> that confidently describes a deployment path that does not work is exactly what
+> let issue #30 sit open for a week.
+
 ### The one rule that will bite you
 
 **A deploy makes the live worker match `wrangler.toml`, replacing whatever is
