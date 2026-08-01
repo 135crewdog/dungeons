@@ -64,12 +64,18 @@ export function descend(state) {
 // Go up the stairs. The floor above has always been visited (you descended
 // through it), so it is restored from the cache; the player arrives at its
 // down-stairs — the tile they originally descended from.
+// Returns true when the floor actually changed. Floor 1 has no up-staircase, so
+// the guard is unreachable today — but resolveStairStep logs and skips the rest
+// of the turn on the strength of this call, and "the generator never writes
+// STAIRS_UP on floor 1" is an invariant three modules away from the code that
+// depends on it. Reporting the refusal is cheaper than that coupling.
 export function ascend(state) {
-  if (state.floor <= 1) return; // no way up from the top floor
+  if (state.floor <= 1) return false; // no way up from the top floor
   const player = getPlayer(state);
   const target = state.floor - 1;
   snapshotFloor(state);
   activateFloor(state, target, 'down', player);
+  return true;
 }
 
 // Reset the existing state object in place to a brand-new run on floor 1 with a

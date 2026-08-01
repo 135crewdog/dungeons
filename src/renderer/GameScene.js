@@ -22,7 +22,7 @@ import {
   RENDER_STYLE,
   SPRITE_DIM,
 } from './tileStyle.js';
-import { spawnFloatingText } from './floatingText.js';
+import { spawnFloatingText, clearFloatingText } from './floatingText.js';
 import { applyEventFacing } from './facing.js';
 import { createMotion } from './motion.js';
 import {
@@ -176,6 +176,7 @@ export class DungeonScene extends Phaser.Scene {
     // in-flight tweens die with their sprites, and the camera snaps.
     this.facing.clear();
     this.motion.clear();
+    clearFloatingText(this);
     this.camFollowing = null;
     this.forceCamSnap = true;
     this.render();

@@ -165,11 +165,39 @@ describe('client', () => {
     expect(queueOf(storage)).toEqual([]);
   });
 
-  it('reads a pre-versioning queue written by an older client', () => {
-    // Raw-array form, as shipped before the envelope existed.
-    const { storage } = makeClient({});
+  it('reads a pre-versioning queue written by an older client', async () => {
+    // Raw-array form, as shipped before the envelope existed. This has to be
+    // asserted THROUGH the client: reading it back with the test's own queueOf
+    // helper only round-trips JSON and passes with readQueue's migration branch
+    // deleted. Flushing it proves the client itself understood the old shape.
+    const sent = [];
+    const { client, storage } = makeClient({
+      fetchFn: async (_url, opts) => {
+        sent.push(JSON.parse(opts.body));
+        return okJson();
+      },
+    });
     storage.setItem('lb.queue', JSON.stringify([PAYLOAD]));
-    expect(queueOf(storage)).toEqual([PAYLOAD]);
+    const res = await client.flushQueue();
+    expect(sent).toEqual([PAYLOAD]); // the old-format entry was actually posted
+    expect(res.sent).toBe(1);
+    expect(queueOf(storage)).toEqual([]);
+  });
+
+  it('discards a queue written by a FUTURE client version', async () => {
+    // Forward-compat: an envelope from a newer version may hold entries this
+    // build cannot interpret, so it is dropped rather than posted blind.
+    const sent = [];
+    const { client, storage } = makeClient({
+      fetchFn: async (_url, opts) => {
+        sent.push(JSON.parse(opts.body));
+        return okJson();
+      },
+    });
+    storage.setItem('lb.queue', JSON.stringify({ v: 999, items: [PAYLOAD] }));
+    const res = await client.flushQueue();
+    expect(sent).toEqual([]); // nothing from an unreadable envelope is posted
+    expect(res.sent).toBe(0);
   });
 
   it('flushQueue re-queues the remainder from the first RETRYABLE failure on', async () => {
@@ -260,6 +288,49 @@ describe('client', () => {
 
     expect(res).toMatchObject({ sent: 1, kept: 1 });
     expect(queueOf(storage).map((p) => p.turns)).toEqual([2]);
+  });
+
+  it('keeps that score even when the queue is already at capacity', () => {
+    // Same race as above, at QUEUE_CAP. The "arrived during the drain" set used
+    // to be computed as everything past the snapshot's LENGTH, but writeQueue
+    // caps by dropping the OLDEST, so appending to a full queue shifts it left
+    // and that index lands at/past the end — yielding nothing, and the drain
+    // then wrote an empty queue over a score submit() had just promised to
+    // keep. The sub-cap test above passes either way, which is how it hid.
+    let releaseQueued;
+    const held = new Promise((r) => {
+      releaseQueued = r;
+    });
+    const { client, storage } = makeClient({
+      fetchFn: async (_url, opts) => {
+        const payload = JSON.parse(opts.body);
+        if (payload.turns === 999) return httpFail(500); // the fresh one: queues
+        await held; // the drain: parked until the fresh submit has landed
+        return okJson();
+      },
+    });
+    const full = Array.from({ length: 10 }, (_, i) => ({ ...PAYLOAD, turns: i + 1 }));
+    storage.setItem('lb.queue', JSON.stringify(full));
+
+    const flushing = client.flushQueue();
+    return client.submit({ ...PAYLOAD, turns: 999 }).then(async (submitted) => {
+      expect(submitted).toMatchObject({ queued: true });
+      releaseQueued();
+      const res = await flushing;
+      expect(res).toMatchObject({ sent: 10, kept: 1 });
+      expect(queueOf(storage).map((p) => p.turns)).toEqual([999]); // survived
+    });
+  });
+
+  it('times out a fetchScores whose BODY stalls, not just its headers', async () => {
+    // request() cleared its deadline as soon as headers arrived, so a response
+    // that never finished its body left the leaderboard overlay on "Loading…"
+    // forever. The read is inside the deadline now.
+    const { client } = makeClient({
+      timeoutMs: 20,
+      fetchFn: async () => ({ ok: true, status: 200, json: () => new Promise(() => {}) }),
+    });
+    expect(await client.fetchScores()).toEqual({ ok: false, reason: 'timeout' });
   });
 
   it('defers a flush while a Retry-After backoff is in force', async () => {

@@ -112,7 +112,7 @@ function resolveStairStep(state, player, fromX, fromY, events) {
     return true;
   }
   if (tile === TILE.STAIRS_UP) {
-    ascend(state);
+    if (!ascend(state)) return false; // refused (floor 1): not a floor change
     pushLog(state, 'ascend', { floor: state.floor });
     events.push(ascendEvent(state.floor));
     revealNearbyKeys(state, events);
@@ -226,7 +226,7 @@ function resolvePickups(state, events) {
       state.items.splice(i, 1);
       events.push(pickupEvent(item.id, item.x, item.y, { item: 'lockedChest', effect: item.ring }));
       pushLog(state, 'unlock', { ring: item.ring });
-      dropRing(state, item.x, item.y, item.ring, player);
+      dropRing(state, item.x, item.y, item.ring, player, events);
     } else if (events.some((e) => e.type === EV.MOVE && e.id === player.id)) {
       // Locked and keyless: the chest is never spliced, so announce only on
       // the turn the player ARRIVES (this turn has a player move event). A
@@ -244,7 +244,7 @@ function resolvePickups(state, events) {
 // chest drop (no RNG draw, so replays match). The player is standing ON the
 // chest tile, so the ring never lands underfoot; if every neighbor is blocked
 // (vanishingly rare) it goes straight onto the player's finger instead.
-function dropRing(state, x, y, ring, player) {
+function dropRing(state, x, y, ring, player, events) {
   for (const { dx, dy } of DIRS8) {
     const nt = tileAt(state.map, x + dx, y + dy);
     const free =
@@ -258,7 +258,15 @@ function dropRing(state, x, y, ring, player) {
       return;
     }
   }
+  // Boxed in: the ring goes straight onto the finger. It still has to ANNOUNCE
+  // itself the same way a walked-over ring does — this branch used to set the
+  // flag silently, so the player read "a ring tumbles out!" and then nothing:
+  // no float, and a message log that never named which ring they had just been
+  // given. Reachable in ordinary play, since the enemy phase runs before
+  // pickups and a chaser can seal a dead-end alcove behind you.
   player[RING_FLAG[ring]] = true;
+  events.push(pickupEvent(0, x, y, { item: 'ring', effect: ring }));
+  pushLog(state, 'pickup', { item: 'ring', ring });
 }
 
 function openChest(state, player, item, events) {
@@ -323,6 +331,11 @@ function enemyPhase(state, events) {
 // headless balance bots; the player was the only mover without the rule.
 export function planPath(state, tx, ty) {
   const player = getPlayer(state);
+  // Drop any previous path FIRST. Every failure exit below returns false, and
+  // "false" must not read as "the old path is still installed and walkable" —
+  // today's callers all stop the walk on failure, but that is their discipline,
+  // not this function's contract.
+  state.path = null;
   if (tx === player.x && ty === player.y) return false;
   if (!isKnownWalkable(state, tx, ty)) return false;
 

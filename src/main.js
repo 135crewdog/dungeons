@@ -92,11 +92,30 @@ function spriteIconEl(kind) {
 const hud = createHud(document.body, { iconFor: spriteIconEl });
 const messageLog = createMessageLog(document.body);
 
+// Reading the localStorage PROPERTY throws (not returns null) when site data is
+// blocked — Chrome/Edge with cookies disabled, Firefox with dom.storage.enabled
+// off. At module scope that throw stops the whole composition root and the
+// player gets a blank page, which is exactly the failure randomSeed above was
+// fixed for; the leaderboard client's own storage calls are already defensive,
+// but only the handle acquisition can throw this early. A no-op shim keeps the
+// game booting: the offline queue is simply unavailable, which is the correct
+// behavior on a browser that has refused storage.
+function safeStorage() {
+  try {
+    const s = window.localStorage;
+    s.getItem('lb.probe'); // Safari private mode throws on USE, not on access
+    return s;
+  } catch {
+    console.warn('[dungeons] localStorage unavailable — leaderboard queue disabled.');
+    return { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  }
+}
+
 // Cross-device leaderboard client (disabled while LEADERBOARD_URL is empty).
 // Failed submissions queue in localStorage; flush on boot and on reconnect.
 const lb = createLeaderboardClient({
   url: LEADERBOARD_URL,
-  storage: window.localStorage,
+  storage: safeStorage(),
   fetchFn: (...args) => fetch(...args),
   now: () => Date.now(),
 });

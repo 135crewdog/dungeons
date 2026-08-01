@@ -117,12 +117,39 @@ function dropBossChest(state, x, y) {
     );
   };
   if (!free(x, y)) {
-    for (const { dx, dy } of DIRS8) {
-      if (free(x + dx, y + dy)) {
-        dropX = x + dx;
-        dropY = y + dy;
-        break;
+    // Widening BFS in DIRS8 order rather than a single ring — the same shape,
+    // and for the same reason, as ensureArrivalClear. A single ring had to fall
+    // back to the DEATH TILE when it found nothing, and that tile is the one
+    // already known to fail the check: a boss dying on loot in a pocket stacked
+    // its chest on that loot, re-breaking the very invariant this relocation
+    // exists to protect. Searching outward means "nowhere to put it" can only
+    // happen on a floor with no free tile at all. Ring 1 is explored first and
+    // in DIRS8 order, so every case a ring scan already handled resolves to the
+    // identical tile — the balance simulator's byte-identity is the acceptance
+    // test for that. No RNG, so replays stay exact.
+    const map = state.map;
+    const seen = new Set([y * map.width + x]);
+    const queue = [{ x, y }];
+    for (let qi = 0; qi < queue.length; qi++) {
+      const cur = queue[qi];
+      let placed = false;
+      for (const { dx, dy } of DIRS8) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        const key = ny * map.width + nx;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const t = tileAt(map, nx, ny);
+        if (t === TILE.WALL) continue; // never queue through rock
+        if (free(nx, ny)) {
+          dropX = nx;
+          dropY = ny;
+          placed = true;
+          break;
+        }
+        queue.push({ x: nx, y: ny });
       }
+      if (placed) break;
     }
   }
   const chest = createBossChest(state.rng, dropX, dropY);

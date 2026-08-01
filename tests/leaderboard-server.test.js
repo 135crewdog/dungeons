@@ -357,6 +357,10 @@ describe('dashboard worker parity', () => {
     if (c.ct) headers['content-type'] = c.ct;
     const body = c.raw ?? (c.body ? JSON.stringify(c.body) : undefined);
     const res = await w.fetch(new Request(url, { method: c.method, headers, body }), {
+      // ALLOWED_ORIGIN must be SET here: without it both workers run
+      // fail-closed and the compared `cors` field is null on every case, so the
+      // CORS dimension of "parity" would be asserting nothing at all.
+      ALLOWED_ORIGIN: '*',
       DB: fakeDb([
         { initials: 'AAA', floor: 9, turns: 1, seed: '1', version: '0.5.2', created_at: 1 },
       ]),

@@ -761,6 +761,7 @@ for (const [label, opts] of [
         lockState.input &&
         lockState.btn &&
         !after.over &&
+        escaped.length === 0 &&
         after.url.includes(String(after.seed)),
       `initials="${initialsVal}" posts=${posts.length} payload=${JSON.stringify(payload)} status="${statusMsg}" locked=${lockState.input && lockState.btn} restartNewSeed=${after.seed} escaped=${escaped.length}`,
     );
@@ -814,7 +815,7 @@ for (const [label, opts] of [
     manifest.icons.length >= 3;
   record(
     'E13/pwa',
-    manifestOk && swReady && controlled && offlineBoot,
+    manifestOk && swReady && controlled && offlineBoot && escaped.length === 0,
     `manifest=${manifestOk} swReady=${swReady} controlledAfterReload=${controlled} offlineReloadBoots=${offlineBoot} escaped=${escaped.length}`,
   );
   await ctx.close();
@@ -833,4 +834,7 @@ writeFileSync(
   new URL('./.artifacts/results.json', import.meta.url),
   JSON.stringify({ results, pageErrors }, null, 2),
 );
-process.exit(failures.length === 0 ? 0 : 1);
+// An uncaught page exception is a failure even when every DOM assertion still
+// holds — it was collected and printed but never gated on, so a boot-time throw
+// could ride through a green campaign.
+process.exit(failures.length === 0 && pageErrors.length === 0 ? 0 : 1);

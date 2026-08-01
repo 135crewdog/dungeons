@@ -101,7 +101,11 @@ export function createLeaderboardClient({
   // the request's AbortSignal, so a fetch implementation that ignores signals
   // (or a stubbed one) still can't hang the UI forever; the controller is
   // aborted too so a real request is actually cancelled.
-  async function request(input, init = {}) {
+  // `readBody`, when given, is awaited INSIDE the same deadline and its result
+  // returned as `.data` — a stalled body is as much a hang as stalled headers,
+  // and clearing the timer the moment headers land would leave the caller
+  // waiting on res.json() with nothing watching it.
+  async function request(input, init = {}, readBody = null) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     let timer = null;
     const deadline = new Promise((_, reject) => {
@@ -113,10 +117,15 @@ export function createLeaderboardClient({
       }, timeoutMs);
     });
     try {
-      return await Promise.race([
-        fetchFn(input, controller ? { ...init, signal: controller.signal } : init),
-        deadline,
-      ]);
+      const work = (async () => {
+        const res = await fetchFn(
+          input,
+          controller ? { ...init, signal: controller.signal } : init,
+        );
+        if (!readBody || !res.ok) return res;
+        return { ...res, ok: res.ok, status: res.status, data: await readBody(res) };
+      })();
+      return await Promise.race([work, deadline]);
     } finally {
       clearTimeout(timer);
     }
@@ -146,15 +155,19 @@ export function createLeaderboardClient({
     };
   }
 
-  // Scores that submit() appended to storage while the drain was awaiting a
-  // POST. The drain works from a snapshot taken before its first request, so
-  // writing that snapshot back would silently discard anything queued in the
-  // meantime — a death-screen submission that failed retryably mid-flush would
-  // report `queued: true` and then vanish. submit() only ever appends, so
-  // everything past the snapshot's length is new.
-  function arrivedDuringDrain(snapshotLength) {
-    return readQueue().slice(snapshotLength);
-  }
+  // Scores that submit() appended while the drain was awaiting a POST. The drain
+  // works from a snapshot taken before its first request, so writing that
+  // snapshot back would silently discard anything queued in the meantime — a
+  // death-screen submission that failed retryably mid-flush would report
+  // `queued: true` and then vanish.
+  //
+  // This used to be computed as "everything in storage past the snapshot's
+  // LENGTH", which lost exactly that score whenever the queue was already at
+  // QUEUE_CAP: writeQueue drops oldest-first, so the stored array had shifted
+  // left and the index pointed at or past its end, yielding []. Tracking the
+  // payloads themselves is exact no matter how much capping shifted the array.
+  let draining = false;
+  let arrivedDuringDrain = [];
 
   // Drain the queue in order. A permanently-rejected entry is DISCARDED and the
   // drain continues — one bad payload used to block every later score forever.
@@ -166,21 +179,26 @@ export function createLeaderboardClient({
 
     let sent = 0;
     let dropped = 0;
-    for (let i = 0; i < queue.length; i++) {
-      const res = await post(queue[i]);
-      if (res.ok) {
-        sent += 1;
-      } else if (res.retryable) {
-        const kept = [...queue.slice(i), ...arrivedDuringDrain(queue.length)];
-        writeQueue(kept);
-        return { sent, dropped, kept: kept.length, reason: res.reason };
-      } else {
-        dropped += 1;
+    draining = true;
+    arrivedDuringDrain = [];
+    try {
+      for (let i = 0; i < queue.length; i++) {
+        const res = await post(queue[i]);
+        if (res.ok) {
+          sent += 1;
+        } else if (res.retryable) {
+          const kept = [...queue.slice(i), ...arrivedDuringDrain];
+          writeQueue(kept);
+          return { sent, dropped, kept: kept.length, reason: res.reason };
+        } else {
+          dropped += 1;
+        }
       }
+      writeQueue(arrivedDuringDrain);
+      return { sent, dropped, kept: arrivedDuringDrain.length };
+    } finally {
+      draining = false;
     }
-    const late = arrivedDuringDrain(queue.length);
-    writeQueue(late);
-    return { sent, dropped, kept: late.length };
   }
 
   return {
@@ -213,16 +231,24 @@ export function createLeaderboardClient({
       if (res.ok) return { ok: true };
       if (!res.retryable) return { ok: false, queued: false, reason: res.reason };
       writeQueue([...readQueue(), payload]);
+      // A drain in flight is about to overwrite the queue with what IT knows
+      // about; hand it this payload directly rather than relying on it
+      // re-reading storage (see arrivedDuringDrain).
+      if (draining) arrivedDuringDrain.push(payload);
       return { ok: false, queued: true, reason: res.reason };
     },
 
     async fetchScores() {
       if (url === '') return { ok: false, disabled: true };
       try {
-        const res = await request(`${url}/scores`);
+        // The deadline has to cover the BODY read too. request() clears its
+        // timer once headers arrive, so a response that stalls mid-body left
+        // this await pending forever and the overlay sat on "Loading…" with no
+        // recovery but closing it. post() never reads a body, which is why the
+        // death screen was never exposed to this.
+        const res = await request(`${url}/scores`, {}, (r) => r.json());
         if (!res.ok) return { ok: false, reason: `http-${res.status}` };
-        const data = await res.json();
-        return { ok: true, scores: data.scores || [], now: data.now ?? now() };
+        return { ok: true, scores: res.data.scores || [], now: res.data.now ?? now() };
       } catch (err) {
         return { ok: false, reason: err && err.name === 'TimeoutError' ? 'timeout' : 'network' };
       }

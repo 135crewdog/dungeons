@@ -137,10 +137,16 @@ describe('unlocking with a key', () => {
       items: [{ id: 41, type: 'potion', x: 2, y: 2, heal: 8 }, lockedChest(3, 2, RING.SURVIVAL)],
       keys: 1,
     });
-    processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    const events = processCommand(state, { type: 'move', dx: 1, dy: 0 });
     expect(player.keys).toBe(0);
     expect(player.ringSurvival).toBe(true);
     expect(state.items.filter((it) => it.type === 'ring')).toHaveLength(0);
+    // ...and it says so. This branch used to set the flag silently, so the
+    // player read "a ring tumbles out!" and then nothing named which ring.
+    const ringPickups = events.filter((e) => e.type === EV.PICKUP && e.item === 'ring');
+    expect(ringPickups).toHaveLength(1);
+    expect(ringPickups[0].effect).toBe(RING.SURVIVAL);
+    expect(state.log.some((e) => e.type === 'pickup' && e.data.ring === RING.SURVIVAL)).toBe(true);
   });
 
   it('keys are interchangeable and stack', () => {

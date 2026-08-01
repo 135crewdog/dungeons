@@ -924,6 +924,58 @@ snap into row 0 — was **checked and rejected**: it needs a walkable border cel
 the generator seals the rim (0 walkable border cells across 120 generated floors).
 Rather than leave that as an unverified claim, the rim is now a tested invariant.
 
+**0.9.8 audit remediation.** `docs/audits/2026-08-01-b7e66f7-v0.9.8.md` is the
+first audit since v0.9.3 — 0.9.4 through 0.9.7 had never been independently
+reviewed. **The simulation layer came through with no P0 and no P1**, every
+candidate at that level refuted under adversarial checking (~275k randomized
+commands over 550 seeds, 7,272 click-paths on 720 real floors, byte-level replay
+determinism, FOV symmetry over 20k pairs). The defects were all in the layers
+_around_ the sim, and shared one shape: a correct mechanism given a guard, index
+or predicate slightly narrower than the thing it guards. Fixed in the same
+release, balance byte-identical throughout:
+
+- **`window.localStorage` read at module scope could stop the game booting** —
+  the property _throws_ when site data is blocked, aborting the composition root
+  into a blank page. The identical failure `randomSeed` was fixed for in 0.9.5,
+  in the twin dependency. Now behind a probing `safeStorage()` shim.
+- **Remembered doors repainted from unseen enemy positions** — the terrain
+  layer's `isOpen` read live entity tiles with no visibility filter, so a
+  doorway across the map swung open as an unseen goblin passed through it.
+  Doors are opaque _precisely_ so a doorway's contents are unknowable; only the
+  terrain layer leaked. Gated on the cell's own lighting.
+- **The offline queue could lose a score submitted during a flush at cap** — the
+  "arrived during the drain" set was computed by array index, and capping drops
+  oldest-first, so the index landed past the end and the drain wrote an empty
+  queue over a score already reported as saved. Tracked by identity now. The
+  existing test covered the same race _below_ cap, where it passes either way.
+- **`fetchScores` could hang forever** — the deadline was cleared once headers
+  arrived, so a stalled body left the leaderboard overlay on "Loading…". The
+  body read is inside the deadline now; `post()` never read a body, so the death
+  screen was never exposed.
+- **Four latent simulation couplings**, none reachable in shipped play: the boss
+  chest's last-resort stacked on the tile it had just rejected (now a widening
+  DIRS8 BFS, ring 1 identical); `resolveStairStep` ignored `ascend`'s refusal;
+  a failed `planPath` left the old path installed; and the boxed-in `dropRing`
+  wore the ring **silently** — that last one _is_ reachable, since the enemy
+  phase runs before pickups and a chaser can seal a dead-end behind you.
+- **Tooling**: the HTML-sink guard banned `${` splicing but not concatenation,
+  which `menu.js` was already using; the e2e escaped-request tripwire gated in
+  only 3 of 17 scenarios and page errors never failed the run; lines/statements
+  coverage floors sat 13.8 points under measured. All tightened, and two
+  genuinely **vacuous tests** repaired (a queue-migration case that never called
+  the client, and a dashboard-parity case whose CORS dimension compared `null`
+  to `null`).
+
+**Deferred deliberately:** vendored art is precached with `revision: null`
+(`public/assets/` matches vite-plugin-pwa's `dontCacheBustURLsMatching` despite
+having no content hash), so a re-vendored sheet would never reach an
+already-installed PWA. Every fix changes asset URLs, and whether installed
+clients recover cannot be answered from a repository — it needs a real device
+with the old service worker. First item for the next release rather than
+changed blind. Four P3 items (the death overlay's modal a11y contract, clicking
+a sprite's head in a room, `trapTabKey` vs the `hidden` attribute, a stale
+comment in `motion.js`) are recorded in the audit and left open.
+
 `window.__game` remains exposed **deliberately**: it is a debugging and
 reproducibility affordance, and hiding it would not be anti-cheat — the POST
 endpoint is spoofable regardless, which is exactly why the board is an
