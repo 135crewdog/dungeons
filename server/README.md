@@ -78,7 +78,7 @@ installing the game's dev dependencies) and the first that deployed.
 
 **Do not try to diagnose this from the GitHub check run's timestamps.** The
 failed builds all reported the same second for start and finish, which looks like
-"rejected before it started" — but the *successful* builds report the same second
+"rejected before it started" — but the _successful_ builds report the same second
 too (`bd35efb`: `20:45:49` → `20:45:49`, for a build that took a quarter of an
 hour). Cloudflare stamps both fields when it updates the check, so they carry no
 duration information at all and cannot distinguish a rejection from a run. The
