@@ -154,6 +154,32 @@ describe('pickClickTile (sprite lift)', () => {
     expect(pickClickTile(inCell(1, 8), inCell(0, TILE_SIZE - 1), room)).toEqual({ x: 1, y: 0 });
   });
 
+  it('still fires with the wall snap disabled (glyph terrain, sprite actors)', () => {
+    // Terrain and creature sheets fall back independently: if only
+    // tiles_prison.png fails, the map is glyphs but actors are still lifted
+    // sprites, so the head band is real while the wall overhang is not.
+    const lift = liftOn(1, 1, 4);
+    expect(pickClickTile(inCell(1, 8), inCell(0, TILE_SIZE - 1), room, lift, 0)).toEqual({
+      x: 1,
+      y: 1,
+    });
+    // ...and with the wall snap off, a dead click on a wall stays dead.
+    expect(pickClickTile(inCell(1, 4), inCell(0, TILE_SIZE - 1), corridor, () => 0, 0)).toEqual({
+      x: 1,
+      y: 0,
+    });
+  });
+
+  it('degenerates to worldToTile with both corrections off', () => {
+    // Full glyph mode: no lift, no overhang — every click resolves by plain
+    // arithmetic, exactly as it did before either correction existed.
+    for (const frac of [0, 4, 8, TILE_SIZE - 1]) {
+      expect(pickClickTile(inCell(1, 4), inCell(0, frac), corridor, () => 0, 0)).toEqual(
+        worldToTile(inCell(1, 4), inCell(0, frac)),
+      );
+    }
+  });
+
   it('does not disturb the wall-overhang snap it runs ahead of', () => {
     // The corridor cases from 0.9.7, now with a lift predicate present but
     // reporting nothing: identical results.

@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createHelp } from '../src/ui/help.js';
 import { createLeaderboard } from '../src/ui/leaderboard.js';
+import { trapTabKey } from '../src/ui/dom.js';
 
 beforeEach(() => {
   document.body.innerHTML = '';
@@ -103,5 +104,64 @@ describe('leaderboard overlay', () => {
     });
     await lb.open();
     expect(lb.el.querySelector('.lb-status').textContent).toMatch(/offline|reach/i);
+  });
+});
+describe('focus trap (ui/dom.js)', () => {
+  // Every overlay focuses its PANEL on open so a screen reader announces the
+  // dialog rather than a stray button. The panel has tabIndex -1, and
+  // panel.contains(panel) is true, so a bare "is it inside?" test read that as
+  // already-in-cycle and wrapped neither way: forward Tab survived by luck
+  // (the panel precedes its children in document order), Shift+Tab walked out
+  // of the modal into the page behind it.
+  function fixture() {
+    const before = document.createElement('button');
+    before.textContent = 'behind the modal';
+    const panel = document.createElement('div');
+    panel.tabIndex = -1;
+    const a = document.createElement('button');
+    const b = document.createElement('button');
+    panel.append(a, b);
+    document.body.append(before, panel);
+    return { before, panel, a, b };
+  }
+  const tab = (shiftKey) => ({ key: 'Tab', shiftKey, preventDefault: () => {} });
+
+  it('wraps Shift+Tab from the panel itself to the LAST control', () => {
+    const { panel, b } = fixture();
+    panel.focus();
+    trapTabKey(panel, tab(true));
+    expect(document.activeElement).toBe(b);
+  });
+
+  it('sends forward Tab from the panel to the FIRST control', () => {
+    const { panel, a } = fixture();
+    panel.focus();
+    trapTabKey(panel, tab(false));
+    expect(document.activeElement).toBe(a);
+  });
+
+  it('still wraps at the real ends of the cycle', () => {
+    const { panel, a, b } = fixture();
+    b.focus();
+    trapTabKey(panel, tab(false));
+    expect(document.activeElement).toBe(a);
+    a.focus();
+    trapTabKey(panel, tab(true));
+    expect(document.activeElement).toBe(b);
+  });
+
+  it('pulls focus back in from outside the panel', () => {
+    const { before, panel, a } = fixture();
+    before.focus();
+    trapTabKey(panel, tab(false));
+    expect(document.activeElement).toBe(a);
+  });
+
+  it('skips a control hidden by the `hidden` attribute', () => {
+    const { panel, a, b } = fixture();
+    a.hidden = true;
+    b.focus();
+    trapTabKey(panel, tab(false));
+    expect(document.activeElement).toBe(b); // b is now both first and last
   });
 });

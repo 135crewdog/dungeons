@@ -65,7 +65,14 @@ export const CLICK_SNAP_PX = TILE_SIZE / 2;
 //
 // Everything else is returned untouched, which is what keeps rooms, items and
 // open ground behaving exactly as they always have.
-export function pickClickTile(wx, wy, walkable, liftBelow = () => 0) {
+// The two corrections have INDEPENDENT gates, so `overhangPx` is a parameter
+// rather than a constant: terrain sprites and creature sprites fall back to
+// glyphs separately (useSprites vs useEntitySprites), and a run with glyph
+// terrain but sprite actors still needs the lift correction while the wall
+// overhang no longer exists to compensate for. Pass 0 to disable the wall snap
+// — `withinCell` is always < TILE_SIZE, so the test can never fire. With both
+// off this degenerates to plain worldToTile.
+export function pickClickTile(wx, wy, walkable, liftBelow = () => 0, overhangPx = CLICK_SNAP_PX) {
   const t = worldToTile(wx, wy);
   const withinCell = wy - t.y * TILE_SIZE;
 
@@ -73,7 +80,7 @@ export function pickClickTile(wx, wy, walkable, liftBelow = () => 0) {
   if (lift > 0 && withinCell >= TILE_SIZE - lift) return { x: t.x, y: t.y + 1 };
 
   if (walkable(t.x, t.y)) return t;
-  if (withinCell >= TILE_SIZE - CLICK_SNAP_PX && walkable(t.x, t.y + 1)) {
+  if (overhangPx > 0 && withinCell >= TILE_SIZE - overhangPx && walkable(t.x, t.y + 1)) {
     return { x: t.x, y: t.y + 1 };
   }
   return t;

@@ -44,12 +44,21 @@ export function trapTabKey(panel, e) {
   const first = items[0];
   const last = items[items.length - 1];
   const active = document.activeElement;
+  // The PANEL itself counts as outside the cycle. Every overlay focuses its
+  // panel on open (overlay.js, and the death screen when its initials form is
+  // hidden) so a screen reader announces the dialog rather than a stray button
+  // — but `panel.contains(panel)` is TRUE, so a bare `!contains` test read the
+  // panel as already inside the cycle and wrapped neither way. Forward Tab
+  // survived that by luck, since the panel precedes its children in document
+  // order; Shift+Tab did not, and walked straight out of the modal into the
+  // page behind it.
+  const outside = active === panel || !panel.contains(active);
   if (e.shiftKey) {
-    if (active === first || !panel.contains(active)) {
+    if (active === first || outside) {
       e.preventDefault();
       last.focus();
     }
-  } else if (active === last || !panel.contains(active)) {
+  } else if (active === last || outside) {
     e.preventDefault();
     first.focus();
   }

@@ -12,7 +12,13 @@ import { EV } from '../core/events.js';
 import { TILE_SIZE } from '../core/constants.js';
 import { GlyphGrid, createGlyphTextures, glyphKey } from './glyphLayer.js';
 import { SpriteTileGrid, TILESHEET_KEY } from './spriteLayer.js';
-import { computeZoom, tileToWorld, tileCenterWorld, worldToTile, pickClickTile } from './camera.js';
+import {
+  computeZoom,
+  tileToWorld,
+  tileCenterWorld,
+  pickClickTile,
+  CLICK_SNAP_PX,
+} from './camera.js';
 import {
   entityGlyph,
   entityColor,
@@ -418,12 +424,18 @@ export class DungeonScene extends Phaser.Scene {
     const cy = this.camCenter ? this.camCenter.y : cam.midPoint.y;
     const wx = cx + (cssX * r - cam.width / 2) / cam.zoom;
     const wy = cy + (cssY * r - cam.height / 2) / cam.zoom;
-    if (!this.useSprites()) return worldToTile(wx, wy);
+    // Each correction is gated on the art it compensates for, separately:
+    // terrain and creature sheets fall back to glyphs independently, and a run
+    // with glyph terrain but sprite actors still draws lifted heads even though
+    // no wall overhang exists. spriteLift already returns 0 without entity
+    // sprites, and overhangPx 0 disables the wall snap, so full glyph mode
+    // degenerates to plain worldToTile.
     return pickClickTile(
       wx,
       wy,
       (x, y) => isKnownWalkable(this.state, x, y),
       (x, y) => this.spriteLift(x, y),
+      this.useSprites() ? CLICK_SNAP_PX : 0,
     );
   }
 
