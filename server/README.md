@@ -9,7 +9,9 @@ submission time. The game client talks to it via `src/net/leaderboard.js`.
 - `worker.dashboard.js` — the same Worker inlined into one import-free file for
   pasting into the Cloudflare dashboard editor (the no-install path below).
 - `schema.sql` — the one-table D1 schema.
-- `wrangler.toml` — Worker + D1 binding config.
+- `../wrangler.toml` — Worker + D1 binding config. It lives at the **repository
+  root**, not here, because Cloudflare Workers Builds only looks for it there;
+  see "Why the config is a directory up" below. It is the only copy.
 
 ## Deploy from the browser — no install (Cloudflare dashboard)
 
@@ -34,7 +36,8 @@ Prefer clicking to typing, or don't want to install anything? Do it all at
 
 ## One-time deploy (wrangler CLI)
 
-Requires a free Cloudflare account. From this `server/` directory:
+Requires a free Cloudflare account. Run these from the **repository root** (that
+is where `wrangler.toml` is):
 
 ```sh
 npx wrangler login
@@ -44,7 +47,7 @@ npx wrangler d1 create dungeons-leaderboard
 Copy the printed `database_id` into `wrangler.toml`, then:
 
 ```sh
-npx wrangler d1 execute dungeons-leaderboard --remote --file=./schema.sql
+npx wrangler d1 execute dungeons-leaderboard --remote --file=./server/schema.sql
 npx wrangler deploy
 ```
 
@@ -62,13 +65,41 @@ the backend deploy from the same push instead of the backend waiting on somebody
 to remember it. The game's own workflow still only publishes `dist/` — it is
 Cloudflare, not GitHub Actions, that ships the worker.
 
-> **Status: the connection exists but its builds are not yet succeeding.** Until
-> one goes green, the section above describes the intended route rather than the
-> working one, and deploys go through the dashboard-paste fallback at the bottom
-> of this file — which is how the current v0.9.5+ worker got live. Delete this
-> note in the commit that gets a build passing. It is here because a document
-> that confidently describes a deployment path that does not work is exactly what
-> let issue #30 sit open for a week.
+> **Status: the cause of the failing builds is identified and the fix is in, but
+> no build has been observed green yet.** Until one is, the section above
+> describes the intended route rather than a proven one, and the dashboard-paste
+> fallback at the bottom of this file remains what is known to work — it is how
+> the current v0.9.5+ worker got live. Delete this note in the commit that sees a
+> build pass. It is here because a document that confidently describes a
+> deployment path that does not work is exactly what let issue #30 sit open for a
+> week, and "I fixed it" is not the same as "it ran".
+
+### Why the config is a directory up
+
+`wrangler.toml` is at the **repository root** even though everything it describes
+is in here. Workers Builds looks for a Wrangler config in the build's **root
+directory** — which defaults to the repository root — and **rejects the build
+before it starts** when it finds none.
+
+That is what four consecutive failed builds were. Each reported the same second
+for start and finish; a build that failed while installing or deploying takes
+tens of seconds, so an instant one never ran at all. The log was never needed to
+tell that.
+
+Keeping the config where the tooling already looks means the deploy works on
+Cloudflare's **default** settings — no root directory to set, no deploy command
+to override, nothing for the next person to rediscover. `main =
+"server/worker.js"` points back at the code, and wrangler bundles that entry with
+its `./scores.js` import as usual.
+
+**Do not add a second `wrangler.toml` under `server/`.** Two copies would drift,
+and the one that loses is whichever a deploy doesn't read — the same reason
+`worker.dashboard.js` is generated and byte-checked rather than maintained by
+hand.
+
+If someone has since set **Root directory** to `server` in the dashboard (Workers
+& Pages → dungeons-leaderboard → Settings → Build), put it back to blank — with
+this layout the default is correct.
 
 ### The one rule that will bite you
 
@@ -80,8 +111,12 @@ configured in the dashboard** — both `[vars]` and bindings. So:
   returns `500 {"error":"storage unavailable"}`.
 - Setting `ALLOWED_ORIGIN` by hand in the dashboard is redundant: the value in
   this file wins on the next deploy. Change it here, not there.
+- `workers_dev = true` is stated explicitly rather than left to the default. The
+  game reaches the worker at its `*.workers.dev` address (`LEADERBOARD_URL` in
+  `src/net/config.js`), so that URL is not a convenience — an unstated value that
+  ever resolved to `false` would switch it off and take the leaderboard with it.
 
-Both are correct in the committed file. Editing bindings or vars in the
+All three are correct in the committed file. Editing bindings or vars in the
 dashboard is the thing to avoid — those edits are lost on the next push.
 
 ### Schema changes are NOT automatic — and they must go FIRST
@@ -154,20 +189,22 @@ only needed if you edited `server/*.js` yourself. Note this route does **not**
 apply `wrangler.toml`, so bindings and vars must already be right in the
 dashboard.
 
-**With wrangler.** `wrangler.toml` supplies the binding and the variable, so it
-is just:
+**With wrangler.** `wrangler.toml` supplies the binding and the variable, so from
+the **repository root** it is just:
 
 ```sh
 # 1. new indexes / schema (idempotent, safe to re-run on a live database)
-npx wrangler d1 execute dungeons-leaderboard --remote --file=./schema.sql
+npx wrangler d1 execute dungeons-leaderboard --remote --file=./server/schema.sql
 # 2. the worker itself
 npx wrangler deploy
 ```
 
 ## Local development
 
+From the **repository root**:
+
 ```sh
-npx wrangler d1 execute dungeons-leaderboard --local --file=./schema.sql
+npx wrangler d1 execute dungeons-leaderboard --local --file=./server/schema.sql
 npx wrangler dev
 ```
 

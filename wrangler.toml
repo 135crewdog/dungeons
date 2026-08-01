@@ -1,0 +1,45 @@
+# Cloudflare Worker config for the leaderboard backend in `server/`.
+#
+# WHY THIS FILE IS AT THE REPOSITORY ROOT rather than next to the code it
+# describes: Cloudflare Workers Builds looks for a Wrangler config file in the
+# build's *root directory*, which defaults to the repository root, and rejects
+# the build outright when it finds none — before any install or build step
+# runs. With this file in `server/`, every build failed in the same second it
+# started, four times, which is what that rejection looks like from GitHub.
+#
+# Putting the config where the tooling already looks means the deploy works on
+# Cloudflare's DEFAULT settings, with nothing to configure in the dashboard and
+# nothing for a future reader to rediscover. `main` simply points into
+# `server/`; wrangler bundles that entry and its imports.
+#
+# This is the ONLY Wrangler config in the repository. Do not add a second one
+# under `server/` — the two would drift, and the one that loses is whichever a
+# deploy doesn't read.
+
+name = "dungeons-leaderboard"
+main = "server/worker.js"
+compatibility_date = "2026-07-01"
+
+# The game reaches the worker at its *.workers.dev URL (LEADERBOARD_URL in
+# src/net/config.js). A deploy makes the live worker match THIS FILE, so an
+# unstated value here could switch that URL off and take the leaderboard with
+# it. Stated explicitly for that reason, not as boilerplate.
+workers_dev = true
+
+[vars]
+# REQUIRED. The worker treats a missing value as a misconfiguration and sends no
+# CORS headers at all, so leaving it unset breaks the leaderboard in the browser.
+# "*" is fine because the API uses no cookies or credentials; to restrict it,
+# use a comma-separated list, e.g. "https://<user>.github.io,http://localhost:5173".
+ALLOWED_ORIGIN = "*"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dungeons-leaderboard"
+# The real id of the live database. NOT a secret — it names a database inside
+# the account, and touching it still needs account credentials; Cloudflare's own
+# templates commit this field. It is load-bearing for the Git deploy: a deploy
+# REPLACES the worker's bindings with what this file says, so a wrong or
+# placeholder id silently detaches the worker from its data and every request
+# comes back 500 "storage unavailable". `npx wrangler d1 list` reprints it.
+database_id = "0b3f742e-9b5d-420b-a393-b49160683244"

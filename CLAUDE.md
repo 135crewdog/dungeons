@@ -85,15 +85,16 @@ autofocuses the initials field, and status lines are `aria-live` regions.
 ## Leaderboard (cross-device, 30-day rolling)
 
 The one networked feature. A tiny **Cloudflare Worker + D1** backend lives in
-**`server/`** (worker.js + pure logic in scores.js + schema.sql + wrangler.toml),
-deployed by **Cloudflare Workers Builds from this repository** — a change under
-`server/` that lands on `main` ships itself (steps and the one dangerous rule in
+**`server/`** (worker.js + pure logic in scores.js + schema.sql; its
+**`wrangler.toml` sits at the repository root**, see below), deployed by
+**Cloudflare Workers Builds from this repository** — a change under `server/`
+that lands on `main` ships itself (steps and the one dangerous rule in
 `server/README.md`); the game itself stays a static GitHub Pages deploy, so the
 two halves deploy from the same push but by different pipelines. **Caveat, as of
-0.9.9: that connection is configured but its builds are still failing**, so the
-live worker is currently updated through the dashboard-paste fallback. The
-intended route is the one described here; the working one is in
-`server/README.md`. API: `POST /scores` validates
+0.9.9: that connection is configured and its builds had been failing** — the
+cause is now identified (below) and the fix is in; until a build is observed
+green, treat the dashboard-paste fallback in `server/README.md` as the route
+that is known to work. API: `POST /scores` validates
 `{ initials, floor, turns, seed, version }` (initials exactly 3 chars A–Z0-9, uppercased
 server-side) and stamps a **server** timestamp; `GET /scores` returns the top 50 of the
 last 30 days ordered **floor DESC, turns ASC, created_at ASC**, plus the server clock so
@@ -124,11 +125,24 @@ deploying without one, not the normal route.
 **The rule that makes the Git deploy safe** (0.9.9): a deploy makes the live
 worker match `wrangler.toml`, **replacing** the dashboard's vars and bindings. So
 `database_id` must be the real database's id — a placeholder detaches the worker
-from its data and every request returns `500 storage unavailable` — and
-`ALLOWED_ORIGIN` is owned by the file, not the dashboard. Schema changes are the
+from its data and every request returns `500 storage unavailable` — `ALLOWED_ORIGIN`
+is owned by the file, not the dashboard, and `workers_dev = true` is stated
+explicitly because `LEADERBOARD_URL` is a `*.workers.dev` address and an unstated
+value could switch it off. Schema changes are the
 one thing NOT automatic: a pipeline ships code, not migrations, so `schema.sql`
 is applied by hand in the D1 console (it is `CREATE ... IF NOT EXISTS`
 throughout, so re-running it is safe).
+
+**Why `wrangler.toml` is at the repository root, not in `server/`** (0.9.9):
+Workers Builds looks for a Wrangler config in the build's **root directory**
+(default: the repo root) and **rejects the build before it starts** when it finds
+none. That is what four consecutive failed builds were — each reported the same
+second for start and finish, which is a rejection, not a build that ran and
+broke. Keeping the config where the tooling already looks makes the deploy work
+on Cloudflare's **default** settings, with nothing to configure in the dashboard;
+`main = "server/worker.js"` points back at the code. It is the **only** Wrangler
+config in the repo, deliberately — a second one under `server/` would drift, and
+the loser would be whichever a deploy doesn't read.
 
 The client lives in **`src/net/`** — the only code allowed to fetch or touch
 localStorage (the architecture test enforces that the sim never does either).
