@@ -180,6 +180,30 @@ describe('boss chest drop', () => {
     expect(new Set(tiles).size).toBe(state.items.length);
   });
 
+  it('a boss dying in a doorway drops the chest on a floor tile instead', () => {
+    // A door is walkable, so the drop used to stay put — and the walls layer
+    // paints a sideways door OVER the item layer, so the chest was invisible
+    // until an entity stepped into the doorway and swung it open.
+    const { state, boss } = bossFight(3, { bossTile: TILE.DOOR });
+    for (let i = 0; i < 30 && state.entities.byId.has(2); i++) resolveAttack(state, 1, 2);
+    expect(state.items).toHaveLength(1);
+    const chest = state.items[0];
+    expect(chest.x === boss.x && chest.y === boss.y).toBe(false); // not in the doorway
+    expect(Math.max(Math.abs(chest.x - boss.x), Math.abs(chest.y - boss.y))).toBe(1); // adjacent
+    expect(state.map.tiles[chest.y * state.map.width + chest.x]).toBe(TILE.FLOOR);
+  });
+
+  it('the relocation scan skips doorways as well as littered tiles', () => {
+    // Boss on the stairs with the whole north row doored off: the scan has to
+    // walk past those before it finds somewhere the chest can actually be seen.
+    const { state } = bossFight(3, { bossTile: TILE.STAIRS_DOWN });
+    for (let x = 0; x < state.map.width; x++) state.map.tiles[x] = TILE.DOOR;
+    for (let i = 0; i < 30 && state.entities.byId.has(2); i++) resolveAttack(state, 1, 2);
+    const chest = state.items.find((it) => it.type === 'chest');
+    expect(chest.y).not.toBe(0); // never on the doored row
+    expect(state.map.tiles[chest.y * state.map.width + chest.x]).toBe(TILE.FLOOR);
+  });
+
   it('never drops a trap; all three bonuses occur across seeds', () => {
     const bonusFor = {
       strength: CHEST_STRENGTH_BONUS,

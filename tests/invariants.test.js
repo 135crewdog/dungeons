@@ -46,6 +46,9 @@ function floorProblems(state, label) {
     if (tile === TILE.STAIRS_DOWN || tile === TILE.STAIRS_UP) {
       problems.push(`${label}: ${it.type} on a staircase at ${key}`);
     }
+    // An item in a doorway is invisible: the walls layer paints a sideways
+    // door over the item layer, and only an entity makes a door render open.
+    if (tile === TILE.DOOR) problems.push(`${label}: ${it.type} in a doorway at ${key}`);
     if (tile === TILE.WALL) problems.push(`${label}: ${it.type} inside a wall at ${key}`);
   }
   return problems;

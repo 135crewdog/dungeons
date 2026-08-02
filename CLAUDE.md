@@ -100,9 +100,11 @@ row ages ("3d ago") never trust the device clock. The API uses no cookies or
 credentials, and ships configured with `ALLOWED_ORIGIN = "*"` (see the hardening
 paragraph below for what that variable now does). The board is
 **deliberately an honor system** — a settled decision, not a gap awaiting a fix: the
-client asserts its own floor/turns and the server takes them on trust, and the
-leaderboard overlay and README say so in as many words rather than implying a
-verification that isn't there. Every score still carries its seed, so a run could
+client asserts its own floor/turns and the server takes them on trust, and the READMEs
+say so in as many words rather than implying a verification that isn't there. The
+**overlay itself carries no disclaimer** (0.9.10 removed the footer it shipped with in
+0.9.4): the trust model is documented, not something to re-explain to the player every
+time they open the board. Every score still carries its seed, so a run could
 later be replay-verified with the headless engine if that ever becomes worth doing.
 
 Server hardening (0.9.5): CORS **fails closed** — a missing `ALLOWED_ORIGIN` is a
@@ -380,8 +382,9 @@ the floor uses the main RNG like every other spawn. Constants: `SECRET_BAND_FLOO
   the player object is carried by reference).
 - **The locked chest** is visibly a different chest (blue crystal vs. the golden
   regular chest). Keyless, it announces "locked" once per arrival and never opens.
-  With a key it consumes one and **drops its ring on an adjacent tile** (deterministic
-  DIRS8 scan, boss-chest style; if boxed in, the ring goes straight onto the finger).
+  With a key it consumes one and **drops its ring on an adjacent floor tile**
+  (deterministic DIRS8 scan over `query.canDropAt`, boss-chest style — **never a
+  doorway**, see below; if boxed in, the ring goes straight onto the finger).
 - **The four rings** are passive, auto-worn on walk-over, kept for the run
   (`restart` wipes them), shown as HUD gem chips, one per band in a seed-shuffled
   cycle (bands 0–3 all differ; deeper bands wrap — a duplicate permanent ring is a
@@ -1066,6 +1069,36 @@ everything else (see Leaderboard). The one step that stays manual is applying
 reproducibility affordance, and hiding it would not be anti-cheat — the POST
 endpoint is spoofable regardless, which is exactly why the board is an
 acknowledged honor system.
+
+**0.9.10 — a dropped item is never invisible; the honor footer is gone.** Two
+unrelated playtest items.
+
+**Rings and boss chests keep out of doorways.** A ring tumbling from a locked
+chest could land on a **door** tile and simply not be there: the drop scan
+accepted any walkable-ish tile, and the sprite renderer paints a **sideways**
+door (`autotile.js`'s `wallsFrame`) as a full frame in the **walls layer**,
+which is drawn OVER the item layer by design. Nothing rescued it, either — the
+"door renders open while occupied" rule builds its occupancy set from
+**entities only**, so an item never opens the door it is hiding under. The
+pickup worked the whole time; only the art lied. The same predicate backed the
+boss chest, so a boss dying in a doorway hid its reward the same way. Fixed in
+the **sim**, not the renderer — the walls-over-actors occlusion is the SPD
+pseudo-3D the project wants, and spawning has always been floor-only
+(`randomFreeFloorInRoom`: "nothing spawns in a doorway or on `>`"); the two drop
+paths were the only code that disagreed. Both now share one predicate,
+**`query.canDropAt`** — unoccupied, item-free, `TILE.FLOOR` — which folds in the
+stairs exclusion 0.9.7 added for the same class of reason (a staircase swallows
+the pickup, a doorway hides it). The boss chest's widening BFS still queues
+_through_ doors, so a boss that dies in one relocates to the nearest real floor
+tile rather than giving up. "No item on a door tile" joins the broad-seed
+invariants next to "no item on a staircase". Balance: byte-identical (the bots
+fight bosses in rooms, and a chest-adjacent doorway is rare enough not to appear
+in 400 runs) — measured rather than assumed, since a moved chest is exactly the
+kind of thing that shifts a run.
+
+**The leaderboard's honor-system footer is removed.** The board is still an
+honor system and both READMEs still say so; the overlay just no longer repeats
+it under every table. See the Leaderboard section.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,

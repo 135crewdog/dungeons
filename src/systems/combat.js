@@ -13,7 +13,7 @@ import {
 import { nextInt } from '../core/rng.js';
 import { attackEvent, deathEvent, survivalEvent } from '../core/events.js';
 import { pushLog, allocId } from '../core/entity.js';
-import { tileAt, entityAt, enemiesSorted, chebyshev } from '../core/query.js';
+import { tileAt, canDropAt, enemiesSorted, chebyshev } from '../core/query.js';
 import { createBossChest } from '../entities/items.js';
 
 // Damage after armor. A >0 raw hit always lands for at least 1 (armor can't
@@ -85,12 +85,14 @@ export function resolveAttack(state, attackerId, targetId) {
 // A slain boss always leaves a bonus chest, normally right where it fell —
 // which is never under the player, since two entities never share a tile.
 //
-// Two death tiles can't hold it, and both shift the drop to the first adjacent
-// unoccupied, item-free floor/door tile (deterministic DIRS8 scan; no RNG draw,
-// so replays match):
+// Three death tiles can't hold it, and each shifts the drop to the first
+// adjacent tile that can (deterministic DIRS8 scan; no RNG draw, so replays
+// match). All three are the shared canDropAt predicate:
 //
 //  - A STAIRCASE swallows the pickup: a player stepping onto stairs changes
 //    floor before pickups resolve, so the chest would be unreachable.
+//  - A DOORWAY hides it: the sprite renderer paints a sideways door over the
+//    item layer, so the chest is invisible until something stands in the door.
 //  - A tile that ALREADY HOLDS AN ITEM would end up with two, breaking the
 //    one-item-per-tile invariant. A boss reaches one only when boxed in (enemies
 //    route around item tiles), so this is rare rather than impossible.
@@ -105,17 +107,9 @@ function dropBossChest(state, x, y) {
   let dropX = x;
   let dropY = y;
   // One predicate for "a chest can sit here", applied to the death tile and
-  // then to its neighbors — a staircase fails it on the tile type, a littered
-  // tile on the item check. The dying boss is already out of state.entities by
+  // then to its neighbors. The dying boss is already out of state.entities by
   // the time this runs, so its own tile reads as unoccupied.
-  const free = (fx, fy) => {
-    const ft = tileAt(state.map, fx, fy);
-    return (
-      (ft === TILE.FLOOR || ft === TILE.DOOR) &&
-      !entityAt(state, fx, fy) &&
-      !state.items.some((it) => it.x === fx && it.y === fy)
-    );
-  };
+  const free = (fx, fy) => canDropAt(state, fx, fy);
   if (!free(x, y)) {
     // Widening BFS in DIRS8 order rather than a single ring — the same shape,
     // and for the same reason, as ensureArrivalClear. A single ring had to fall
