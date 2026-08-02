@@ -1209,6 +1209,34 @@ action. Deferred, not rejected: D1 retention (the 30-day window still filters
 reads without deleting rows), dependency-update automation, `prefers-reduced-
 motion`, and an e2e Chromium preflight.
 
+**0.9.12 — an HP bar in the HUD.** The HP readout gains a fixed-width bar beside
+its numbers: the bar carries the ratio at a glance, the existing `14/20` text keeps
+the absolute values. Presentation only — no simulation change, no new RNG draw, no
+balance run needed (nothing under `core/`, `world/`, `entities/`, `systems/` is
+touched). It is inside the scope fence below for that reason: it re-presents state
+the HUD already displayed, rather than changing what a player can do.
+
+**Why the bar does not grow with max HP**, which is the non-obvious part and the
+thing not to "fix" later: `maxHp` has **no cap anywhere** — the only write is
+`player.maxHp += amount` in `openChest`, +4 per health chest — so it climbs
+linearly at ~+1.27/floor (~39 by floor 12, ~52 by floor 20, ~67 by floor 30, and
+nothing stops it). There is no width to size a growing bar against, and one that
+resized mid-run would reflow the whole HUD every time a chest opened. A fixed track
+with a proportional fill sidesteps both, and the numbers next to it supply the
+absolute scale the ratio drops.
+
+Worth knowing when reading the bar: because health chests **refill to full**, the
+hp/maxHp ratio _rises_ with depth (0.80 on floor 1 → 0.90 by floor 30), so a deep
+run's bar sits visually fuller than a shallow one. That is a property of the loot
+table, not of the widget. The fill color reuses the HP number's own band
+computation (`> 0.5` good, `> 0.25` warn, else bad) rather than recomputing it, so
+the two can never disagree, and the bar is `aria-hidden` because it duplicates text
+that is already accessible. There is deliberately **no transition**: the DOM
+overlay layer swaps instantly everywhere else, `hud.js` recreates its children each
+turn via `replaceChildren` (so a transition could not animate without restructuring
+the chip to be persistent), and the renderer's floating damage number already sells
+the hit.
+
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,
 auto-worn pickups** — flat flags on the player, no slots, no managing — not a

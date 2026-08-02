@@ -130,6 +130,29 @@
       #hud .hud-dim {
         opacity: 0.5;
       }
+      /* HP bar: fixed width, proportional fill — the ratio at a glance, with
+         the "14/20" beside it carrying the absolute numbers. It never resizes,
+         because maxHp grows without a cap (see hud.js).
+
+         A block element gets nothing from the HUD's text-shadow, so it earns
+         its own legibility over arbitrary terrain: an opaque dark track plus a
+         hairline border. The fill color is set inline from the same band the
+         HP number uses. No transition — every other DOM readout swaps
+         instantly, and the renderer's floating damage number already sells
+         the hit. */
+      #hud .hud-bar {
+        display: inline-block;
+        width: 64px;
+        height: 8px;
+        margin-left: var(--sp-2);
+        vertical-align: middle;
+        background: rgba(5, 6, 10, 0.75);
+        border: 1px solid var(--c-rule);
+      }
+      #hud .hud-bar-fill {
+        display: block;
+        height: 100%;
+      }
       /* Build version: dim watermark on the row under the Menu text, so
          screenshots identify the build without crowding the gameplay stats. */
       #hudversion {
