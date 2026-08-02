@@ -51,6 +51,9 @@ three initials on the cross-device leaderboard.
 - Deterministic: every run is driven by a single seed — logged to the console and
   shown in the pause menu with one-click copy; reopen with `?seed=<value>` to
   replay it
+- Installed and offline, it **updates on your terms**: the app checks for a new
+  build in the background and shows a dim "Update ready" line in the corner —
+  it never reloads a run out from under you
 
 ## Controls
 
@@ -83,6 +86,9 @@ npm run lint       # ESLint correctness ratchet
 npm run format     # rewrite with Prettier (format:check verifies without writing)
 npm run balance    # headless balance simulator (seeded bot runs, survival tables)
 ```
+
+The service worker — and so the update prompt — exists only in a real build;
+`npm run dev` registers nothing, so exercise both under `npm run preview`.
 
 Before committing, run the quality gate — the same one CI runs:
 

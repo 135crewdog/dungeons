@@ -15,9 +15,15 @@ import { createGameOver } from './ui/gameOver.js';
 import { createMenu } from './ui/menu.js';
 import { createLeaderboard } from './ui/leaderboard.js';
 import { createHelp } from './ui/help.js';
+import { createUpdateNotice } from './ui/updateNotice.js';
 import { APP_VERSION } from './ui/version.js';
 import { createLeaderboardClient, buildScorePayload } from './net/leaderboard.js';
 import { LEADERBOARD_URL } from './net/config.js';
+// A Vite virtual module, not a real file — it does not resolve under Vitest,
+// which is one more reason service-worker wiring can only live in this module
+// (already excluded from coverage for that class of reason). Outside a build it
+// is a no-op stub, so `npm run dev` registers nothing.
+import { registerSW } from 'virtual:pwa-register';
 
 // A fresh run's starting seed. Web Crypto is the good source, but assuming it
 // exists threw on browsers that don't have it (or on an insecure origin, where
@@ -120,15 +126,83 @@ const lb = createLeaderboardClient({
   now: () => Date.now(),
 });
 lb.flushQueue();
-window.addEventListener('online', () => lb.flushQueue());
+window.addEventListener('online', () => {
+  lb.flushQueue();
+  checkForUpdate();
+});
 // A retryable failure while the tab stays online (a 500, a D1 outage, a
 // timeout) never sees an `online` event, so the client's own backoff timer is
 // what actually delivers it. Coming back to a backgrounded tab is a good
-// moment to try early — timers are throttled while hidden.
+// moment to try early — timers are throttled while hidden, which is the same
+// reason the service-worker check rides along here: an hourly interval in a
+// background tab is not hourly.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') lb.flushQueue();
+  if (document.visibilityState !== 'visible') return;
+  lb.flushQueue();
+  checkForUpdate();
 });
-window.addEventListener('pagehide', () => lb.stop());
+window.addEventListener('pagehide', () => {
+  lb.stop();
+  stopUpdateChecks();
+});
+
+// --- Service-worker updates -------------------------------------------------
+//
+// The worker precaches every new build already; what it cannot do on its own is
+// notice one promptly, or tell a tab that is ALREADY running the previous one.
+// The browser checks sw.js on a navigation and at most daily, so an installed
+// app that gets resumed rather than relaunched can serve a stale build for days.
+//
+// vite.config.js sets registerType: 'prompt', so a new build installs and then
+// WAITS: nothing reloads under the player, because permadeath means a run
+// destroyed by a background update is destroyed for nothing. These checks find
+// the update; the notice offers it; the click applies it.
+const UPDATE_CHECK_MS = 60 * 60 * 1000; // the tab-left-open case; the events below carry the rest
+
+let swRegistration = null;
+let updateTimer = null;
+
+// One conditional GET of sw.js, byte-diffed by the browser. update() REJECTS
+// when the fetch fails, which for an installed offline game is an ordinary
+// Tuesday — swallowed rather than logged, since nothing has gone wrong and
+// there is nothing the player could do.
+function checkForUpdate() {
+  if (!swRegistration) return; // not registered yet: the boot check covers it
+  if (navigator.onLine === false) return;
+  swRegistration.update().catch(() => {});
+}
+
+function stopUpdateChecks() {
+  if (updateTimer !== null) clearInterval(updateTimer);
+  updateTimer = null;
+}
+
+// Created before registerSW: a worker left waiting by an earlier session raises
+// onNeedRefresh during registration, and there has to be something to show it
+// on. (It could not fire earlier anyway — registration happens on window's
+// `load`, after this module finishes evaluating.)
+const updateNotice = createUpdateNotice(document.body, {
+  // Messages SKIP_WAITING to the waiting worker. The reload is the plugin's
+  // own `controlling` listener, once that worker takes over — not ours.
+  onApply: () => updateSW(),
+});
+
+const updateSW = registerSW({
+  // A newer build is installed and waiting. Raise the line and change nothing
+  // else: the run in progress is untouched until the player says otherwise.
+  onNeedRefresh: () => updateNotice.show(),
+  onRegisteredSW: (_swUrl, registration) => {
+    if (!registration) return;
+    swRegistration = registration;
+    // No explicit check here: register() itself performs one, so the boot case
+    // is already covered and calling update() again would only duplicate the
+    // request. The timer is for the tab nobody closes.
+    stopUpdateChecks(); // never stack timers if this ever runs twice
+    updateTimer = setInterval(checkForUpdate, UPDATE_CHECK_MS);
+  },
+  // Not fatal — the game runs fine uninstalled and uncached. Say so once.
+  onRegisterError: (err) => console.warn('[dungeons] service worker registration failed —', err),
+});
 
 // The menu / leaderboard / help (created below) layer over the death screen;
 // while any is open it owns the keys, so the death screen's Enter/Space
