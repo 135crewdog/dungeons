@@ -91,6 +91,14 @@ describe('formatAge', () => {
   it('never goes negative on clock skew', () => {
     expect(formatAge(5000, 1000)).toBe('just now');
   });
+
+  // Used to fall through to the last branch and render "NaNd ago".
+  it('reports a non-finite clock as unknown rather than NaN', () => {
+    expect(formatAge(1000, NaN)).toBe('unknown');
+    expect(formatAge(1000, Infinity)).toBe('unknown');
+    expect(formatAge(NaN, 1000)).toBe('unknown');
+    expect(formatAge(1000, undefined)).toBe('unknown');
+  });
 });
 
 describe('client', () => {
@@ -391,5 +399,234 @@ describe('client', () => {
     expect(client.getLastInitials()).toBe('');
     client.setLastInitials('XYZ');
     expect(client.getLastInitials()).toBe('XYZ');
+  });
+});
+
+// A controllable clock + timer queue, so the backoff ladder is tested by its
+// real scheduling behavior rather than by waiting on wall-clock time.
+function fakeScheduler(start = 1_000_000) {
+  let t = start;
+  let nextId = 1;
+  let timers = [];
+  return {
+    now: () => t,
+    setTimeoutFn: (fn, ms) => {
+      const id = nextId++;
+      timers.push({ id, at: t + ms, fn });
+      return id;
+    },
+    clearTimeoutFn: (id) => {
+      timers = timers.filter((x) => x.id !== id);
+    },
+    pending: () => timers.length,
+    // Delay of the next scheduled timer, relative to now.
+    nextDelay: () => (timers.length === 0 ? null : Math.min(...timers.map((x) => x.at)) - t),
+    // Jump to the earliest timer and run it. The callback kicks off a drain
+    // without returning it; callers await client.flushQueue(), which hands
+    // back that same in-flight promise (single-flight).
+    fire() {
+      if (timers.length === 0) return false;
+      timers.sort((a, b) => a.at - b.at);
+      const timer = timers.shift();
+      t = timer.at;
+      timer.fn();
+      return true;
+    },
+  };
+}
+
+function schedulerClient({ fetchFn, url = 'https://lb.example' }) {
+  const clock = fakeScheduler();
+  const storage = fakeStorage();
+  const client = createLeaderboardClient({
+    url,
+    storage,
+    fetchFn,
+    now: clock.now,
+    setTimeoutFn: clock.setTimeoutFn,
+    clearTimeoutFn: clock.clearTimeoutFn,
+  });
+  return { client, storage, clock };
+}
+
+describe('queue retry scheduler', () => {
+  // The headline defect: a retryable failure while the tab stays ONLINE queued
+  // the score and then nothing ever came back for it. No `online` event fires,
+  // so before this the only delivery was a reload.
+  it('retries a queued score on its own timer, with no online event', async () => {
+    let calls = 0;
+    const { client, storage, clock } = schedulerClient({
+      fetchFn: async () => {
+        calls += 1;
+        return calls === 1 ? httpFail(500) : okJson();
+      },
+    });
+
+    const res = await client.submit(PAYLOAD);
+    expect(res).toMatchObject({ ok: false, queued: true });
+    expect(queueOf(storage)).toHaveLength(1);
+    expect(clock.pending()).toBe(1);
+
+    expect(clock.fire()).toBe(true);
+    await client.flushQueue();
+
+    expect(calls).toBe(2);
+    expect(queueOf(storage)).toHaveLength(0);
+    // Delivered: the ladder stands down rather than retrying an empty queue.
+    expect(clock.pending()).toBe(0);
+  });
+
+  it('doubles the delay while the failure persists, and resets after success', async () => {
+    let ok = false;
+    const { client, clock } = schedulerClient({
+      fetchFn: async () => (ok ? okJson() : httpFail(503)),
+    });
+
+    await client.submit(PAYLOAD);
+    const first = clock.nextDelay();
+    expect(first).toBeGreaterThan(0);
+
+    clock.fire();
+    await client.flushQueue();
+    const second = clock.nextDelay();
+    expect(second).toBe(first * 2);
+
+    clock.fire();
+    await client.flushQueue();
+    expect(clock.nextDelay()).toBe(first * 4);
+
+    ok = true;
+    clock.fire();
+    await client.flushQueue();
+    expect(clock.pending()).toBe(0);
+
+    // A brand-new failure starts the ladder over rather than inheriting the
+    // delay it had climbed to.
+    ok = false;
+    await client.submit(PAYLOAD);
+    expect(clock.nextDelay()).toBe(first);
+  });
+
+  it('caps the delay instead of climbing forever', async () => {
+    const { client, clock } = schedulerClient({ fetchFn: async () => httpFail(500) });
+    await client.submit(PAYLOAD);
+    let previous = clock.nextDelay();
+    for (let i = 0; i < 20; i++) {
+      clock.fire();
+      await client.flushQueue();
+      const next = clock.nextDelay();
+      expect(next).toBeGreaterThanOrEqual(previous);
+      previous = next;
+    }
+    expect(previous).toBe(5 * 60_000);
+  });
+
+  it('honors Retry-After over the ladder when it is longer', async () => {
+    const { client, clock } = schedulerClient({
+      fetchFn: async () => httpFail(429, { 'retry-after': '120' }),
+    });
+    await client.submit(PAYLOAD);
+    // Ladder would be 10s; the server said two minutes.
+    expect(clock.nextDelay()).toBe(120_000);
+  });
+
+  // Was: any non-ok status armed the backoff, so a permanent rejection — one
+  // that is dropped, never retried — still delayed every later score.
+  it('does not let a permanent rejection arm the backoff', async () => {
+    let posts = 0;
+    const { client, clock } = schedulerClient({
+      fetchFn: async () => {
+        posts += 1;
+        return httpFail(400, { 'retry-after': '600' });
+      },
+    });
+
+    const first = await client.submit(PAYLOAD);
+    expect(first).toMatchObject({ ok: false, queued: false });
+    expect(clock.pending()).toBe(0);
+
+    // The next submission goes out immediately rather than deferring behind a
+    // backoff the 400 should never have set.
+    const second = await client.submit(PAYLOAD);
+    expect(posts).toBe(2);
+    expect(second.reason).not.toBe('backoff');
+  });
+
+  // Was: submit() ignored nextAttemptAt entirely and POSTed into an active
+  // server-requested backoff. Safe to honor now only because the timer exists.
+  it('queues instead of POSTing while a server backoff is running', async () => {
+    let posts = 0;
+    const { client, storage, clock } = schedulerClient({
+      fetchFn: async () => {
+        posts += 1;
+        return httpFail(429, { 'retry-after': '120' });
+      },
+    });
+
+    await client.submit(PAYLOAD);
+    expect(posts).toBe(1);
+
+    const second = await client.submit({ ...PAYLOAD, turns: 99 });
+    expect(posts).toBe(1); // no second request
+    expect(second).toMatchObject({ queued: true, reason: 'backoff' });
+    expect(queueOf(storage)).toHaveLength(2);
+    expect(clock.pending()).toBe(1);
+  });
+
+  it('stop() cancels the pending retry', async () => {
+    const { client, clock } = schedulerClient({ fetchFn: async () => httpFail(500) });
+    await client.submit(PAYLOAD);
+    expect(clock.pending()).toBe(1);
+    client.stop();
+    expect(clock.pending()).toBe(0);
+  });
+
+  it('keeps one timer outstanding no matter how many flushes are requested', async () => {
+    const { client, clock } = schedulerClient({ fetchFn: async () => httpFail(500) });
+    await client.submit(PAYLOAD);
+    await Promise.all([client.flushQueue(), client.flushQueue(), client.flushQueue()]);
+    expect(clock.pending()).toBe(1);
+  });
+});
+
+describe('fetchScores response validation', () => {
+  const scoresFrom = async (body) => {
+    const { client } = makeClient({ fetchFn: async () => okJson(body) });
+    return client.fetchScores();
+  };
+
+  it('accepts a well-formed body', async () => {
+    const res = await scoresFrom({ scores: [{ initials: 'ABC', floor: 2 }], now: 123 });
+    expect(res).toMatchObject({ ok: true, now: 123 });
+    expect(res.scores).toHaveLength(1);
+  });
+
+  // Each of these reached the view before, which calls .forEach on `scores`
+  // and formats `now` as a clock.
+  it.each([
+    ['null body', null],
+    ['array as root', [{ initials: 'ABC' }]],
+    ['scores missing', { now: 1 }],
+    ['scores as a number', { scores: 42, now: 1 }],
+    ['scores as a string', { scores: 'nope', now: 1 }],
+    ['scores as an object', { scores: { a: 1 }, now: 1 }],
+    ['now missing', { scores: [] }],
+    ['now not finite', { scores: [], now: 'soon' }],
+    ['now NaN', { scores: [], now: NaN }],
+    ['absurdly long', { scores: new Array(201).fill({}), now: 1 }],
+  ])('rejects %s as an invalid response', async (_label, body) => {
+    expect(await scoresFrom(body)).toEqual({ ok: false, reason: 'invalid-response' });
+  });
+
+  it('reports a rejecting json() as a failure, not a crash', async () => {
+    const { client } = makeClient({
+      fetchFn: async () => ({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError('not json');
+        },
+      }),
+    });
+    expect((await client.fetchScores()).ok).toBe(false);
   });
 });

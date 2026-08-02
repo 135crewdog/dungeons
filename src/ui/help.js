@@ -3,6 +3,9 @@
 // above the menu (z-index 30) like the leaderboard; Escape closes this layer
 // only (the menu defers via isChildOpen).
 //
+// Six sections: Denizens / Loot / Rings / Dungeon legends, then Stats, Rules,
+// and Controls tables.
+//
 // The legend is sprite-first: `iconFor(kind)` is injected by the composition
 // root (the only place allowed to bridge renderer sprite data into the DOM)
 // and returns an element cropping the real sheet — the same art the dungeon
@@ -59,10 +62,28 @@ const STATS = [
 ];
 
 const CONTROLS = [
-  ['Arrows / WASD', 'Move one tile (up, down, left, right)'],
-  ['Numpad 1–9', 'Move in all 8 directions, diagonals included'],
+  ['Arrows / WASD', 'Move one tile — up, down, left or right only'],
+  ['Numpad 1–4, 6–9', 'Move in all 8 directions, diagonals included'],
   ['Click / tap', 'Auto-walk there, one tile per turn'],
+  ['Click an enemy', 'Close in and take a single swing'],
   ['Escape', 'Open or close the menu'],
+  ['Menu → End run', 'Stop here on purpose and post your score'],
+];
+
+// The rules a player can otherwise only learn by being surprised by them. Kept
+// as its own table rather than swelling the legend rows, and deliberately
+// without the tuned numbers (radii, spawn weights) — how a thing behaves is
+// the player's business, how it is balanced is not.
+const RULES = [
+  ['Turns', 'Every move, attack or stair step is one turn. Blocked moves are free'],
+  ['Attacking', 'Step into an enemy to hit it. A d20 roll decides; a natural 1 always misses'],
+  ['Damage', 'Your die plus strength, less their armor — a hit always does at least 1'],
+  ['Diagonals', 'Numpad only. You cannot cut a wall corner, and neither can they'],
+  ['Auto-walk', 'Routes around staircases, so you never change floor by accident'],
+  ['Stairs', 'Stepping on them changes floor at once. Floors keep their state — go back up'],
+  ['Ring of Speed', 'The second step is given up if you land on loot or on stairs'],
+  ['Ring of Shadow', 'Swinging is heard through walls, hit or miss. Bosses always see you'],
+  ['Keys', 'Any key opens any locked chest — a key you skipped is not lost forever'],
 ];
 
 // A legend table: [icon] Name | description per row. The icon cell is omitted
@@ -130,6 +151,8 @@ export function createHelp(parent, { iconFor = null } = {}) {
     legendTable(DUNGEON, iconFor),
     label('Stats'),
     table(STATS, 'help-key'),
+    label('Rules'),
+    table(RULES, 'help-key'),
     label('Controls'),
     table(CONTROLS, 'help-key'),
   );

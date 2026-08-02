@@ -24,6 +24,14 @@ export const DUPLICATE_SQL =
   'SELECT id FROM scores WHERE initials = ? AND floor = ? AND turns = ? AND seed = ? ' +
   'AND created_at >= ? LIMIT 1';
 
+// Health probe: cheapest query that proves the D1 binding is attached AND the
+// `scores` table exists. The count is deliberately part of the answer — a
+// worker bound to the WRONG but schema-compatible database answers every other
+// check identically, and a row count an operator can sanity-check against the
+// live board is the difference between "responding" and "responding with our
+// data". It exposes nothing the board does not already show.
+export const HEALTH_SQL = 'SELECT COUNT(*) AS rows FROM scores';
+
 // Rank: deepest floor first, fewer turns breaks ties, earlier submission wins.
 export const SELECT_TOP_SQL =
   'SELECT initials, floor, turns, version, created_at FROM scores ' +

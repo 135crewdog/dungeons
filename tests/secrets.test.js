@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { bandOf, secretPlan, ringFor } from '../src/world/secrets.js';
 import { createGame, descend } from '../src/core/gameState.js';
-import { SECRET_BAND_FLOORS, RING_TYPES } from '../src/core/constants.js';
+import { sweepForDropTile } from '../src/entities/spawn.js';
+import { SECRET_BAND_FLOORS, RING_TYPES, TILE } from '../src/core/constants.js';
 
 describe('the per-band secret plan (pure, seed-derived)', () => {
   const seeds = [1, 2, 3, 42, 1337, 987654321, 'custom-text-seed'];
@@ -115,5 +116,80 @@ describe('secret spawning across a real run', () => {
           .map(({ type, x, y, ring }) => ({ type, x, y, ring }));
       expect(secretsOf(a)).toEqual(secretsOf(b));
     }
+  });
+});
+
+describe('deterministic placement fallback for a band secret', () => {
+  // A band's key and locked chest used to be skipped outright when the random
+  // room scans all missed — silently, and for the chest that meant losing the
+  // band's ring, since secretPlan never re-rolls the chest floor. The RNG-free
+  // sweep below is the last resort. It draws nothing, which is what keeps every
+  // existing seed byte-identical (`npm run balance` is the real proof).
+  //
+  // Tested directly rather than through a run: the random path and the sweep
+  // search the SAME tiles by the SAME predicate and differ only in
+  // thoroughness, so there is no floor you can build where random provably
+  // fails and the sweep provably succeeds without reaching in and rigging the
+  // generator. Pinning the pure function is the honest version of that test.
+  function synthState(rows) {
+    const width = rows[0].length;
+    const tiles = new Uint8Array(width * rows.length);
+    rows.forEach((row, y) =>
+      [...row].forEach((ch, x) => {
+        tiles[y * width + x] = ch === '.' ? TILE.FLOOR : TILE.WALL;
+      }),
+    );
+    return {
+      map: { width, height: rows.length, tiles },
+      entities: { byId: new Map() },
+      items: [],
+    };
+  }
+
+  // Two 2x2 rooms side by side, separated by a wall column.
+  const ROWS = ['######', '#..#..', '#..#..', '######'];
+  const ROOM_A = { x: 1, y: 1, w: 2, h: 2 };
+  const ROOM_B = { x: 4, y: 1, w: 2, h: 2 };
+
+  it('returns the first legal tile in room-then-tile order', () => {
+    const state = synthState(ROWS);
+    expect(sweepForDropTile(state, [ROOM_A, ROOM_B])).toEqual({ x: 1, y: 1 });
+  });
+
+  it('skips tiles holding an entity or an item', () => {
+    const state = synthState(ROWS);
+    state.entities.byId.set(1, { id: 1, x: 1, y: 1 });
+    state.items.push({ type: 'potion', x: 2, y: 1 });
+    expect(sweepForDropTile(state, [ROOM_A])).toEqual({ x: 1, y: 2 });
+  });
+
+  it('moves on to the next room when the first is full', () => {
+    const state = synthState(ROWS);
+    let id = 1;
+    for (const y of [1, 2]) for (const x of [1, 2]) state.entities.byId.set(id, { id: id++, x, y });
+    expect(sweepForDropTile(state, [ROOM_A, ROOM_B])).toEqual({ x: 4, y: 1 });
+  });
+
+  it('reports failure instead of inventing a tile when nothing is legal', () => {
+    const state = synthState(['######', '######', '######', '######']);
+    expect(sweepForDropTile(state, [ROOM_A, ROOM_B])).toBe(null);
+  });
+
+  // canDropAt is the shared predicate, so the sweep inherits the rules that
+  // keep drops off doorways and staircases — the 0.9.10 and 0.9.7 fixes.
+  it('never lands on a walkable-but-not-FLOOR tile: a door or a staircase', () => {
+    const state = synthState(ROWS);
+    // Room A becomes all doors and stairs — walkable, but a doorway hides a
+    // dropped item under the wall art and a staircase swallows the pickup.
+    const put = (x, y, tile) => {
+      state.map.tiles[y * state.map.width + x] = tile;
+    };
+    put(1, 1, TILE.DOOR);
+    put(2, 1, TILE.DOOR);
+    put(1, 2, TILE.STAIRS_DOWN);
+    put(2, 2, TILE.STAIRS_UP);
+    expect(sweepForDropTile(state, [ROOM_A])).toBe(null);
+    // …but the untouched neighbouring room is still fair game.
+    expect(sweepForDropTile(state, [ROOM_A, ROOM_B])).toEqual({ x: 4, y: 1 });
   });
 });
