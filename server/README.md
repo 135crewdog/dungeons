@@ -4,7 +4,8 @@ A tiny worker that stores and serves the cross-device leaderboard: 30-day
 rolling window, top 50, ranked by floor (desc), then turns (asc), then
 submission time. The game client talks to it via `src/net/leaderboard.js`.
 
-- `worker.js` — the Worker: `GET /scores`, `POST /scores`, CORS, rate limit.
+- `worker.js` — the Worker: `GET /scores`, `POST /scores`, `GET /health`, CORS,
+  rate limit.
 - `scores.js` — pure validation/SQL logic (unit-tested in `tests/`).
 - `worker.dashboard.js` — the same Worker inlined into one import-free file for
   pasting into the Cloudflare dashboard editor (the no-install path below).
@@ -162,22 +163,47 @@ CREATE INDEX IF NOT EXISTS idx_scores_dupe ON scores (seed, initials, floor, tur
 
 ### Checking a deploy landed
 
+Ask the worker directly. `GET /health` is unauthenticated, writes nothing, and
+is never edge-cached:
+
+```sh
+curl -s <worker-url>/health
+```
+
+```json
+{ "ok": true, "version": "…", "deployedAt": "…", "db": "ok", "rows": 128 }
+```
+
+- **`version` / `deployedAt`** come from Cloudflare's version-metadata binding
+  and identify the exact deployment. Compare `deployedAt` against the build you
+  expect to be live; if it predates your merge, the deploy did not land, whatever
+  the build log says. `null` for both means the `[version_metadata]` block in
+  `wrangler.toml` did not survive the deploy — the code is old.
+- **`db: "ok"`** means the D1 binding is attached and the `scores` table exists.
+  A `500 storage unavailable` here means it is not — the probe is the same query
+  path the real endpoints use.
+- **`rows`** is the total row count. This is the only field that distinguishes a
+  worker bound to the RIGHT database from one bound to a different database with
+  the same schema — sanity-check it against what the in-game board shows. Nothing
+  else in the API can tell those apart.
+
+CORS is worth checking separately, since it is configuration rather than code:
+
 ```sh
 curl -si <worker-url>/scores | grep -i access-control-allow-origin
 ```
 
-should print a line containing `*`. Nothing means CORS is unconfigured — check
-that the deploy actually replaced the code. Then POST the same score twice:
-`201` then `409`. The `409` is duplicate suppression, which exists only in
-v0.9.5+, so it is the clearest single proof of which code is live.
+should print a line containing `*`. Nothing means `ALLOWED_ORIGIN` is unset —
+CORS fails closed by design, so the browser sees no headers at all.
 
-A `500 storage unavailable` means the worker could not reach its data, but it
-does **not** pin down why: `storageError` normalizes every D1 exception into that
-one response, so a wrong binding, a missing table, a half-applied migration and a
-transient D1 outage all look identical from outside. Nor is a `201` proof the
-binding is right — a different database with the same schema answers just as
-happily. Check the binding in `wrangler.toml` against `npx wrangler d1 list`, and
-the build log, before assuming which it is.
+Note what `/health` still cannot tell you: `storageError` normalizes every D1
+exception into one response, so a missing table, a half-applied migration and a
+transient outage all read as `500 storage unavailable`. Check the binding in
+`wrangler.toml` against `npx wrangler d1 list` before assuming which it is.
+
+The old probe — POST the same score twice and look for `201` then `409` — still
+works and still proves the code is v0.9.5+, but prefer `/health`: it is exact
+rather than inferential, and it does not leave a junk score on the board.
 
 ### Fallbacks, if the Git deploy is unavailable
 
@@ -229,7 +255,12 @@ To point the game at it, temporarily set `LEADERBOARD_URL` in
   offline queue re-sending a score whose response was lost), `413` (body > 512
   bytes, measured in real UTF-8 bytes and also checked against `Content-Length`
   before the body is read), `415` (content type is not JSON), `429` (> 6
-  posts/min/IP, best-effort per isolate, with `Retry-After`).
+  posts/min/IP, best-effort per isolate, with `Retry-After`). A body that cannot
+  be read at all — aborted upload, truncated stream — is `400`, not a crash.
+- `GET /health` → `200 { ok, version, deployedAt, db, rows }` with `no-store`.
+  Identifies the live deployment and proves the D1 binding works; `rows` is what
+  distinguishes the right database from a schema-compatible wrong one. No
+  authentication, and nothing here is secret. See "Checking a deploy landed".
 - Any other method on `/scores` → `405`; any other path → `404`; a D1 failure on
   either route → `500 { error: 'storage unavailable' }` with `no-store`.
 - `OPTIONS` → `204`. CORS **fails closed**: with `ALLOWED_ORIGIN` unset, every

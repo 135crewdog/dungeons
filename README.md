@@ -4,7 +4,8 @@ A browser-based roguelike dungeon crawler built with **Phaser** and vanilla
 JavaScript, playable as an installable **offline PWA**. The dungeon renders from
 Shattered Pixel Dungeon art: autotiled pseudo-3D walls from the prison tileset,
 with the warrior, gnolls, skeletons, the evil Eye, and loot as animated SPD
-sprites (classic ASCII one switch away). There is no scripted story — everything
+sprites (a complete ASCII rendering path is kept as a build-time fallback). There
+is no scripted story — everything
 emerges from the systems and procedural generation.
 
 Descend through procedurally generated floors, fight monsters that grow with the
@@ -17,8 +18,10 @@ three initials on the cross-device leaderboard.
 - **SPD sprite art** with SPD-style autotiling: stitched wall tops drawn over
   actors (pseudo-3D), two door orientations that swing open as you step through,
   per-cell floor variety — plus sprite creatures and items (warrior, gnoll,
-  skeleton, the evil Eye as the boss, potion, golden chest), with the full ASCII
-  look one switch away
+  skeleton, the evil Eye as the boss, potion, golden chest). A complete ASCII
+  rendering path is kept behind a source constant (`RENDER_STYLE` in
+  `src/renderer/tileStyle.js`) and is used automatically if a sheet fails to
+  load — a safety net and a developer switch, not an in-game option
 - **Animation:** idle and walk cycles from the sheets' own frames, tile-to-tile
   move glides, attack lunges, and a camera locked to the player's sprite
 - Symmetric-shadowcasting field of view with remembered (dimmed) terrain
@@ -43,7 +46,8 @@ three initials on the cross-device leaderboard.
   and are not verified, though every row stores the run's seed, so a submission
   could be replay-checked against the deterministic engine later
 - Pause **menu** (Escape or the top-right "Menu" text) with seed tools, the
-  leaderboard, and an in-game **help** page (glyphs, stats, controls)
+  leaderboard, and an in-game **help** page (sprite legend, stats, rules,
+  controls)
 - Deterministic: every run is driven by a single seed — logged to the console and
   shown in the pause menu with one-click copy; reopen with `?seed=<value>` to
   replay it

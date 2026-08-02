@@ -14,6 +14,7 @@ import {
   SELECT_TOP_SQL,
   INSERT_SQL,
   DUPLICATE_SQL,
+  HEALTH_SQL,
   MAX_BODY_BYTES,
 } from '../server/scores.js';
 
@@ -23,26 +24,32 @@ import {
 // `results` answers the top-scores SELECT; `dupes` answers the duplicate check
 // the worker runs before an insert (empty = not a duplicate). `fail` makes
 // every query throw, standing in for a D1 outage.
-function fakeDb(results = [], { dupes = [], fail = false } = {}) {
+function fakeDb(results = [], { dupes = [], fail = false, health = [{ rows: 0 }] } = {}) {
   const calls = [];
+  // A prepared statement can be run with or without bound parameters — the
+  // health probe takes no arguments, so `.all()` has to work straight off
+  // prepare() the way real D1 allows.
+  const runnable = (sql, args) => {
+    calls.push({ sql, args });
+    const rows = sql === DUPLICATE_SQL ? dupes : sql === HEALTH_SQL ? health : results;
+    return {
+      all: async () => {
+        if (fail) throw new Error('D1_ERROR: no such table');
+        return { results: rows };
+      },
+      run: async () => {
+        if (fail) throw new Error('D1_ERROR: no such table');
+        return {};
+      },
+    };
+  };
   return {
     calls,
     prepare(sql) {
       return {
-        bind(...args) {
-          calls.push({ sql, args });
-          const rows = sql === DUPLICATE_SQL ? dupes : results;
-          return {
-            all: async () => {
-              if (fail) throw new Error('D1_ERROR: no such table');
-              return { results: rows };
-            },
-            run: async () => {
-              if (fail) throw new Error('D1_ERROR: no such table');
-              return {};
-            },
-          };
-        },
+        bind: (...args) => runnable(sql, args),
+        all: (...args) => runnable(sql, args).all(),
+        run: (...args) => runnable(sql, args).run(),
       };
     },
   };
@@ -449,5 +456,88 @@ describe('rate limiter bounds (worker.js)', () => {
       const res = await worker.fetch(post(VALID, first), withEnv(okDb()));
       expect(res.status, `post ${i + 1} after eviction`).toBe(201);
     }
+  });
+});
+
+describe('malformed request body', () => {
+  // `await request.text()` used to sit outside every try/catch, and the fetch
+  // handler has no outer one, so a rejecting body stream escaped as an opaque
+  // platform 500 with NO CORS headers — which the browser client can only read
+  // as a network error, indistinguishable from being offline.
+  const rejectingBody = (ip) => ({
+    method: 'POST',
+    url: 'https://lb.example/scores',
+    headers: {
+      get: (k) =>
+        ({ 'content-type': 'application/json', 'cf-connecting-ip': ip })[k.toLowerCase()] ?? null,
+    },
+    text: async () => {
+      throw new TypeError('network error while reading body');
+    },
+  });
+
+  it('answers 400 in the normal JSON+CORS shape instead of crashing', async () => {
+    const db = fakeDb();
+    const res = await worker.fetch(rejectingBody('9.9.9.1'), withEnv(db));
+    expect(res.status).toBe(400);
+    expect(res.headers.get('content-type')).toContain('application/json');
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.json()).toEqual({ error: 'malformed request body' });
+    expect(insertsIn(db)).toHaveLength(0);
+  });
+});
+
+describe('GET /health', () => {
+  it('reports the live version, deploy time and a working DB', async () => {
+    const db = fakeDb([], { health: [{ rows: 17 }] });
+    const env = withEnv(db, {
+      CF_VERSION_METADATA: { id: 'abc-123', timestamp: '2026-08-02T00:00:00Z' },
+    });
+    const res = await worker.fetch(new Request('https://lb.example/health'), env);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(await res.json()).toEqual({
+      ok: true,
+      version: 'abc-123',
+      deployedAt: '2026-08-02T00:00:00Z',
+      db: 'ok',
+      rows: 17,
+    });
+    // It probes the real table, so a detached or empty binding cannot pass.
+    expect(db.calls.some((c) => c.sql === HEALTH_SQL)).toBe(true);
+  });
+
+  it('still answers when the version-metadata binding is absent', async () => {
+    const res = await worker.fetch(new Request('https://lb.example/health'), withEnv(fakeDb()));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, version: null, deployedAt: null });
+  });
+
+  // The whole point: a worker whose D1 binding is wrong or missing must be
+  // distinguishable from a healthy one, which "POST twice and look for 409"
+  // never was.
+  it('reports a storage failure rather than claiming health', async () => {
+    const res = await worker.fetch(
+      new Request('https://lb.example/health'),
+      withEnv(fakeDb([], { fail: true })),
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'storage unavailable' });
+  });
+
+  it('refuses non-GET methods', async () => {
+    const res = await worker.fetch(
+      new Request('https://lb.example/health', { method: 'POST' }),
+      withEnv(fakeDb()),
+    );
+    expect(res.status).toBe(405);
+  });
+
+  it('does not shadow /scores or the 404 for anything else', async () => {
+    const env = withEnv(fakeDb());
+    expect((await worker.fetch(new Request('https://lb.example/scores'), env)).status).toBe(200);
+    expect((await worker.fetch(new Request('https://lb.example/nope'), env)).status).toBe(404);
   });
 });

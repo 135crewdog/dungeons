@@ -31,6 +31,14 @@ const DUPLICATE_SQL =
   'SELECT id FROM scores WHERE initials = ? AND floor = ? AND turns = ? AND seed = ? ' +
   'AND created_at >= ? LIMIT 1';
 
+// Health probe: cheapest query that proves the D1 binding is attached AND the
+// `scores` table exists. The count is deliberately part of the answer — a
+// worker bound to the WRONG but schema-compatible database answers every other
+// check identically, and a row count an operator can sanity-check against the
+// live board is the difference between "responding" and "responding with our
+// data". It exposes nothing the board does not already show.
+const HEALTH_SQL = 'SELECT COUNT(*) AS rows FROM scores';
+
 // Rank: deepest floor first, fewer turns breaks ties, earlier submission wins.
 const SELECT_TOP_SQL =
   'SELECT initials, floor, turns, version, created_at FROM scores ' +
@@ -185,6 +193,42 @@ export default {
       return new Response(null, { status: 204, headers: cors || {} });
     }
     const url = new URL(request.url);
+
+    // GET /health — which code is live, and is it talking to the right data?
+    //
+    // The old runbook's best remote check was "POST the same score twice, look
+    // for 201 then 409", which proves only that some build from v0.9.5 onward
+    // is deployed — and writes a junk score to find out. This answers the
+    // question directly and reads nothing into the board.
+    //
+    // `version` comes from Cloudflare's version-metadata binding rather than a
+    // var we maintain by hand: a hand-kept version string is one more thing to
+    // forget on release day, which is the whole reason this release added a
+    // package/lockfile version gate.
+    if (url.pathname === '/health') {
+      if (request.method !== 'GET') return json(405, { error: 'method not allowed' }, cors);
+      const meta = env.CF_VERSION_METADATA;
+      let rows = null;
+      try {
+        const probe = await env.DB.prepare(HEALTH_SQL).all();
+        rows = probe.results && probe.results[0] ? probe.results[0].rows : null;
+      } catch (err) {
+        return storageError(request, cors, err);
+      }
+      return json(
+        200,
+        {
+          ok: true,
+          version: (meta && meta.id) || null,
+          deployedAt: (meta && meta.timestamp) || null,
+          db: 'ok',
+          rows,
+        },
+        cors,
+        { 'Cache-Control': 'no-store' },
+      );
+    }
+
     if (url.pathname !== '/scores') return json(404, { error: 'not found' }, cors);
 
     if (request.method === 'GET') {
@@ -215,7 +259,17 @@ export default {
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
       return json(413, { error: 'payload too large' }, cors);
     }
-    const text = await request.text();
+    // Reading the body can itself reject — an aborted upload, a truncated
+    // stream, a bad content-encoding. Unguarded, that escaped the handler as
+    // an opaque platform 500 with NO CORS headers, which the client can only
+    // read as a network error: the exact failure mode storageError exists to
+    // prevent, one step earlier in the request.
+    let text;
+    try {
+      text = await request.text();
+    } catch {
+      return json(400, { error: 'malformed request body' }, cors, { 'Cache-Control': 'no-store' });
+    }
     if (byteLength(text) > MAX_BODY_BYTES) {
       return json(413, { error: 'payload too large' }, cors);
     }

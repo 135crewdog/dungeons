@@ -18,8 +18,8 @@ describe('help overlay', () => {
     expect(text).toContain('Goblin');
     expect(text).toContain('Strength');
     expect(text).toContain('Numpad');
-    // six tables: denizens, loot, rings, dungeon, stats, controls
-    expect(help.el.querySelectorAll('.help-table').length).toBe(6);
+    // seven tables: denizens, loot, rings, dungeon, stats, rules, controls
+    expect(help.el.querySelectorAll('.help-table').length).toBe(7);
     help.close();
     expect(help.isOpen()).toBe(false);
   });

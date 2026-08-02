@@ -121,6 +121,14 @@ const lb = createLeaderboardClient({
 });
 lb.flushQueue();
 window.addEventListener('online', () => lb.flushQueue());
+// A retryable failure while the tab stays online (a 500, a D1 outage, a
+// timeout) never sees an `online` event, so the client's own backoff timer is
+// what actually delivers it. Coming back to a backgrounded tab is a good
+// moment to try early — timers are throttled while hidden.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') lb.flushQueue();
+});
+window.addEventListener('pagehide', () => lb.stop());
 
 // The menu / leaderboard / help (created below) layer over the death screen;
 // while any is open it owns the keys, so the death screen's Enter/Space

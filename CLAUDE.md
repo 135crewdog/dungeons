@@ -96,7 +96,14 @@ note below. API: `POST /scores` validates
 `{ initials, floor, turns, seed, version }` (initials exactly 3 chars A–Z0-9, uppercased
 server-side) and stamps a **server** timestamp; `GET /scores` returns the top 50 of the
 last 30 days ordered **floor DESC, turns ASC, created_at ASC**, plus the server clock so
-row ages ("3d ago") never trust the device clock. The API uses no cookies or
+row ages ("3d ago") never trust the device clock. `GET /health` (0.9.11) answers which
+build is live and whether it can reach its data: the deployment id and timestamp from
+Cloudflare's `[version_metadata]` binding — automatic, so it cannot drift the way a
+hand-kept version string does — a real D1 probe, and the table's **row count**, which
+is the only field that distinguishes the right database from a schema-compatible wrong
+one. It closes issue #30 (confirming the worker serves current code), and it is
+deliberately not a schema-version table with migrations: more apparatus than this earns.
+The API uses no cookies or
 credentials, and ships configured with `ALLOWED_ORIGIN = "*"` (see the hardening
 paragraph below for what that variable now does). The board is
 **deliberately an honor system** — a settled decision, not a gap awaiting a fix: the
@@ -151,16 +158,34 @@ localStorage (the architecture test enforces that the sim never does either).
 `src/net/config.js` holds `LEADERBOARD_URL`; **empty string = feature disabled** (the
 death screen hides the initials form, the leaderboard view says "not configured", and
 the game is otherwise unchanged). `createLeaderboardClient` takes injected
-fetch/storage/clock so it tests in plain Node. Offline-first: a failed submit queues in
-localStorage (`lb.queue`, cap 10, oldest dropped, stored under a version envelope) and
-is flushed on boot and on the `online` event; the last-used initials are remembered
-(`lb.initials`) and prefilled. Failures are **classified** (0.9.5): only _retryable_
-ones queue — network, timeout, 408/425/429, 5xx — while a permanent 4xx (including
-the server's duplicate 409) is reported and dropped, and the flush **skips past** a
-permanently-rejected entry instead of letting it block every later score forever.
-Both requests carry a **timeout** (raced in the client, so a fetch that ignores its
-signal still can't hang the death screen), `flushQueue` is **single-flight** (boot and
-every `online` event call it), and a `Retry-After` defers the next flush.
+fetch/storage/clock/timers so it tests in plain Node. Offline-first: a failed submit
+queues in localStorage (`lb.queue`, cap 10, oldest dropped, stored under a version
+envelope); the last-used initials are remembered (`lb.initials`) and prefilled.
+Failures are **classified** (0.9.5): only _retryable_ ones queue — network, timeout,
+408/425/429, 5xx — while a permanent 4xx (including the server's duplicate 409) is
+reported and dropped, and the flush **skips past** a permanently-rejected entry
+instead of letting it block every later score forever. Both requests carry a
+**timeout** (raced in the client, so a fetch that ignores its signal still can't hang
+the death screen).
+
+The queue drains on boot, on `online`, on `visibilitychange` back to visible, and —
+since 0.9.11 — on **its own backoff timer**: 10s doubling to a 5-minute cap, reset the
+moment the queue empties, cancelled on `pagehide`. Before that timer existed, a
+retryable failure while the tab stayed _online_ (a 500, a D1 outage, a timeout) had no
+delivery path at all short of a reload, which made the death screen's "will send
+later" a wish. There is **no jitter**, deliberately: jitter decorrelates a fleet of
+clients, this is one tab draining its own queue, and it would mean `Math.random()`
+under `src/`, which the architecture test forbids. A `Retry-After` **extends** the
+wait and never shortens it, only a _retryable_ status may arm it, and `submit()`
+honors it by queueing rather than POSTing into a backoff the server just asked for.
+
+`fetchScores` **validates the response shape** at the boundary (object body, `scores`
+an array within a sane cap, finite `now`); anything else is `invalid-response` and the
+overlay shows its normal failure state rather than letting a body that merely parses
+reach a view that calls `.forEach` on it. The device-clock fallback for a missing
+`now` was removed with it: our server always sends one, so its absence means the
+response is not ours, and dating other players' rows off an unsynced local clock is
+the exact thing the server clock exists to prevent.
 
 UI: on death the "You died" panel offers arcade-style 3-character initials entry
 (sanitized while typing, **one submission per death** — the form locks after submit)
@@ -171,9 +196,15 @@ builds every cell with `textContent` since rows are other players' input.
 ## Help
 
 A static menu-reachable overlay (`src/ui/help.js`), **sprite-first**: the legend shows
-the real sheet art (five sections — Denizens / Loot / Rings / Dungeon — plus Stats and
-Controls tables) with playful one-liners; glyph notation no longer appears anywhere in
-the UI. The icons are CSS crops of the public sprite sheets, built by an `iconFor`
+the real sheet art (four legend sections — Denizens / Loot / Rings / Dungeon — plus
+Stats, **Rules** and Controls tables, seven in all) with playful one-liners; glyph
+notation no longer appears anywhere in the UI. **Rules** (0.9.11) is where the
+surprising and irreversible mechanics are stated plainly — stair-avoiding auto-walk,
+one swing per enemy click, numpad-only diagonals and the corner rule, the Ring of
+Speed's forfeits, the Ring of Shadow's noise through walls, the d20 to-hit and the
+minimum-1 damage floor — because none of them were learnable inside the installed
+offline app. Tuned numbers (radii, spawn weights) stay out: how a thing behaves is
+the player's business, how it is balanced is not. The icons are CSS crops of the public sprite sheets, built by an `iconFor`
 factory that **the composition root injects** (`src/renderer/uiIcons.js` holds the
 pure specs; `ui/` never imports `renderer/`, so main.js is the bridge — the HUD's
 key/ring chips take the **same `iconFor` seam**, which since 0.9.4 hands over an
@@ -1099,6 +1130,84 @@ kind of thing that shifts a run.
 **The leaderboard's honor-system footer is removed.** The board is still an
 honor system and both READMEs still say so; the overlay just no longer repeats
 it under every table. See the Leaderboard section.
+
+**0.9.11 — Codex audit remediation (v0.9.10, `5255dc1`).** Every one of the
+audit's 14 findings was verified true, but the ranking was inverted: neither of
+its two P1s could produce a wrong pixel, a wrong turn or a lost score, while the
+one finding with real data loss sat below both. Balance is **byte-identical**
+(the acceptance test for the one simulation change, not a nice-to-have). Taken:
+
+- **The offline queue actually retries.** `flushQueue` ran on boot and on
+  `online` and nowhere else, so a retryable failure while the tab stayed
+  online — a 500, a D1 outage, a timeout — queued the score and then nothing
+  ever came back for it, while the death screen said "will send later". There
+  is now a backoff ladder (10s doubling to a 5-minute cap, reset on success)
+  on injected timer functions, plus a `visibilitychange` flush and a `pagehide`
+  teardown. **No jitter, deliberately** — it decorrelates a fleet, this is one
+  tab, and it would mean `Math.random()` under `src/`, which the architecture
+  test forbids outright. Three defects the audit missed, all in the same code:
+  the backoff was armed by **any** non-ok status including permanent 4xx that
+  are never retried; it **assigned** rather than extended, so a later short
+  `Retry-After` undid a longer one; and `submit()` ignored it entirely and
+  POSTed straight through an active backoff (it now queues — safe only because
+  the timer exists).
+- **`fetchScores` validates the response shape.** It returned
+  `res.data.scores || []` and the view calls `.forEach` on it. The audit's
+  mechanism was partly wrong and the fix is written to the real one: a `null`
+  body throws _inside_ the try and is swallowed as `reason: 'network'` — a
+  mislabel, not a crash — and only a **truthy non-array** `scores` actually
+  escaped. Also missed by the audit: `formatAge` had no finite check, so a
+  non-finite server clock rendered **"NaNd ago"**. The device-clock fallback for
+  a missing `now` is gone on purpose (see the Leaderboard section).
+- **A rejecting request body is a 400, not a crash.** `await request.text()` sat
+  outside every try/catch and the handler has no outer one, so an aborted or
+  truncated upload escaped as an opaque platform 500 **with no CORS headers** —
+  which the client can only read as a network error. Exactly what `storageError`
+  exists to prevent, one step earlier in the request.
+- **`GET /health`** — closes issue #30, the repo's one recorded open item.
+  Returns the deployment id and timestamp (Cloudflare's `[version_metadata]`
+  binding, so it cannot drift the way a hand-kept version string does), a real
+  D1 probe, and the **row count** — the only field that tells the right database
+  from a schema-compatible wrong one. Deliberately NOT the audit's schema-version
+  table and migration machinery. The old "POST twice, look for 201 then 409"
+  probe still works but is inferential and leaves a junk score.
+- **Secret placement no longer gives up silently.** `spawnSecrets` skipped the
+  band's key or locked chest when its ten random room scans all missed. A missed
+  key was survivable (keys are interchangeable); a missed **locked chest cost the
+  run that band's ring**, and `secretPlan` never re-rolls the chest floor. A
+  deterministic room-then-tile sweep over `query.canDropAt` now catches what the
+  random path misses, drawing **zero RNG** — same shape as 0.9.8's boss-chest
+  BFS, and what keeps every existing seed identical. The `rooms.length < 2` bail
+  the audit missed now warns rather than vanishing. Tested against the pure
+  function directly: random and the sweep search the same tiles by the same
+  predicate and differ only in thoroughness, so no constructible floor makes one
+  provably fail and the other provably succeed without rigging the generator —
+  pinning the helper is the honest version, and beats a vacuous integration test.
+- **A version-consistency gate.** `package-lock.json` said `0.9.5` in both root
+  locations while `package.json` said `0.9.10` — five releases of drift against
+  the briefing's own single-source-of-truth rule, because nothing read it.
+  `scripts/check-version.mjs` runs first in `npm run check`.
+- **Docs caught up with Phase 6.** README called Help a glyph legend and ASCII
+  "one switch away"; `tileStyle.js` still claimed entities and items stay ASCII
+  either way, which `GameScene.useEntitySprites()` falsified. Help gained a
+  **Rules** table for what a player could otherwise only learn by being surprised
+  (stair-avoiding auto-walk, one swing per enemy click, numpad-only diagonals and
+  the corner rule, Speed's forfeits, Shadow's noise through walls, End run, the
+  d20 and the minimum-1 damage floor), and "Numpad 1–9" became "1–4, 6–9" —
+  numpad 5 is unmapped.
+
+**Rejected, with reasons, so they are not re-filed.** The audit's suggestion to
+change `grep` to `rg` in `server/README.md` is **wrong**: that snippet is a
+command a human operator runs on their own machine, where `grep` is universal and
+`rg` is not, and the ripgrep preference is agent-tooling guidance rather than a
+project convention. A **wait command** (numpad 5) is a new mechanic and the scope
+fence below forbids it — only the documentation half was taken. **Idempotency
+keys** for the duplicate-submission race are over-built for a board the audit
+itself says not to harden: the consequence is one extra row when two tabs race,
+and it stays an accepted quirk. The **bundle-headroom** item recommended no
+action. Deferred, not rejected: D1 retention (the 30-day window still filters
+reads without deleting rows), dependency-update automation, `prefers-reduced-
+motion`, and an e2e Chromium preflight.
 
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,

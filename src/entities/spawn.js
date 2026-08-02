@@ -19,7 +19,7 @@ import {
   ENEMY_TYPES,
   BOSS_FLOOR_INTERVAL,
 } from '../core/constants.js';
-import { idx, entityAt } from '../core/query.js';
+import { idx, entityAt, canDropAt } from '../core/query.js';
 import { addEntity, allocId } from '../core/entity.js';
 import { createEnemy } from './enemies.js';
 import { createPotion, createChest, createKey, createLockedChest } from './items.js';
@@ -159,27 +159,58 @@ function spawnChests(state) {
   }
 }
 
+// Deterministic last resort for a band's secrets: sweep the candidate rooms in
+// map order and take the first legal drop site. Draws NO RNG, which is what
+// makes it invisible to every existing seed — the random scans above run first
+// and unchanged, so this can only fire where the old code placed nothing at
+// all. Same shape as the boss chest's widening BFS (0.9.8), and the same
+// reason: a one-per-band reward is not something to lose to bad luck.
+//
+// canDropAt is the shared predicate (FLOOR, no entity, no item) — the one that
+// already keeps drops off doorways and staircases.
+export function sweepForDropTile(state, rooms) {
+  for (const room of rooms) {
+    for (let y = room.y; y < room.y + room.h; y++) {
+      for (let x = room.x; x < room.x + room.w; x++) {
+        if (canDropAt(state, x, y)) return { x, y };
+      }
+    }
+  }
+  return null;
+}
+
 // The band's secrets (Phase 7): if this floor is its band's keyFloor, hide the
 // key here; if it's the chestFloor, place the locked chest. WHICH floors (and
 // WHICH ring) come from the pure per-band plan; WHERE on the floor uses the
 // main RNG like every other spawn. The key never spawns in the start room —
-// no instant glimmer where the player arrives. On total placement failure
-// (vanishingly rare) the item is skipped: keys are interchangeable, so a
-// later band's key still opens the chest.
+// no instant glimmer where the player arrives.
+//
+// Placement no longer gives up silently. A skipped key was survivable (keys
+// are interchangeable, so a later band's opens the chest), but a skipped
+// locked chest cost the run that band's ring outright, and secretPlan never
+// re-rolls the chest floor. The random scans are tried exactly as before, then
+// the RNG-free sweep above catches what they missed.
 function spawnSecrets(state, floorNumber) {
   const rooms = state.map.rooms;
-  if (rooms.length < 2) return;
+  if (rooms.length < 2) {
+    console.warn(`[dungeons] floor ${floorNumber}: ${rooms.length} room(s), secrets skipped`);
+    return;
+  }
   const plan = secretPlan(state.seed, bandOf(floorNumber));
   if (floorNumber === plan.keyFloor) {
-    const tile = placeItem(
-      state,
-      () => rooms[nextInt(state.rng, 1, rooms.length - 1)],
-      SECRET_TRIES,
-    );
+    const tile =
+      placeItem(state, () => rooms[nextInt(state.rng, 1, rooms.length - 1)], SECRET_TRIES) ||
+      // rooms[0] is the start room, excluded here for the same reason the
+      // random pick starts at index 1.
+      sweepForDropTile(state, rooms.slice(1));
     if (tile) addItem(state, createKey(tile.x, tile.y));
+    else console.warn(`[dungeons] floor ${floorNumber}: no legal tile for the band key`);
   }
   if (floorNumber === plan.chestFloor) {
-    const tile = placeItem(state, () => pick(state.rng, rooms), SECRET_TRIES);
+    const tile =
+      placeItem(state, () => pick(state.rng, rooms), SECRET_TRIES) ||
+      sweepForDropTile(state, rooms);
     if (tile) addItem(state, createLockedChest(tile.x, tile.y, plan.ring));
+    else console.warn(`[dungeons] floor ${floorNumber}: no legal tile for the locked chest`);
   }
 }

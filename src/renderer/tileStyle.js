@@ -1,17 +1,24 @@
 // The sprite-swap seam. Everything the renderer needs to turn a tile type or an
-// entity into a glyph + color lives here. To move from ASCII to sprites later,
-// only this module (and the texture it feeds) changes — game logic is untouched.
+// entity into a glyph + color lives here, and RENDER_STYLE below selects which
+// art path the scene builds — game logic is untouched either way.
 
 import { TILE } from '../core/constants.js';
 
 // Visibility levels a tile can be drawn at.
 export const VIS = Object.freeze({ UNSEEN: 0, EXPLORED: 1, VISIBLE: 2 });
 
-// Which terrain art the scene builds: 'sprites' (the SPD prison tileset with
-// autotiled walls) or 'ascii' (the original glyph grid). Entities, items, and
-// floating text are ASCII glyphs either way. A pause-menu toggle can later
-// swap this at runtime; for now it is a build-time switch, and the scene
-// falls back to 'ascii' on its own if the tilesheet fails to load.
+// Which art the scene builds: 'sprites' (the SPD prison tileset with autotiled
+// walls) or 'ascii' (the original glyph grid).
+//
+// This switches the WHOLE cast, not just terrain — GameScene.useEntitySprites()
+// gates creatures and items on it too, so 'ascii' restores the complete glyph
+// game. (It did leave entities as glyphs either way, before Phase 6 gave them
+// sprites; that is no longer true.) Floating damage numbers are the one thing
+// that is text in both.
+//
+// It is a build-time constant with no runtime toggle: the scene also falls back
+// to 'ascii' on its own if a sheet fails to load, which is the only way a
+// player ever sees it. A pause-menu art-style toggle remains deferred scope.
 export const RENDER_STYLE = 'sprites';
 
 // Explored-but-not-visible sprite tiles get one uniform grey multiply —
