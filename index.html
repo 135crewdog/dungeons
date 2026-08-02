@@ -164,6 +164,62 @@
           0 1px 2px #000,
           0 0 2px #000;
       }
+      /* "Update ready" line: the third row of the top-right stack (Menu text,
+         version watermark, then this) and the only one of the three that is
+         ever interactive.
+
+         The PWA registers with registerType: 'prompt' — a new build installs
+         and waits instead of taking over, because a service worker that
+         reloaded the page under a live run would end it (permadeath) — so this
+         line is how the player finds out, and clicking it is how they consent.
+         Styled to be the quietest thing on screen: watermark-dim, no box, no
+         backdrop.
+
+         z-index 15 matches #menubtn: readable over the death overlay (10),
+         covered by the menu and its children (20/30) rather than floating over
+         an open dialog. Deliberately NOT a .overlay — that class sets
+         pointer-events: none, which is right for readouts and wrong for the one
+         HUD element you are meant to click. The wrapper is an empty live region
+         until there is something to say, so it paints nothing of its own. */
+      #updatenotice {
+        position: fixed;
+        z-index: 15;
+        top: calc(max(8px, env(safe-area-inset-top)) + 44px);
+        right: max(10px, env(safe-area-inset-right));
+      }
+      #updatenotice .update-line {
+        margin: 0;
+        /* A bare 13px line is a poor touch target; pad it out without moving
+           the text off the stack's right edge. */
+        padding: 4px 0 4px 10px;
+        font-family: var(--font-mono);
+        font-size: var(--fs-sm);
+        color: var(--c-text-dim);
+        background: none;
+        border: 0;
+        cursor: pointer;
+        touch-action: manipulation;
+        text-shadow:
+          0 1px 2px #000,
+          0 0 2px #000;
+      }
+      #updatenotice .update-line:hover {
+        color: var(--c-text-hi);
+      }
+      /* Same contract as #menubtn: keep it looking like plain text, with
+         keyboard focus shown by brightening instead of a default focus box. */
+      #updatenotice .update-line:focus {
+        outline: none;
+      }
+      #updatenotice .update-line:focus-visible {
+        color: var(--c-text-hi);
+      }
+      /* Once applied it is a status line, not a button. */
+      #updatenotice .update-line:disabled {
+        color: var(--c-text-dim);
+        cursor: default;
+      }
+
       #msglog {
         left: max(10px, env(safe-area-inset-left));
         right: max(10px, env(safe-area-inset-right));

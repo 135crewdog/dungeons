@@ -821,6 +821,97 @@ for (const [label, opts] of [
   await ctx.close();
 }
 
+// ---------- E18: PWA — a waiting update prompts, and applying reloads --------
+//
+// The only place this feature can run at all: it needs a real service worker
+// (blocked in every other context), a real build (`virtual:pwa-register` is a
+// no-op stub in dev and unresolvable in Vitest), and a second build to update
+// TO. Its own context, so it starts from a clean registration and leaves E13's
+// assertions untouched.
+{
+  const SW_PATH = fileURLToPath(new URL('../dist/sw.js', import.meta.url));
+  const original = readFileSync(SW_PATH);
+  const { ctx, escaped } = await newGameContext(browser, { allowSW: true });
+  const page = await newGamePage(ctx);
+  let noticeShown = false;
+  let quietUntilAsked = false;
+  let after = { fresh: false, waiting: true, controlled: false };
+  try {
+    await page.goto(`${BASE}/`, { waitUntil: 'load' });
+    await page.waitForFunction(
+      () => window.__game && !!document.querySelector('#game canvas'),
+      null,
+      { timeout: 20000 },
+    );
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    // Reload before updating, which is not ceremony: workbox decides whether a
+    // later takeover counts as an UPDATE (and so whether to reload) by whether
+    // the page was already controlled when it registered. Every returning
+    // player is; the very first install is not, and has no stale build to be
+    // prompted about anyway. This puts the page in the state the feature
+    // actually ships into.
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForFunction(
+      () => window.__game && !!document.querySelector('#game canvas'),
+      null,
+      { timeout: 20000 },
+    );
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, {
+      timeout: 20000,
+    });
+
+    // A different sw.js is all an update takes. A trailing comment leaves the
+    // precache manifest byte-identical, so the "new" worker installs by reusing
+    // every cached entry — fast, and it isolates the test to the update
+    // lifecycle rather than re-downloading Phaser.
+    writeFileSync(SW_PATH, Buffer.concat([original, Buffer.from('\n// e2e-update-probe\n')]));
+
+    await page.evaluate(() => {
+      window.__e2eBeforeReload = true;
+    });
+    await page.evaluate(async () => {
+      const r = await navigator.serviceWorker.getRegistration();
+      await r.update();
+    });
+    await page.waitForSelector('#updatenotice button', { timeout: 20000 });
+    noticeShown = true;
+    // The whole premise: a waiting build does NOT reload the page out from
+    // under the run. The document is still the one that started.
+    quietUntilAsked = await page.evaluate(() => window.__e2eBeforeReload === true);
+
+    const navigated = page.waitForEvent('framenavigated', { timeout: 20000 });
+    await page.click('#updatenotice button');
+    await navigated;
+    await page.waitForFunction(
+      () => window.__game && !!document.querySelector('#game canvas'),
+      null,
+      { timeout: 20000 },
+    );
+    after = await page.evaluate(async () => {
+      const r = await navigator.serviceWorker.getRegistration();
+      return {
+        fresh: window.__e2eBeforeReload === undefined, // a new document, not a re-render
+        waiting: !!r?.waiting, // the waiting worker was CONSUMED, not dismissed
+        controlled: !!navigator.serviceWorker.controller,
+      };
+    });
+  } finally {
+    writeFileSync(SW_PATH, original); // never leave dist/ mutated
+    await ctx.close();
+  }
+  record(
+    'E18/pwa-update',
+    noticeShown &&
+      quietUntilAsked &&
+      after.fresh &&
+      !after.waiting &&
+      after.controlled &&
+      escaped.length === 0,
+    `notice=${noticeShown} noAutoReload=${quietUntilAsked} reloaded=${after.fresh} ` +
+      `waitingConsumed=${!after.waiting} controlled=${after.controlled} escaped=${escaped.length}`,
+  );
+}
+
 await browser.close();
 if (previewChild) previewChild.kill();
 const failures = results.filter((r) => !r.pass);

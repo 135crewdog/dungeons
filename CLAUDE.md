@@ -658,7 +658,9 @@ points under the measured level (~87% lines/branches) as a floor, not a target;
 only `main.js`, `phaserConfig.js`, and `GameScene.js` are excluded (they cannot run
 outside a browser), so the ~40% coverage of the scene-taking renderer modules stays
 visible rather than excluded away. `scripts/check-bundle.mjs` enforces gzip
-entry-chunk and precache ceilings (currently 89% of both) — Vite's own chunk warning
+entry-chunk and precache ceilings (89% and 90% as of 0.9.13, which added
+`workbox-window` as a small dynamic chunk and dropped the plugin's generated
+`registerSW.js`) — Vite's own chunk warning
 is raised to 2000 kB because Phaser is expected to be large, which left nothing
 watching the real number.
 
@@ -672,7 +674,8 @@ build time as the `__APP_VERSION__` constant (`define` in `vite.config.js`), rea
 `src/ui/version.js` (falls back to `'dev'` outside Vite). It shows as a dim version
 watermark (`v0.5.2` style) top-right on the row under the Menu text (kept apart from
 the realtime gameplay stats) and in the pause-menu footer, so screenshots identify the
-build — and it rides along on every leaderboard submission. Bump the version in the
+build — and it rides along on every leaderboard submission. Since 0.9.13 the row
+_below_ the watermark is where an update notice can appear (see PWA). Bump the version in the
 same commit as the change it describes (Phase 4, the leaderboard + help release, was
 **0.5.0**; Phase 5, sprite terrain, was **0.6.0**; Phase 6, entity/item sprites, was
 **0.7.0**; Phase 7, secrets, was **0.8.0**; Phase 8, animation, was **0.9.0**;
@@ -1237,6 +1240,34 @@ turn via `replaceChildren` (so a transition could not animate without restructur
 the chip to be persistent), and the renderer's floating damage number already sells
 the hit.
 
+**0.9.13 — the installed app finds updates, and applies them only when asked.**
+Players opening the offline PWA got an older cached build, sometimes for days. Two
+causes, one of them the supposed fix: the browser looks for a new `sw.js` only on a
+**navigation** (and at most daily), so an installed app that is resumed rather than
+relaunched never checks; and `autoUpdate` — which sounds like the answer — reloads the
+page from a service-worker event the moment a new build activates, which in a
+permadeath game is an infrastructure event ending a run, while the already-booted page
+runs old code until that happens anyway. Now `registerType: 'prompt'`: the new build
+installs, waits, and says so with one dim clickable line under the version watermark,
+found by checks on boot / tab-visible / reconnect / hourly. Presentation and tooling
+only — nothing under `core/`, `world/`, `entities/`, `systems/` is touched, no RNG is
+drawn, so **no balance run**. Full mechanics in the PWA section.
+
+**Why no "check for updates" button**, which is the obvious thing to add and the thing
+not to add later: checking is one conditional GET of a ~10 kB file, and the app already
+has four natural moments to do it — three of which are the listeners the leaderboard
+flush was already using. A button delegates to the player a job the page can do itself,
+and a menu entry that almost always answers "you're up to date" teaches people not to
+press it.
+
+**Why the notice never expires or escalates.** It is not a toast and has no timeout: it
+sits at `z-index` 15 like the Menu text, so it is legible over the death screen (10) —
+the best moment to take an update — and _covered_ by the menu and its children (20/30)
+rather than floating over an open dialog. A player mid-descent can ignore it for a
+week. The one concession to feedback is that clicking disables it and relabels it
+"Updating…", because the reload belongs to the incoming worker and is not instant, and
+a second click would only post a second `SKIP_WAITING`.
+
 **Do not** implement inventory, equipment, leveling, save files, quests, or any
 mechanic not listed here. (The Phase-7 rings and keys are deliberately **passive,
 auto-worn pickups** — flat flags on the player, no slots, no managing — not a
@@ -1337,6 +1368,17 @@ BUILD time instead of in a unit test: `scripts/check-bundle.mjs` parses the
 generated `dist/sw.js` and fails when any URL without a content hash carries
 `revision: null`, which is the only place the property is actually observable.
 
+0.9.13 adds `tests/ui-updateNotice.test.js` (jsdom), which covers the notice as a
+pure DOM factory — silent until told, announcing by **inserting** into a live region
+that exists from boot (a region toggled with `hidden` reports nothing), an idempotent
+`show()` so a repeat `waiting` event cannot re-announce, one `onApply` per click with
+the second click a no-op, and a case asserting a bare `keydown` does **not** call
+`onApply`, which pins the decision to rely on the platform `<button>` rather than
+hand-rolled key handling that would double-fire against it. Everything above the DOM
+— registration, the waiting worker, `SKIP_WAITING`, the reload — lives in `main.js`
+and is covered by e2e E18 instead, because `virtual:pwa-register` does not resolve
+outside a build.
+
 **Broad-seed invariants** (`tests/invariants.test.js`, 0.9.5) assert the rules the
 example-based suites' outcomes are supposed to obey, across 40 seeds and down to
 floor 12: no two entities or two items on a tile, nothing in a wall or out of
@@ -1353,10 +1395,15 @@ A **browser end-to-end** campaign lives in `e2e/` (Playwright via
 `playwright-core`) and runs in PR CI (Chromium installed with playwright-core's own
 CLI, cached by version; artifacts uploaded on failure):
 `npm run build && npm run test:e2e` drives the real PWA through
-17 scenarios — rendering, input→sim→renderer round-trips, floor persistence, overlay
+18 scenarios — rendering, input→sim→renderer round-trips, floor persistence, overlay
 layering, the death/leaderboard flow, PWA offline boot, the mobile **gesture
 policy** (E17: computed `touch-action` and panel scrolling with Help open at
-390×844@2x), and a recorded-command
+390×844@2x), the service-worker **update round-trip** (E18: append a byte to
+`dist/sw.js`, `registration.update()`, assert the notice appears **and the page did
+not reload on its own**, then click and assert it reloaded with the waiting worker
+_consumed_ — restoring the file in a `finally`; it is the only place this feature can
+run at all, since dev stubs `virtual:pwa-register` out and every other context blocks
+service workers), and a recorded-command
 **sim/browser parity** replay that deep-equals the headless engine (the fixture —
 and so the replay's length — is regenerated by `node e2e/discover.mjs` after any
 generation-affecting change, including one that shifts turn numbering). It spawns its
@@ -1377,6 +1424,38 @@ display, no orientation lock, precache of all built assets for full offline play
 add-to-home-screen installability. The service worker is precache-only — cross-origin
 leaderboard calls pass through it untouched (no `runtimeCaching`), so the API needs no
 PWA configuration and offline play is unaffected.
+
+**Updates are found early and applied only on request** (0.9.13). `registerType` is
+**`'prompt'`**: a newly deployed build installs in the background and then **waits**.
+Nothing reloads under the player, because this is a permadeath game and a service
+worker that seized the page would end a run nobody asked it to touch. Registration is
+**explicit, from the composition root** (`injectRegister: null`, so the plugin injects
+no second registration of its own) — `virtual:pwa-register` does not resolve under
+Vitest, which is one more reason it can only live in `main.js`. The player is told by
+**one dim line in the top-right stack**, under the version watermark
+(`src/ui/updateNotice.js`); clicking it posts `SKIP_WAITING` to the waiting worker and
+the page reloads when that worker takes control. There is deliberately **no "check for
+updates" button** — checking is the app's job, not a chore: on boot, on
+`visibilitychange` → visible, on `online`, and hourly while open, folded into the three
+listeners the leaderboard flush already owns rather than a parallel set.
+Registration itself performs the boot check, so only the other three call
+`registration.update()` explicitly — one conditional GET of `sw.js`, skipped when
+`navigator.onLine` is false and swallowed when it rejects — an installed offline game is
+offline much of the time, and a failed check is not a condition the player can act on.
+`skipWaiting: false` is what keeps the worker waiting **and** what makes Workbox emit
+the `SKIP_WAITING` message listener the click talks to; `clientsClaim: true` matters
+only on a first install, where it lets the fresh worker control the page that installed
+it. A player who **never clicks is not stuck**: the waiting worker activates on its own
+once every client of the old one is gone, so a full close-and-reopen applies it.
+
+Two accepted quirks, both strictly better than the `autoUpdate` they replace (which
+reloaded any tab automatically the moment an update activated). **Multi-tab**: the
+plugin attaches its reload listener when the prompt is raised, not when it is clicked,
+so if one tab applies an update, another tab that also saw the notice reloads with it.
+**First install**: Workbox treats a takeover as an update only if the page was already
+controlled when it registered, so the reload-on-apply needs a returning visitor — which
+is every case where a stale build exists to complain about. e2e E18 reproduces that
+state deliberately rather than testing a shape no player is in.
 
 ## Milestones
 

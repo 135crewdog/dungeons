@@ -34,9 +34,11 @@ function copyLegalFiles() {
 }
 
 // Vite dev/build config. vite-plugin-pwa (Workbox) generates the manifest and a
-// service worker that precaches the built app for full offline play, and
-// registers it automatically (autoUpdate). Vitest reads this same config; the
-// simulation tests run in a plain Node environment with no browser or Phaser.
+// service worker that precaches the built app for full offline play. It is
+// registered EXPLICITLY from the composition root (registerType: 'prompt' — a
+// new build waits for the player instead of reloading under a live run).
+// Vitest reads this same config; the simulation tests run in a plain Node
+// environment with no browser or Phaser.
 export default defineConfig({
   base: './',
   define: {
@@ -45,7 +47,26 @@ export default defineConfig({
   plugins: [
     copyLegalFiles(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate'. Under autoUpdate the plugin forces
+      // skipWaiting/clientsClaim and reloads the page from a service-worker
+      // event the moment a new build activates — in a permadeath game that is
+      // an infrastructure event ending a run nobody asked it to touch. It also
+      // never fixed the problem it looks like it fixes: the browser only looks
+      // for a new sw.js on a NAVIGATION (and at most daily), so an installed
+      // app that gets resumed rather than relaunched, or a tab left open, keeps
+      // serving the old build indefinitely — which is the stale-version report
+      // this replaces.
+      //
+      // Under 'prompt' the new worker installs and then WAITS. src/main.js
+      // checks for it on boot / tab-visible / reconnect / hourly and raises a
+      // notice; applying it is the player's click (see src/ui/updateNotice.js).
+      registerType: 'prompt',
+      // Registration is explicit, in the composition root — it has to be, since
+      // that is the only module that may hold the onNeedRefresh callback that
+      // raises the notice. `null` stops the plugin from also injecting its own
+      // <script src="registerSW.js">, which would register the same scope a
+      // second time with none of that wiring attached.
+      injectRegister: null,
       includeAssets: ['icons/apple-touch-icon.png', 'icons/favicon-64.png'],
       manifest: {
         name: 'Dungeons',
@@ -69,6 +90,22 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Both are Workbox's defaults under 'prompt' (the plugin only forces
+        // them on for 'autoUpdate'), stated anyway because they are the two
+        // switches this whole feature rests on.
+        //
+        // skipWaiting: false is what keeps the new worker waiting — and, in the
+        // generated worker, what emits the `message → SKIP_WAITING` listener
+        // that the player's click actually talks to. Setting it true would
+        // restore autoUpdate's behavior while the config still said 'prompt'.
+        //
+        // clientsClaim: true only matters on a FIRST install, where there is no
+        // waiting phase: it lets the freshly activated worker control the page
+        // that installed it instead of leaving it uncontrolled until the next
+        // navigation. That is today's behavior, and e2e E18 relies on it to set
+        // up an update round-trip within one page load.
+        skipWaiting: false,
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
         // A precache entry with `revision: null` is never re-fetched while its
         // URL is unchanged — correct for a file whose NAME carries a content
