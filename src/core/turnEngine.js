@@ -11,6 +11,7 @@ import {
   isVisible,
   entityAt,
   hasItemAt,
+  canDropAt,
   chebyshev,
 } from './query.js';
 import { TILE, CHEST_EFFECT, KEY_REVEAL_RADIUS, RING_FLAG, DIRS8 } from './constants.js';
@@ -239,19 +240,16 @@ function resolvePickups(state, events) {
   }
 }
 
-// The unlocked chest's ring tumbles onto the first adjacent unoccupied,
-// item-free floor/door tile — the same deterministic DIRS8 scan as the boss
-// chest drop (no RNG draw, so replays match). The player is standing ON the
-// chest tile, so the ring never lands underfoot; if every neighbor is blocked
-// (vanishingly rare) it goes straight onto the player's finger instead.
+// The unlocked chest's ring tumbles onto the first adjacent tile that can hold
+// a drop — canDropAt, the same predicate the boss chest uses, applied in a
+// deterministic DIRS8 scan (no RNG draw, so replays match). A DOORWAY is not
+// one of them: the walls layer paints a sideways door over the item layer, so
+// a ring dropped there was invisible until something stepped into the door.
+// The player is standing ON the chest tile, so the ring never lands underfoot;
+// if every neighbor is blocked it goes straight onto the player's finger.
 function dropRing(state, x, y, ring, player, events) {
   for (const { dx, dy } of DIRS8) {
-    const nt = tileAt(state.map, x + dx, y + dy);
-    const free =
-      (nt === TILE.FLOOR || nt === TILE.DOOR) &&
-      !entityAt(state, x + dx, y + dy) &&
-      !state.items.some((it) => it.x === x + dx && it.y === y + dy);
-    if (free) {
+    if (canDropAt(state, x + dx, y + dy)) {
       const item = createRing(x + dx, y + dy, ring);
       item.id = allocId(state);
       state.items.push(item);

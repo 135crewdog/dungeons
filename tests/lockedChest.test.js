@@ -125,6 +125,39 @@ describe('unlocking with a key', () => {
     expect(state.log.some((e) => e.type === 'pickup' && e.data.item === 'ring')).toBe(true);
   });
 
+  it('never drops the ring in a doorway — it skips to the next DIRS8 tile', () => {
+    // The tile north of the chest is a DOOR. It is walkable, so the drop scan
+    // used to take it (N is first in DIRS8) and the ring vanished: the walls
+    // layer paints a sideways door OVER the item layer, and only an entity
+    // makes a door render open, so it stayed invisible until something walked
+    // in. NE is the next candidate.
+    const { state } = miniState({ items: [lockedChest(3, 2, RING.SHADOW)], keys: 1 });
+    state.map.tiles[idx(state.map, 3, 1)] = TILE.DOOR;
+    processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    const ring = state.items[0];
+    expect(ring).toMatchObject({ type: 'ring', ring: RING.SHADOW, x: 4, y: 1 });
+    expect(state.map.tiles[idx(state.map, ring.x, ring.y)]).toBe(TILE.FLOOR);
+  });
+
+  it('grants the ring directly when a doorway is the only neighbor', () => {
+    // Same two-tile corridor as the boxed-in case, but the free neighbor is a
+    // door rather than a littered floor tile: an unreachable-looking ring is
+    // worse than one that goes straight on the finger and announces itself.
+    const { state, player } = miniState({
+      floors: [
+        { x: 2, y: 2 },
+        { x: 3, y: 2 },
+      ],
+      items: [{ id: 41, type: 'potion', x: 2, y: 2, heal: 8 }, lockedChest(3, 2, RING.SPEED)],
+      keys: 1,
+    });
+    state.map.tiles[idx(state.map, 4, 2)] = TILE.DOOR;
+    const events = processCommand(state, { type: 'move', dx: 1, dy: 0 });
+    expect(player.ringSpeed).toBe(true);
+    expect(state.items.filter((it) => it.type === 'ring')).toHaveLength(0);
+    expect(events.filter((e) => e.type === EV.PICKUP && e.item === 'ring')).toHaveLength(1);
+  });
+
   it('grants the ring directly when every neighbor tile is blocked', () => {
     // A two-tile corridor: the only non-wall neighbor of the chest already
     // holds an item, so the drop scan finds nothing and the ring goes

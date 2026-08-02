@@ -53,6 +53,25 @@ export function hasItemAt(state, x, y) {
   return state.items.some((it) => it.x === x && it.y === y);
 }
 
+// Can a DROPPED item sit here? An unoccupied, item-free FLOOR tile — narrower
+// than isWalkable on purpose, and for three separate reasons:
+//  - An OCCUPIED tile would open the drop instantly under the entity standing
+//    there (resolvePickups), or bury it under an enemy.
+//  - A LITTERED tile would end up holding two items, breaking the
+//    one-item-per-tile invariant.
+//  - STAIRS swallow the pickup (a step onto one swaps floor before pickups
+//    resolve) and a DOORWAY hides it: the sprite renderer paints a sideways
+//    door's slab in the walls layer, OVER the item layer, and only an ENTITY
+//    ever makes a door render open — so an item in a doorway is invisible
+//    until something walks into it. Both are excluded by the FLOOR test.
+// Spawning has always been floor-only (randomFreeFloorInRoom); the two drop
+// paths — the locked chest's ring and the boss chest — are what weren't.
+export function canDropAt(state, x, y) {
+  return (
+    tileAt(state.map, x, y) === TILE.FLOOR && !entityAt(state, x, y) && !hasItemAt(state, x, y)
+  );
+}
+
 export function isExplored(state, x, y) {
   return inBounds(state.map, x, y) && state.vis.explored[idx(state.map, x, y)] === 1;
 }
