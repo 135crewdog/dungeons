@@ -48,6 +48,33 @@ export function createHud(parent, { iconFor = null } = {}) {
     return span;
   }
 
+  // The HP bar: a fixed-width track with a proportional fill. It carries the
+  // RATIO; the "14/20" text beside it carries the absolute numbers, which is
+  // the division that lets the bar stay a fixed size.
+  //
+  // It deliberately does NOT grow with maxHp. maxHp has no cap anywhere —
+  // openChest only ever does `maxHp += 4` — so there is no width to size a
+  // growing bar against, and a bar that resized mid-run would reflow the whole
+  // HUD every time a health chest opened.
+  //
+  // `color` is passed in rather than recomputed so the fill and the number can
+  // never disagree about which band the player is in.
+  function hpBar(ratio, color) {
+    const track = document.createElement('span');
+    track.className = 'hud-bar';
+    // Purely decorative: it duplicates the "14/20" text, which is already
+    // readable. role="progressbar" here would announce the same value twice.
+    track.setAttribute('aria-hidden', 'true');
+    const fill = document.createElement('span');
+    fill.className = 'hud-bar-fill';
+    // Guarded so a non-finite ratio empties the bar instead of writing NaN%.
+    const pct = Number.isFinite(ratio) ? Math.max(0, Math.min(100, ratio * 100)) : 0;
+    fill.style.width = `${pct}%`;
+    fill.style.backgroundColor = color;
+    track.appendChild(fill);
+    return track;
+  }
+
   function update(state) {
     const p = getPlayer(state);
     if (!p) return;
@@ -61,6 +88,7 @@ export function createHud(parent, { iconFor = null } = {}) {
     max.className = 'hud-dim';
     max.textContent = `/${p.maxHp}`;
     hp.appendChild(max);
+    hp.appendChild(hpBar(ratio, color));
 
     const items = [hp, chip(null, 'Floor', String(state.floor))];
     // Chest-earned stats appear once the first bonus is banked.
