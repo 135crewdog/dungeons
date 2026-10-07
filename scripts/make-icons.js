@@ -7,9 +7,10 @@
 //
 // The five outputs keep the filenames wired into vite.config.js/index.html:
 // favicon-64, icon-192, icon-512, apple-touch-icon (180) — the eye centered
-// on a flat black background, no border or frame — and icon-maskable-512, the
-// same with a smaller eye so the glyph stays inside the maskable safe zone
-// (full-bleed opaque; Android may crop the square to any shape).
+// on a flat near-black background (the theme color), no border or frame — and
+// icon-maskable-512, the same with a smaller eye so the glyph stays inside the
+// maskable safe zone (full-bleed opaque; Android may crop the square to any
+// shape).
 //
 // Licensing: the outputs are DERIVED from GPLv3 Shattered Pixel Dungeon art —
 // see the "App icons" section of CREDITS.md.
@@ -21,7 +22,7 @@ const EYE_SHEET = 'public/assets/sprites/eye.png';
 const OUT_DIR = 'public/icons';
 const FRAME = { x: 0, y: 0, w: 16, h: 18 }; // eye frame 0, per entitySprites.js
 
-const BG = [0x00, 0x00, 0x00, 0xff]; // plain black, edge to edge
+const BG = [0x0b, 0x0d, 0x12, 0xff]; // theme_color (#0b0d12), the app palette's panel near-black
 
 // --- minimal PNG decode (indexed-color, as shipped by SPD sheets) -------------
 
