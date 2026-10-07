@@ -6,10 +6,11 @@
 //   node scripts/make-icons.js
 //
 // The five outputs keep the filenames wired into vite.config.js/index.html:
-// favicon-64, icon-192, icon-512, apple-touch-icon (180) — dark background,
-// rounded border, eye centered — and icon-maskable-512, which is background
-// plus a smaller eye so the glyph stays inside the maskable safe zone
-// (full-bleed opaque; Android may crop the square to any shape).
+// favicon-64, icon-192, icon-512, apple-touch-icon (180) — the eye centered
+// on a flat near-black background (the theme color), no border or frame — and
+// icon-maskable-512, the same with a smaller eye so the glyph stays inside the
+// maskable safe zone (full-bleed opaque; Android may crop the square to any
+// shape).
 //
 // Licensing: the outputs are DERIVED from GPLv3 Shattered Pixel Dungeon art —
 // see the "App icons" section of CREDITS.md.
@@ -21,8 +22,7 @@ const EYE_SHEET = 'public/assets/sprites/eye.png';
 const OUT_DIR = 'public/icons';
 const FRAME = { x: 0, y: 0, w: 16, h: 18 }; // eye frame 0, per entitySprites.js
 
-const BG = [0x0b, 0x0d, 0x12, 0xff]; // theme_color, matches the old icons
-const BORDER = [0x2b, 0x31, 0x40, 0xff];
+const BG = [0x0b, 0x0d, 0x12, 0xff]; // theme_color (#0b0d12), the app palette's panel near-black
 
 // --- minimal PNG decode (indexed-color, as shipped by SPD sheets) -------------
 
@@ -172,41 +172,9 @@ function extractGlyph(sheet, frame) {
 
 // --- composition ---------------------------------------------------------------
 
-// Signed "inside" test for a rounded rectangle spanning [inset, size-inset).
-function insideRoundRect(x, y, size, inset, radius) {
-  const min = inset;
-  const max = size - inset - 1;
-  if (x < min || x > max || y < min || y > max) return false;
-  const cx = Math.min(Math.max(x, min + radius), max - radius);
-  const cy = Math.min(Math.max(y, min + radius), max - radius);
-  const dx = x - cx;
-  const dy = y - cy;
-  return dx * dx + dy * dy <= radius * radius;
-}
-
-function composeIcon(glyph, size, { scale, border }) {
+function composeIcon(glyph, size, scale) {
   const rgba = Buffer.alloc(size * size * 4);
   for (let i = 0; i < size * size; i++) Buffer.from(BG).copy(rgba, i * 4);
-
-  if (border) {
-    // A rounded ring a few pixels in from the edge, like the old icons.
-    const inset = Math.max(2, Math.round(size * 0.02));
-    const thickness = Math.max(2, Math.round(size * 0.03));
-    const radius = Math.round(size / 8);
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const outer = insideRoundRect(x, y, size, inset, radius);
-        const inner = insideRoundRect(
-          x,
-          y,
-          size,
-          inset + thickness,
-          Math.max(0, radius - thickness),
-        );
-        if (outer && !inner) Buffer.from(BORDER).copy(rgba, (y * size + x) * 4);
-      }
-    }
-  }
 
   // Nearest-neighbor integer upscale, centered.
   const gw = glyph.w * scale;
@@ -229,17 +197,17 @@ const sheet = decodePng(readFileSync(EYE_SHEET));
 const glyph = extractGlyph(sheet, FRAME); // 16×13 of ink
 
 const icons = [
-  { file: 'favicon-64.png', size: 64, scale: 3, border: true },
-  { file: 'apple-touch-icon.png', size: 180, scale: 6, border: true },
-  { file: 'icon-192.png', size: 192, scale: 6, border: true },
-  { file: 'icon-512.png', size: 512, scale: 16, border: true },
-  // Maskable: glyph stays well inside the central safe zone; no border,
-  // full-bleed opaque background (the OS may crop to any shape).
-  { file: 'icon-maskable-512.png', size: 512, scale: 10, border: false },
+  { file: 'favicon-64.png', size: 64, scale: 3 },
+  { file: 'apple-touch-icon.png', size: 180, scale: 6 },
+  { file: 'icon-192.png', size: 192, scale: 6 },
+  { file: 'icon-512.png', size: 512, scale: 16 },
+  // Maskable: glyph stays well inside the central safe zone, full-bleed
+  // opaque background (the OS may crop to any shape).
+  { file: 'icon-maskable-512.png', size: 512, scale: 10 },
 ];
 
-for (const { file, size, scale, border } of icons) {
-  const png = composeIcon(glyph, size, { scale, border });
+for (const { file, size, scale } of icons) {
+  const png = composeIcon(glyph, size, scale);
   writeFileSync(`${OUT_DIR}/${file}`, png);
   console.log(`${OUT_DIR}/${file}  ${size}x${size}  eye at ${glyph.w * scale}px (${scale}x)`);
 }
